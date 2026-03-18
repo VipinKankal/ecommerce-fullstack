@@ -1,0 +1,148 @@
+package com.example.ecommerce.order.service.impl;
+
+import com.example.ecommerce.common.domain.OrderStatus;
+import com.example.ecommerce.common.domain.PaymentStatus;
+import com.example.ecommerce.modal.*;
+import com.example.ecommerce.repository.AddressRepository;
+import com.example.ecommerce.repository.CartRepository;
+import com.example.ecommerce.repository.OrderItemRepository;
+import com.example.ecommerce.repository.OrderRepository;
+import com.example.ecommerce.order.service.OrderService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+public class OrderServiceImpl implements OrderService {
+
+    private final OrderRepository orderRepository;
+    private final AddressRepository addressRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final CartRepository cartRepository;
+
+    @Override
+    @Transactional
+    public Set<Order> createOrder(User user, Address shippingAddress, Cart cart) {
+        Address address = addressRepository.save(shippingAddress);
+        // brand 1 == 4 shirts
+        // brand 2 == 3 pants
+        // brand 3 == 1 watch
+
+        Map<Long, List<CartItem>> itemsByBrand = cart.getCartItems().stream()
+                .collect(Collectors.groupingBy(item -> item.getProduct().getSeller().getId()));
+        Set<Order> orders = new HashSet<>();
+        for (Map.Entry<Long,List<CartItem>>entry:itemsByBrand.entrySet()){
+            Long sellerId=entry.getKey();
+            List<CartItem> items=entry.getValue();
+            int totalOrderPrice = items.stream().mapToInt(
+                    CartItem::getSellingPrice
+            ).sum();
+            int totalItem = items.stream().mapToInt(
+                    CartItem::getQuantity
+            ).sum();
+            Order createOrder = new Order();
+            createOrder.setUser(user);
+            createOrder.setSellerId(sellerId);
+            createOrder.setTotalMrpPrice(totalOrderPrice);
+            createOrder.setTotalSellingPrice(totalOrderPrice);
+            createOrder.setTotalItems(totalItem);
+            createOrder.setShippingAddress(address);
+            createOrder.setOrderStatus(OrderStatus.PENDING);
+            createOrder.getPaymentDetails().setStatus(PaymentStatus.PENDING);
+
+            Order savedOrder = orderRepository.save(createOrder);
+            orders.add(savedOrder);
+
+            List<OrderItem> orderItems = new ArrayList<>();
+            for(CartItem item:items){
+                OrderItem orderItem = new OrderItem();
+                orderItem.setOrder(savedOrder);
+                orderItem.setMrpPrice(item.getMrpPrice());
+                orderItem.setProduct(item.getProduct());
+                orderItem.setQuantity(item.getQuantity());
+                orderItem.setSize(item.getSize());
+                orderItem.setUserId(item.getUserId());
+                orderItem.setSellingPrice(item.getSellingPrice());
+                savedOrder.getOrderItems().add(orderItem);
+                OrderItem savedOrderItem = orderItemRepository.save(orderItem);
+                orderItems.add(savedOrderItem);
+            }
+        }
+
+        // Once order is created, clear purchased items from cart.
+        cart.getCartItems().clear();
+        cart.setTotalItems(0);
+        cart.setTotalMrpPrice(0);
+        cart.setTotalSellingPrice(0);
+        cart.setDiscount(0);
+        cart.setCouponCode(null);
+        cartRepository.save(cart);
+
+        return orders;
+    }
+
+    @Override
+    public Order findOrderById(long id) throws Exception {
+        return orderRepository.findDetailedById(id).orElseThrow(
+                () -> new Exception("Order not found"));
+    }
+
+    @Override
+    public List<Order> usersOrderHistory(Long userId) {
+        return orderRepository.findByUserId(userId);
+    }
+
+    @Override
+    public List<Order> sellersOrder(Long sellerId) {
+        return orderRepository.findBySellerId(sellerId);
+    }
+
+    @Override
+    public Order updateOrderStatus(Long orderId, OrderStatus status) throws Exception {
+        Order order = findOrderById(orderId);
+        order.setOrderStatus(status);
+        return orderRepository.save(order);
+    }
+
+    @Override
+    public Order updateOrderStatusBySeller(Long orderId, OrderStatus status, Long sellerId) throws Exception {
+        Order order = findOrderById(orderId);
+        if (!Objects.equals(order.getSellerId(), sellerId)) {
+            throw new Exception("Unauthorized to update this order");
+        }
+        order.setOrderStatus(status);
+        orderRepository.save(order);
+        return orderRepository.findDetailedByIdAndSellerId(orderId, sellerId)
+                .orElseThrow(() -> new Exception("Order not found"));
+    }
+
+    @Override
+    public Order cancelOrder(Long orderId, User user, String cancelReasonCode, String cancelReasonText) throws Exception {
+        Order order = findOrderById(orderId);
+        if (!order.getUser().getId().equals(user.getId())) {
+            throw new Exception("Unauthorized to cancel this order");
+        }
+        order.setOrderStatus(OrderStatus.CANCELLED);
+        order.setCancelReasonCode(cancelReasonCode);
+        order.setCancelReasonText(cancelReasonText);
+        order.setCancelledAt(java.time.LocalDateTime.now());
+        return orderRepository.save(order);
+    }
+
+    @Override
+    public OrderItem getOrderItemById(Long id) throws Exception {
+        return orderItemRepository.findDetailedById(id).orElseThrow(
+                () -> new Exception("Order Item not found"));
+    }
+}
+
+
+
+
+
+
+

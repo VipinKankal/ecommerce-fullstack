@@ -1,0 +1,5 @@
+ALTER TABLE seller MODIFY COLUMN pan_card_url LONGTEXT;
+ALTER TABLE seller MODIFY COLUMN aadhaar_card_url LONGTEXT;
+ALTER TABLE seller MODIFY COLUMN gst_certificate_url LONGTEXT;
+ALTER TABLE seller MODIFY COLUMN store_logo LONGTEXT;
+ALTER TABLE seller MODIFY COLUMN store_description LONGTEXT;

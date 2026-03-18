@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "name": "frontend",
+      "path": "."
+    },
+    {
+      "name": "backend",
+      "path": "../Ecommerce"
+    }
+  ],
+  "settings": {
+    "github.copilot.chat.agent.autoFix": true,
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.updateBuildConfiguration": "automatic"
+  }
+}

@@ -1,0 +1,49 @@
+# Root-level editor folders
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+.DS_Store
+
+# Preserve old nested Git metadata backups
+/frontend/.git.frontend-backup/
+/backend/.git.backend-backup/
+
+# Frontend
+/frontend/node_modules/
+/frontend/.pnp/
+/frontend/.pnp.js
+/frontend/coverage/
+/frontend/build/
+/frontend/.env.local
+/frontend/.env.development.local
+/frontend/.env.test.local
+/frontend/.env.production.local
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+/frontend/temp_*.js
+/frontend/temp_*.java
+
+# Backend
+/backend/target/
+/backend/.idea/
+/backend/.vscode/
+/backend/.apt_generated/
+/backend/.classpath
+/backend/.factorypath
+/backend/.project
+/backend/.settings/
+/backend/.springBeans
+/backend/.sts4-cache/
+/backend/nbproject/private/
+/backend/nbbuild/
+/backend/dist/
+/backend/nbdist/
+/backend/.nb-gradle/
+/backend/build/
+/backend/HELP.md

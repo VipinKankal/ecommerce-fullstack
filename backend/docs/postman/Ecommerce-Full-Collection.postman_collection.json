@@ -1,0 +1,642 @@
+﻿{
+  "info": {
+    "name": "Ecommerce Master API Collection",
+    "_postman_id": "0b7a6e61-7c0f-44c2-b0f6-80ba8131b1a1",
+    "description": "Master collection generated from controller mappings in com.example.ecommerce.controller",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "customerEmail", "value": "testuser@gmail.com" },
+    { "key": "sellerEmail", "value": "testseller@gmail.com" },
+    { "key": "adminEmail", "value": "admin@gmail.com" },
+    { "key": "otp", "value": "" },
+    { "key": "customerJwt", "value": "" },
+    { "key": "sellerJwt", "value": "" },
+    { "key": "adminJwt", "value": "" },
+    { "key": "productId", "value": "1" },
+    { "key": "orderId", "value": "1" },
+    { "key": "orderItemId", "value": "1" },
+    { "key": "cartItemId", "value": "1" },
+    { "key": "reviewId", "value": "1" },
+    { "key": "couponId", "value": "1" },
+    { "key": "sellerId", "value": "1" },
+    { "key": "paymentId", "value": "pay_123" },
+    { "key": "paymentLinkId", "value": "plink_123" }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Home",
+          "request": { "method": "GET", "url": "{{baseUrl}}/" }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup Customer",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test User\",\n  \"email\": \"{{customerEmail}}\",\n  \"otp\": \"{{otp}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/signup"
+          }
+        },
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"signing_{{customerEmail}}\",\n  \"role\": \"ROLE_CUSTOMER\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/sent/login-signup-otp"
+          }
+        },
+        {
+          "name": "Signin Customer OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{customerEmail}}\",\n  \"otp\": \"{{otp}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/signin"
+          }
+        },
+        {
+          "name": "Signin Seller OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"seller_{{sellerEmail}}\",\n  \"otp\": \"{{otp}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/signin"
+          }
+        },
+        {
+          "name": "Signin Admin OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin_{{adminEmail}}\",\n  \"otp\": \"{{otp}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/auth/signin"
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "User Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/users/profile"
+          }
+        },
+        {
+          "name": "User Profile (Auth Alias)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/auth/users/profile"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Seller",
+      "item": [
+        {
+          "name": "Seller Login (Legacy Endpoint)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{sellerEmail}}\",\n  \"otp\": \"{{otp}}\"\n}" },
+            "url": "{{baseUrl}}/sellers/login"
+          }
+        },
+        {
+          "name": "Verify Seller Email",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{sellerEmail}}\"\n}"
+            },
+            "url": "{{baseUrl}}/sellers/verifyEmail/{{otp}}"
+          }
+        },
+        {
+          "name": "Create Seller",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sellerName\": \"Test Seller\",\n  \"mobileNumber\": \"9123456789\",\n  \"email\": \"{{sellerEmail}}\",\n  \"password\": \"Seller@123\",\n  \"GSTIN\": \"27AAECA1234F1Z5\",\n  \"businessDetails\": {\n    \"businessName\": \"Test Business\",\n    \"businessEmail\": \"biz@test.com\",\n    \"businessMobile\": \"9123456789\",\n    \"businessAddress\": \"Mumbai\",\n    \"logo\": \"\",\n    \"banner\": \"\"\n  },\n  \"bankDetails\": {\n    \"accountHolderName\": \"Test Seller\",\n    \"accountNumber\": \"123456789012\",\n    \"ifscCode\": \"HDFC0001234\"\n  },\n  \"pickupAddress\": {\n    \"name\": \"Warehouse\",\n    \"mobileNumber\": \"9123456789\",\n    \"street\": \"MIDC\",\n    \"locality\": \"Andheri East\",\n    \"address\": \"Plot 10 MIDC\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"pinCode\": \"400093\"\n  }\n}"
+            },
+            "url": "{{baseUrl}}/sellers"
+          }
+        },
+        {
+          "name": "Seller Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/sellers/profile"
+          }
+        },
+        {
+          "name": "Get Seller By Id (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/sellers/{{sellerId}}"
+          }
+        },
+        {
+          "name": "Get All Sellers (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/sellers?status=PENDING_VERIFICATION"
+          }
+        },
+        {
+          "name": "Update Seller (Seller)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"sellerName\": \"Updated Seller\"\n}" },
+            "url": "{{baseUrl}}/sellers"
+          }
+        },
+        {
+          "name": "Delete Seller (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/sellers/{{sellerId}}"
+          }
+        },
+        {
+          "name": "Update Seller Account Status (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/sellers/{{sellerId}}/status?status=APPROVED"
+          }
+        },
+        {
+          "name": "Seller Report",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/sellers/report"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/api/admin/profile"
+          }
+        },
+        {
+          "name": "Admin Profile (Alias)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/api/profile"
+          }
+        },
+        {
+          "name": "Update Seller Status (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/api/admin/seller/{{sellerId}}/status/APPROVED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get Product By Id",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/products/{{productId}}" }
+        },
+        {
+          "name": "Search Products",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/products/search?query=phone" }
+        },
+        {
+          "name": "Get All Products",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/products?pageNumber=0&sort=price_low" }
+        }
+      ]
+    },
+    {
+      "name": "Seller Products",
+      "item": [
+        {
+          "name": "Get Seller Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/api/sellers/products"
+          }
+        },
+        {
+          "name": "Create Seller Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Test Product\",\n  \"description\": \"Demo\",\n  \"category\": \"Electronics\",\n  \"category2\": \"Mobiles\",\n  \"category3\": \"Smartphones\",\n  \"mrpPrice\": 20000,\n  \"sellingPrice\": 15000,\n  \"quantity\": 10,\n  \"color\": \"Black\",\n  \"images\": [\"https://example.com/p1.png\"],\n  \"sizes\": [\"M\", \"L\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/sellers/products"
+          }
+        },
+        {
+          "name": "Update Seller Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{sellerJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated Product\",\n  \"description\": \"Updated\",\n  \"mrpPrice\": 22000,\n  \"sellingPrice\": 16000,\n  \"quantity\": 8\n}"
+            },
+            "url": "{{baseUrl}}/api/sellers/products/{{productId}}"
+          }
+        },
+        {
+          "name": "Delete Seller Product",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/api/sellers/products/{{productId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cart",
+      "item": [
+        {
+          "name": "Get Cart",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/cart"
+          }
+        },
+        {
+          "name": "Add Item To Cart",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerJwt}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"productId\": {{productId}},\n  \"size\": \"M\",\n  \"quantity\": 1\n}" },
+            "url": "{{baseUrl}}/api/cart/add"
+          }
+        },
+        {
+          "name": "Update Cart Item",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerJwt}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"quantity\": 2\n}" },
+            "url": "{{baseUrl}}/api/cart/item/{{cartItemId}}"
+          }
+        },
+        {
+          "name": "Delete Cart Item",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/cart/item/{{cartItemId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wishlist",
+      "item": [
+        {
+          "name": "Get Wishlist",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/wishlist"
+          }
+        },
+        {
+          "name": "Add Product To Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/wishlist/add-product/{{productId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Create Payment Link / Orders",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vipin\",\n  \"mobileNumber\": \"9123456789\",\n  \"address\": \"Street 1\",\n  \"city\": \"Pune\",\n  \"state\": \"Maharashtra\",\n  \"pinCode\": \"411001\"\n}"
+            },
+            "url": "{{baseUrl}}/api/orders?paymentMethod=RAZORPAY"
+          }
+        },
+        {
+          "name": "User Order History",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/orders/user/history"
+          }
+        },
+        {
+          "name": "Get Order By Id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}"
+          }
+        },
+        {
+          "name": "Get Order Item By Id",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/orders/item/{{orderItemId}}"
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/orders/{{orderId}}/cancel"
+          }
+        },
+        {
+          "name": "Seller Orders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/api/seller/orders"
+          }
+        },
+        {
+          "name": "Update Seller Order Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/api/seller/orders/{{orderId}}/status/SHIPPED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Create Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerJwt}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reviewText\": \"Great product\",\n  \"reviewRating\": 5\n}" },
+            "url": "{{baseUrl}}/api/product/{{productId}}/reviews"
+          }
+        },
+        {
+          "name": "Get Product Reviews",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/product/{{productId}}/reviews" }
+        },
+        {
+          "name": "Update Review",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{customerJwt}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"reviewText\": \"Updated review\",\n  \"reviewRating\": 4\n}" },
+            "url": "{{baseUrl}}/api/reviews/{{reviewId}}"
+          }
+        },
+        {
+          "name": "Delete Review",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/reviews/{{reviewId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Coupons",
+      "item": [
+        {
+          "name": "Apply Coupon",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/coupons/apply?apply=true&code=SAVE10"
+          }
+        },
+        {
+          "name": "Create Coupon (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE10\",\n  \"discountPercentage\": 10,\n  \"validityStartDate\": \"2026-03-03\",\n  \"validityEndDate\": \"2026-12-31\",\n  \"minimumOrderValue\": 500\n}"
+            },
+            "url": "{{baseUrl}}/api/coupons/admin/create"
+          }
+        },
+        {
+          "name": "Delete Coupon (Admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/api/coupons/admin/create/{{couponId}}"
+          }
+        },
+        {
+          "name": "Get All Coupons (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/api/coupons/admin/all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment",
+      "item": [
+        {
+          "name": "Payment Success Callback",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{customerJwt}}" }],
+            "url": "{{baseUrl}}/api/payment/{{paymentId}}?paymentLinkId={{paymentLinkId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Seller Transactions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{sellerJwt}}" }],
+            "url": "{{baseUrl}}/api/transactions/seller"
+          }
+        },
+        {
+          "name": "All Transactions (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/api/transactions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Deals",
+      "item": [
+        {
+          "name": "Create Deal",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"discount\": 20,\n  \"title\": \"Deal of the day\"\n}" },
+            "url": "{{baseUrl}}/admin/deal"
+          }
+        },
+        {
+          "name": "Update Deal",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"discount\": 25\n}" },
+            "url": "{{baseUrl}}/admin/deal/1"
+          }
+        },
+        {
+          "name": "Delete Deal",
+          "request": { "method": "DELETE", "url": "{{baseUrl}}/admin/deal/1" }
+        }
+      ]
+    },
+    {
+      "name": "Home Category",
+      "item": [
+        {
+          "name": "Create Home Categories (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"name\": \"Top Picks\",\n    \"image\": \"https://example.com/top.png\"\n  }\n]"
+            },
+            "url": "{{baseUrl}}/home/categories"
+          }
+        },
+        {
+          "name": "Get Home Categories (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{adminJwt}}" }],
+            "url": "{{baseUrl}}/admin/home-category"
+          }
+        },
+        {
+          "name": "Update Home Category (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{adminJwt}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Category\",\n  \"image\": \"https://example.com/new.png\"\n}"
+            },
+            "url": "{{baseUrl}}/admin/home-category/1"
+          }
+        }
+      ]
+    }
+  ]
+}
