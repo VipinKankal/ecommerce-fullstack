@@ -20,7 +20,12 @@ public class Product {
     private Long id;
 
     private String title;
+    private String brand;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
+
     private int mrpPrice;
     private int sellingPrice;
     private int discountPercentage;
@@ -45,8 +50,4 @@ public class Product {
     @JsonIgnore
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews = new ArrayList<>();
-
 }
-
-
-

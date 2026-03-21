@@ -220,6 +220,7 @@ public class SellerServiceImpl implements SellerService {
             if (incoming.getState() != null) current.setState(incoming.getState());
             if (incoming.getPinCode() != null) current.setPinCode(incoming.getPinCode());
             if (incoming.getMobileNumber() != null) current.setMobileNumber(incoming.getMobileNumber());
+            if (incoming.getCountry() != null) current.setCountry(incoming.getCountry());
         }
 
         if (request.getKycDetails() != null) {

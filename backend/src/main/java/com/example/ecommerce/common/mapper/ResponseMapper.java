@@ -28,6 +28,7 @@ public final class ResponseMapper {
         ProductResponse response = new ProductResponse();
         response.setId(product.getId());
         response.setTitle(product.getTitle());
+        response.setBrand(product.getBrand());
         response.setDescription(product.getDescription());
         response.setMrpPrice(product.getMrpPrice());
         response.setSellingPrice(product.getSellingPrice());

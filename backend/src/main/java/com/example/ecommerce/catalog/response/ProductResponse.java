@@ -10,6 +10,7 @@ import java.util.List;
 public class ProductResponse {
     private Long id;
     private String title;
+    private String brand;
     private String description;
     private Integer mrpPrice;
     private Integer sellingPrice;

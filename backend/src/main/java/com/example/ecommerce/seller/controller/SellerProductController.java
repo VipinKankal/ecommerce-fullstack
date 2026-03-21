@@ -8,6 +8,7 @@ import com.example.ecommerce.catalog.request.UpdateProductRequest;
 import com.example.ecommerce.catalog.response.ProductResponse;
 import com.example.ecommerce.catalog.service.ProductService;
 import com.example.ecommerce.seller.service.SellerService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ public class SellerProductController {
 
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
-            @RequestBody CreateProductRequest request,
+            @Valid @RequestBody CreateProductRequest request,
             @RequestHeader("Authorization") String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
@@ -56,7 +57,7 @@ public class SellerProductController {
     @PutMapping("/{productId}")
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long productId,
-            @RequestBody UpdateProductRequest incoming,
+            @Valid @RequestBody UpdateProductRequest incoming,
             @RequestHeader("Authorization") String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
@@ -64,7 +65,3 @@ public class SellerProductController {
         return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
     }
 }
-
-
-
-

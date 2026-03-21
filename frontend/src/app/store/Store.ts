@@ -1,16 +1,16 @@
-import { combineReducers, configureStore } from "@reduxjs/toolkit";
-import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
-import sellerProductReducer from "../../State/Seller/SellerProductSlice";
-import sellerOrderReducer from "../../State/Seller/SellerOrderSlice";
-import productSlice from "../../State/Customer/ProductSlice";
-import authCustomerReducer from "../../State/CustomerLogin/CustomerAuthSlice";
-import authReducer from "../../State/Seller/SellerAuthSlice";
-import cartSlice from "../../State/Cart/cartSlice";
-import masterApiReducer from "../../State/Backend/MasterApiSlice";
-import wishlistReducer from "../../State/Wishlist/wishlistSlice";
-import adminAuthReducer from "../../State/AdminAuthSlice";
-import returnExchangeReducer from "../../State/Returns/returnExchangeSlice";
-import exchangeReducer from "../../State/Exchange/exchangeSlice";
+import { combineReducers, configureStore } from '@reduxjs/toolkit';
+import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
+import sellerProductReducer from '../../State/features/seller/products/slice';
+import sellerOrderReducer from '../../State/features/seller/orders/slice';
+import productSlice from '../../State/features/customer/catalog/slice';
+import authCustomerReducer from '../../State/features/customer/auth/slice';
+import authReducer from '../../State/features/seller/auth/slice';
+import cartSlice from '../../State/features/customer/cart/slice';
+import masterApiReducer from '../../State/features/backend/masterApi/slice';
+import wishlistReducer from '../../State/features/customer/wishlist/slice';
+import adminAuthReducer from '../../State/features/admin/auth/slice';
+import returnExchangeReducer from '../../State/features/customer/returns/slice';
+import exchangeReducer from '../../State/features/customer/exchange/slice';
 
 const rootReducer = combineReducers({
   sellerAuth: authReducer,

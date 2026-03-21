@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
 public class AppConfiguration {
 
     @Value("${app.cors.allowed-origins:http://localhost:3000}")
@@ -44,8 +46,7 @@ public class AppConfiguration {
                                 "/api/auth/signup",
                                 "/api/auth/signin",
                                 "/api/auth/sent/login-signup-otp",
-                                "/api/admin/auth/login",
-                                "/api/admin/auth/signup"
+                                "/api/admin/auth/login"
                         ).permitAll()
                         .requestMatchers(
                                 "/products/**",

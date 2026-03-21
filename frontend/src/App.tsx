@@ -1,32 +1,36 @@
-import { ThemeProvider } from "@emotion/react";
-import customTheme from "./shared/theme/customTheme";
-import "./App.css";
-import { Route, Routes, useLocation, Navigate } from "react-router-dom";
+import { ThemeProvider } from '@emotion/react';
+import customTheme from './shared/theme/customTheme';
+import './App.css';
+import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
 
-import Home from "./modules/customer/pages/Home/Home";
-import Product from "./modules/customer/pages/Product/Product";
-import ProductDetails from "./modules/customer/pages/ProductDetails/ProductDetails";
-import ReviewCard from "./modules/customer/pages/Review/ReviewCard";
-import { Checkout, PaymentCancel, PaymentSuccess } from "./modules/customer/pages/Checkout";
-import Navbar from "./modules/customer/components/Navbar/Navbar";
-import Account from "./modules/customer/pages/Account/Account";
-import Wishlist from "./modules/customer/pages/Account/Wishlist";
-import SellerDashboard from "./modules/seller/Pages/SellerDashboard/SellerDashboard";
-import BecomeSeller from "./modules/customer/pages/BecomeSeller/BecomeSeller";
-import SellerVerifyEmail from "./modules/customer/pages/BecomeSeller/SellerVerifyEmail";
-import AdminDashboard from "./modules/admin/Pages/Dashboard/AdminDashboard";
-import AdminAuth from "./modules/admin/Pages/Dashboard/AdminAuth";
-import CourierLogin from "./modules/courier/pages/CourierLogin";
-import CourierDashboard from "./modules/courier/pages/CourierDashboard";
+import Home from './features/customer/pages/Home/Home';
+import Product from './features/customer/pages/Product/Product';
+import ProductDetails from './features/customer/pages/ProductDetails/ProductDetails';
+import ReviewCard from './features/customer/pages/Review/ReviewCard';
+import {
+  Checkout,
+  PaymentCancel,
+  PaymentSuccess,
+} from './features/customer/pages/Checkout';
+import Navbar from './features/customer/components/Navbar/Navbar';
+import Account from './features/customer/pages/Account/Account';
+import Wishlist from './features/customer/pages/Account/Wishlist';
+import SellerDashboard from './features/seller/Pages/SellerDashboard/SellerDashboard';
+import BecomeSeller from './features/customer/pages/BecomeSeller/BecomeSeller';
+import SellerVerifyEmail from './features/customer/pages/BecomeSeller/SellerVerifyEmail';
+import AdminDashboard from './features/admin/Pages/Dashboard/AdminDashboard';
+import AdminAuth from './features/admin/Pages/Dashboard/AdminAuth';
+import CourierLogin from './features/courier/pages/CourierLogin';
+import CourierDashboard from './features/courier/pages/CourierDashboard';
 
-import Auth from "./modules/customer/pages/Auth/Auth";
-import { useAppDispatch, useAppSelector } from "./app/store/Store";
-import { useEffect, useRef } from "react";
-import { getUserProfile } from "./State/CustomerLogin/CustomerLogin";
-import { fetchSellerProfile } from "./State/Seller/SellerAuthThunks";
-import { getAdminProfile } from "./State/AdminAuthThunks";
-import { getAuthRole } from "./shared/api/Api";
-import RouteApiDispatcher from "./app/providers/RouteApiDispatcher";
+import Auth from './features/customer/pages/Auth/Auth';
+import { useAppDispatch, useAppSelector } from './app/store/Store';
+import { useEffect, useRef } from 'react';
+import { getUserProfile } from './State/features/customer/auth/thunks';
+import { fetchSellerProfile } from './State/features/seller/auth/thunks';
+import { getAdminProfile } from './State/features/admin/auth/thunks';
+import { getAuthRole } from './shared/api/Api';
+import RouteApiDispatcher from './app/providers/RouteApiDispatcher';
 
 function App() {
   const dispatch = useAppDispatch();
@@ -39,7 +43,9 @@ function App() {
 
   useEffect(() => {
     const runtimeToken =
-      typeof window !== "undefined" ? sessionStorage.getItem("auth_jwt") : null;
+      globalThis.sessionStorage !== undefined
+        ? globalThis.sessionStorage.getItem('auth_jwt')
+        : null;
     const authRole = getAuthRole();
     const shouldBootstrap = Boolean(runtimeToken || authRole);
 
@@ -48,7 +54,7 @@ function App() {
     didBootstrap.current = true;
 
     const bootstrapProfile = async () => {
-      if (authRole === "admin") {
+      if (authRole === 'admin') {
         try {
           await dispatch(getAdminProfile()).unwrap();
         } catch {
@@ -57,16 +63,18 @@ function App() {
         return;
       }
 
-      if (authRole === "seller") {
+      if (authRole === 'seller') {
         try {
-          await dispatch(fetchSellerProfile(runtimeToken || undefined)).unwrap();
+          await dispatch(
+            fetchSellerProfile(runtimeToken || undefined),
+          ).unwrap();
         } catch {
           // No active authenticated session.
         }
         return;
       }
 
-      if (authRole === "customer") {
+      if (authRole === 'customer') {
         try {
           await dispatch(getUserProfile(runtimeToken || undefined)).unwrap();
         } catch {
@@ -75,8 +83,11 @@ function App() {
         return;
       }
 
-      if (location.pathname.startsWith("/seller") || location.pathname.startsWith("/admin")) {
-        if (location.pathname.startsWith("/admin")) {
+      if (
+        location.pathname.startsWith('/seller') ||
+        location.pathname.startsWith('/admin')
+      ) {
+        if (location.pathname.startsWith('/admin')) {
           try {
             await dispatch(getAdminProfile()).unwrap();
           } catch {
@@ -84,7 +95,9 @@ function App() {
           }
         } else {
           try {
-            await dispatch(fetchSellerProfile(runtimeToken || undefined)).unwrap();
+            await dispatch(
+              fetchSellerProfile(runtimeToken || undefined),
+            ).unwrap();
           } catch {
             // No active seller session on seller route.
           }
@@ -93,10 +106,10 @@ function App() {
       }
 
       if (
-        location.pathname.startsWith("/account") ||
-        location.pathname.startsWith("/wishlist") ||
-        location.pathname.startsWith("/cart") ||
-        location.pathname.startsWith("/checkout")
+        location.pathname.startsWith('/account') ||
+        location.pathname.startsWith('/wishlist') ||
+        location.pathname.startsWith('/cart') ||
+        location.pathname.startsWith('/checkout')
       ) {
         try {
           await dispatch(getUserProfile(runtimeToken || undefined)).unwrap();
@@ -110,10 +123,10 @@ function App() {
   }, [admin, customer, dispatch, seller, location.pathname]);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (globalThis.sessionStorage === undefined) return;
     const path = location.pathname;
-    if (!path.startsWith("/checkout")) {
-      sessionStorage.setItem("last_non_checkout_path", path);
+    if (!path.startsWith('/checkout')) {
+      globalThis.sessionStorage.setItem('last_non_checkout_path', path);
     }
   }, [location.pathname]);
 
@@ -131,10 +144,19 @@ function App() {
             path="/product-details/:categoryId/:name/:productId"
             element={<ProductDetails />}
           />
-          <Route path="/cart" element={<Navigate to="/checkout/cart" replace />} />
-          <Route path="/checkout" element={<Navigate to="/checkout/cart" replace />} />
+          <Route
+            path="/cart"
+            element={<Navigate to="/checkout/cart" replace />}
+          />
+          <Route
+            path="/checkout"
+            element={<Navigate to="/checkout/cart" replace />}
+          />
           <Route path="/checkout/*" element={<Checkout />} />
-          <Route path="/payment-success/:paymentOrderId" element={<PaymentSuccess />} />
+          <Route
+            path="/payment-success/:paymentOrderId"
+            element={<PaymentSuccess />}
+          />
           <Route path="/payment-cancel" element={<PaymentCancel />} />
           <Route path="/become-seller" element={<BecomeSeller />} />
           <Route path="/seller/verify-email" element={<SellerVerifyEmail />} />
@@ -152,6 +174,3 @@ function App() {
 }
 
 export default App;
-
-
-

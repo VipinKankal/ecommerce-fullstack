@@ -65,6 +65,7 @@ public class ProductServiceImpl implements ProductService{
         product.setSeller(seller);
         product.setCategory(category3);
         product.setDescription(request.getDescription());
+        product.setBrand(request.getBrand() == null ? null : request.getBrand().trim());
         product.setCreatedAt(LocalDateTime.now());
         product.setTitle(request.getTitle());
         product.setColor(request.getColor());
@@ -109,6 +110,9 @@ public class ProductServiceImpl implements ProductService{
         }
         if (request.getDescription() != null) {
             existing.setDescription(request.getDescription());
+        }
+        if (request.getBrand() != null) {
+            existing.setBrand(request.getBrand().trim());
         }
         if (request.getColor() != null) {
             existing.setColor(request.getColor());
@@ -175,7 +179,10 @@ public class ProductServiceImpl implements ProductService{
                 Join<Product, Category> categoryJoin = root.join("category");
                 predicates.add(cb.equal(categoryJoin.get("categoryId"), category));
             }
-            // Brand filtering is intentionally skipped until Product has a dedicated brand column.
+
+            if (brand != null && !brand.isBlank()) {
+                predicates.add(cb.equal(cb.lower(root.get("brand")), brand.trim().toLowerCase()));
+            }
 
             if (colors != null) {
                 predicates.add(cb.equal(root.get("color"), colors));

@@ -1,11 +1,14 @@
 package com.example.ecommerce.common.exceptions;
 
+import com.example.ecommerce.catalog.ProductConstraints;
 import com.razorpay.RazorpayException;
 import com.stripe.exception.StripeException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -41,7 +44,39 @@ public class GlobleException {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorDetails> validationExceptionHandler(MethodArgumentNotValidException ex, WebRequest request){
-        return buildErrorResponse(ex, request, HttpStatus.BAD_REQUEST);
+        String message = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(FieldError::getDefaultMessage)
+                .filter(defaultMessage -> defaultMessage != null && !defaultMessage.isBlank())
+                .findFirst()
+                .orElse("Validation failed");
+        return buildErrorResponse(new Exception(message), request, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorDetails> dataIntegrityViolationExceptionHandler(
+            DataIntegrityViolationException ex,
+            WebRequest request
+    ) {
+        String message = ex.getMostSpecificCause() != null
+                ? ex.getMostSpecificCause().getMessage()
+                : ex.getMessage();
+        String normalized = message == null ? "" : message.toLowerCase();
+
+        if (normalized.contains("data too long") && normalized.contains("description")) {
+            return buildErrorResponse(
+                    new Exception(ProductConstraints.DESCRIPTION_MAX_MESSAGE),
+                    request,
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+
+        return buildErrorResponse(
+                new Exception("Request violates database constraints."),
+                request,
+                HttpStatus.BAD_REQUEST
+        );
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
@@ -79,7 +114,6 @@ public class GlobleException {
         String message = ex.getMessage() == null ? "" : ex.getMessage().trim();
         String normalized = message.toLowerCase();
 
-        // Preserve user-facing validation/business errors instead of masking them as 500.
         if (normalized.contains("otp")
                 || normalized.contains("email already in use")
                 || normalized.contains("new email must be different")
@@ -99,7 +133,3 @@ public class GlobleException {
         return new ResponseEntity<>(errorDetails, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 }
-
-
-
-
