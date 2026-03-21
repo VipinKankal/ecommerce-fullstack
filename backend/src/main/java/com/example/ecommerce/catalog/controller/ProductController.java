@@ -24,7 +24,7 @@ public class ProductController {
     public ResponseEntity<ProductResponse> getProductById(
            @PathVariable Long productId
     ) throws ProductException {
-        Product product = productService.findProductById(productId);
+        Product product = productService.findActiveProductById(productId);
         return ResponseEntity.ok(ResponseMapper.toProductResponse(product));
     }
 

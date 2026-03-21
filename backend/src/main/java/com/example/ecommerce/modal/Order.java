@@ -80,6 +80,7 @@ public class Order {
 
     private LocalDateTime orderDate = LocalDateTime.now();
     private LocalDateTime deliveryDate = orderDate.plusDays(7);
+    private LocalDateTime deliveredAt;
 
 
 

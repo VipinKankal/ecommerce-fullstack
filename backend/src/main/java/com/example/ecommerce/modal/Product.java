@@ -32,6 +32,8 @@ public class Product {
     private int quantity;
     private int sellerStock;
     private int warehouseStock;
+    private String warrantyType;
+    private Integer warrantyDays;
     private String color;
 
     @ElementCollection
@@ -49,6 +51,12 @@ public class Product {
 
     private String size;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean active = true;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProductVariant> variants = new ArrayList<>();
+
     @JsonIgnore
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews = new ArrayList<>();
@@ -56,6 +64,18 @@ public class Product {
     @PrePersist
     @PreUpdate
     private void syncStockFields() {
+        if (variants != null && !variants.isEmpty()) {
+            sellerStock = variants.stream()
+                    .map(ProductVariant::getSellerStock)
+                    .filter(java.util.Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+            warehouseStock = variants.stream()
+                    .map(ProductVariant::getWarehouseStock)
+                    .filter(java.util.Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+        }
         if (sellerStock < 0) {
             sellerStock = 0;
         }

@@ -4,6 +4,7 @@ import {
   createProduct,
   updateSellerProduct,
   transferSellerProductToWarehouse,
+  toggleSellerProductActive,
   deleteSellerProduct,
 } from './sellerProductThunks';
 import { Product } from 'shared/types/product.types';
@@ -60,6 +61,17 @@ const sellerProductSlice = createSlice({
         state.error = null;
       })
       .addCase(transferSellerProductToWarehouse.fulfilled, (state, action) => {
+        state.loading = false;
+        state.products = state.products.map((p) =>
+          p.id === action.payload.id ? action.payload : p,
+        );
+      })
+
+      .addCase(toggleSellerProductActive.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(toggleSellerProductActive.fulfilled, (state, action) => {
         state.loading = false;
         state.products = state.products.map((p) =>
           p.id === action.payload.id ? action.payload : p,

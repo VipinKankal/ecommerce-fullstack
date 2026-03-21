@@ -11,6 +11,7 @@ import AdminTransactions from '../../features/admin/Pages/Dashboard/AdminTransac
 import AdminAccount from '../../features/admin/Pages/Dashboard/AdminAccount';
 import AdminUsers from '../../features/admin/Pages/Dashboard/AdminUsers';
 import AdminProducts from '../../features/admin/Pages/Dashboard/AdminProducts';
+import AdminWarehouseStock from '../../features/admin/Pages/Dashboard/AdminWarehouseStock';
 import AdminOrders from '../../features/admin/Pages/Dashboard/AdminOrders';
 import AdminReports from '../../features/admin/Pages/Dashboard/AdminReports';
 import AdminOverview from '../../features/admin/Pages/Dashboard/AdminOverview';
@@ -27,6 +28,7 @@ const AdminRoutes = () => {
         <Route path="/sellers" element={<SellersTable />} />
         <Route path="/users" element={<AdminUsers />} />
         <Route path="/products" element={<AdminProducts />} />
+        <Route path="/warehouse-stock" element={<AdminWarehouseStock />} />
         <Route path="/orders" element={<AdminOrders />} />
         <Route path="/transactions" element={<AdminTransactions />} />
         <Route path="/manual-upi" element={<AdminManualUpiPayments />} />

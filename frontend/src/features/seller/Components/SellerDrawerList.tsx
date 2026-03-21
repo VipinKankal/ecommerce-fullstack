@@ -15,6 +15,8 @@ import {
   AccountCircleOutlined,
   AccountCircle,
   Logout,
+  AutorenewOutlined,
+  Autorenew,
 } from '@mui/icons-material';
 import { useAppDispatch } from 'State/features/store/Store';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +41,18 @@ const menu = [
     path: '/seller/orders',
     icon: <ShoppingBagOutlined />,
     activeIcon: <ShoppingBag />,
+  },
+  {
+    name: 'Returns',
+    path: '/seller/returns',
+    icon: <AutorenewOutlined />,
+    activeIcon: <Autorenew />,
+  },
+  {
+    name: 'Exchanges',
+    path: '/seller/exchanges',
+    icon: <AutorenewOutlined />,
+    activeIcon: <Autorenew />,
   },
   {
     name: 'Add Product',

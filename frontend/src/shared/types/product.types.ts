@@ -1,5 +1,17 @@
 import { Seller } from './seller.types';
 
+export interface ProductVariant {
+  id?: number;
+  variantType?: string;
+  variantValue?: string;
+  size?: string;
+  color?: string;
+  sku?: string;
+  price?: number;
+  sellerStock?: number;
+  warehouseStock?: number;
+}
+
 export interface Product {
   id?: number;
   title: string;
@@ -11,6 +23,8 @@ export interface Product {
   quantity: number;
   sellerStock?: number;
   warehouseStock?: number;
+  warrantyType?: 'NONE' | 'BRAND' | 'SELLER' | string;
+  warrantyDays?: number;
   color: string;
   images: string[];
   numRatings?: number;
@@ -18,6 +32,8 @@ export interface Product {
   seller?: Seller;
   createdAt?: Date;
   sizes: string;
+  active?: boolean;
+  variants?: ProductVariant[];
 }
 
 export interface Category {

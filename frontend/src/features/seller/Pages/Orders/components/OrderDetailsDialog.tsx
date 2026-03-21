@@ -93,28 +93,17 @@ const OrderDetailsDialog = ({
                 }}
               >
                 <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800 }}>
-                  Shipping Details
+                  Customer Privacy
                 </Typography>
                 <Stack spacing={1}>
                   <Typography variant="body2">
-                    <strong>Name:</strong>{' '}
-                    {order.shippingAddress?.name || 'N/A'}
+                    <strong>Customer:</strong> {order.user?.fullName || 'Customer'}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Mobile:</strong>{' '}
-                    {order.shippingAddress?.mobileNumber || 'N/A'}
+                    <strong>Phone:</strong> Hidden from seller
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Address:</strong>{' '}
-                    {[
-                      order.shippingAddress?.address,
-                      order.shippingAddress?.locality,
-                      order.shippingAddress?.city,
-                      order.shippingAddress?.state,
-                      order.shippingAddress?.pinCode,
-                    ]
-                      .filter(Boolean)
-                      .join(', ') || 'N/A'}
+                    <strong>Address:</strong> Managed by warehouse/admin
                   </Typography>
                 </Stack>
               </Paper>

@@ -5,6 +5,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  MenuItem,
   TextField,
 } from '@mui/material';
 import { PRODUCT_DESCRIPTION_MAX_LENGTH } from '../../pages/addProductConfig';
@@ -37,6 +38,14 @@ const ProductEditDialog = ({
             setEditForm((state) => ({ ...state, title: e.target.value }))
           }
           className="sm:col-span-2"
+        />
+        <TextField
+          fullWidth
+          label="Brand"
+          value={editForm.brand}
+          onChange={(e) =>
+            setEditForm((state) => ({ ...state, brand: e.target.value }))
+          }
         />
         <TextField
           fullWidth
@@ -94,6 +103,34 @@ const ProductEditDialog = ({
             setEditForm((state) => ({ ...state, sizes: e.target.value }))
           }
           className="sm:col-span-2"
+        />
+        <TextField
+          select
+          fullWidth
+          label="Warranty Type"
+          value={editForm.warrantyType}
+          onChange={(e) =>
+            setEditForm((state) => ({
+              ...state,
+              warrantyType: e.target.value,
+            }))
+          }
+        >
+          <MenuItem value="NONE">No Warranty</MenuItem>
+          <MenuItem value="BRAND">Brand Warranty</MenuItem>
+          <MenuItem value="SELLER">Seller Warranty</MenuItem>
+        </TextField>
+        <TextField
+          fullWidth
+          type="number"
+          label="Warranty Days"
+          value={editForm.warrantyDays}
+          onChange={(e) =>
+            setEditForm((state) => ({
+              ...state,
+              warrantyDays: e.target.value,
+            }))
+          }
         />
       </div>
     </DialogContent>

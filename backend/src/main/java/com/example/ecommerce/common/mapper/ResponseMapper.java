@@ -5,6 +5,7 @@ import com.example.ecommerce.modal.Category;
 import com.example.ecommerce.modal.Order;
 import com.example.ecommerce.modal.OrderItem;
 import com.example.ecommerce.modal.Product;
+import com.example.ecommerce.modal.ProductVariant;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.modal.User;
 import com.example.ecommerce.catalog.response.ProductResponse;
@@ -37,6 +38,8 @@ public final class ResponseMapper {
         response.setQuantity(product.getQuantity());
         response.setSellerStock(product.getSellerStock());
         response.setWarehouseStock(product.getWarehouseStock());
+        response.setWarrantyType(product.getWarrantyType());
+        response.setWarrantyDays(product.getWarrantyDays());
         response.setColor(product.getColor());
         response.setImages(product.getImages() == null ? Collections.emptyList() : product.getImages());
         response.setNumRatings(product.getNumRatings());
@@ -45,6 +48,14 @@ public final class ResponseMapper {
         response.setCreatedAt(product.getCreatedAt());
         response.setSize(product.getSize());
         response.setSizes(product.getSize());
+        response.setActive(product.isActive());
+        response.setVariants(
+                product.getVariants() == null
+                        ? Collections.emptyList()
+                        : product.getVariants().stream()
+                        .map(ResponseMapper::toVariantSummary)
+                        .collect(Collectors.toList())
+        );
         return response;
     }
 
@@ -135,6 +146,7 @@ public final class ResponseMapper {
         response.setCancelledAt(order.getCancelledAt());
         response.setOrderDate(order.getOrderDate());
         response.setDeliveryDate(order.getDeliveryDate());
+        response.setDeliveredAt(order.getDeliveredAt());
         response.setUser(toCustomerSummary(order.getUser()));
         response.setShippingAddress(toOrderAddress(order.getShippingAddress()));
         response.setOrderItems(order.getOrderItems() == null ? Collections.emptyList() : order.getOrderItems().stream().map(ResponseMapper::toOrderItemSummary).collect(Collectors.toList()));
@@ -192,28 +204,14 @@ public final class ResponseMapper {
         }
         SellerOrderResponse.CustomerSummary summary = new SellerOrderResponse.CustomerSummary();
         summary.setId(user.getId());
-        summary.setFullName(user.getFullName());
-        summary.setEmail(user.getEmail());
-        summary.setMobileNumber(user.getMobileNumber());
+        summary.setFullName(maskCustomerName(user.getFullName()));
+        summary.setEmail(null);
+        summary.setMobileNumber(null);
         return summary;
     }
 
     private static SellerOrderResponse.AddressSummary toOrderAddress(Address address) {
-        if (address == null) {
-            return null;
-        }
-        SellerOrderResponse.AddressSummary summary = new SellerOrderResponse.AddressSummary();
-        summary.setId(address.getId());
-        summary.setName(address.getName());
-        summary.setStreet(address.getStreet());
-        summary.setLocality(address.getLocality());
-        summary.setAddress(address.getAddress());
-        summary.setCity(address.getCity());
-        summary.setState(address.getState());
-        summary.setPinCode(address.getPinCode());
-        summary.setMobileNumber(address.getMobileNumber());
-        summary.setCountry(address.getCountry());
-        return summary;
+        return null;
     }
 
     private static SellerOrderResponse.OrderItemSummary toOrderItemSummary(OrderItem item) {
@@ -239,6 +237,31 @@ public final class ResponseMapper {
         summary.setColor(product.getColor());
         summary.setImages(product.getImages() == null ? Collections.emptyList() : product.getImages());
         return summary;
+    }
+
+    private static ProductResponse.VariantSummary toVariantSummary(ProductVariant variant) {
+        ProductResponse.VariantSummary summary = new ProductResponse.VariantSummary();
+        summary.setId(variant.getId());
+        summary.setVariantType(variant.getVariantType());
+        summary.setVariantValue(variant.getVariantValue());
+        summary.setSize(variant.getSize());
+        summary.setColor(variant.getColor());
+        summary.setSku(variant.getSku());
+        summary.setPrice(variant.getPrice());
+        summary.setSellerStock(variant.getSellerStock());
+        summary.setWarehouseStock(variant.getWarehouseStock());
+        return summary;
+    }
+
+    private static String maskCustomerName(String fullName) {
+        if (fullName == null || fullName.isBlank()) {
+            return "Customer";
+        }
+        String trimmed = fullName.trim();
+        if (trimmed.length() <= 1) {
+            return trimmed + "***";
+        }
+        return trimmed.charAt(0) + "***";
     }
 }
 

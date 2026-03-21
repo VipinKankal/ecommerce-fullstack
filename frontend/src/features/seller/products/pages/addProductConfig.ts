@@ -89,7 +89,7 @@ export const initialProductFormValues = {
   returnable: true,
   returnWindowDays: '7',
   warrantyType: 'NONE',
-  warrantyPeriod: '',
+  warrantyDays: '',
   replacementAvailable: true,
   manufacturerName: '',
   manufacturerAddress: '',

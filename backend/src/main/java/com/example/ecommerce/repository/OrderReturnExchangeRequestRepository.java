@@ -15,6 +15,11 @@ public interface OrderReturnExchangeRequestRepository extends JpaRepository<Orde
 
     List<OrderReturnExchangeRequest> findByRequestTypeOrderByRequestedAtDesc(String requestType);
 
+    List<OrderReturnExchangeRequest> findBySellerIdAndRequestTypeOrderByRequestedAtDesc(
+            Long sellerId,
+            String requestType
+    );
+
     List<OrderReturnExchangeRequest> findByOrderItemIdAndRequestTypeOrderByRequestedAtDesc(
             Long orderItemId,
             String requestType

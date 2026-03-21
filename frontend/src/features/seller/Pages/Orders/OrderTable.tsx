@@ -1,12 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Button,
   Chip,
   CircularProgress,
-  IconButton,
   InputAdornment,
-  Menu,
   MenuItem,
   Paper,
   Table,
@@ -18,18 +15,14 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import { MoreVert, SearchRounded, Visibility } from '@mui/icons-material';
+import { SearchRounded } from '@mui/icons-material';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import {
   fetchSellerOrders,
-  SellerOrder,
   SellerOrderStatus,
-  updateSellerOrderStatus,
 } from 'State/features/seller/orders/thunks';
 import OrderStatsCards from './components/OrderStatsCards';
-import OrderDetailsDialog from './components/OrderDetailsDialog';
 import {
-  getNextStatusOptions,
   getOrderDate,
   getStatusColor,
   orderStatusOptions,
@@ -42,11 +35,6 @@ const OrderTable = () => {
   const { orders, loading, error } = useAppSelector(
     (state) => state.sellerOrder,
   );
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null);
-  const [selectedOrderStatus, setSelectedOrderStatus] =
-    useState<SellerOrderStatus | null>(null);
-  const [viewOrder, setViewOrder] = useState<SellerOrder | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -88,8 +76,6 @@ const OrderTable = () => {
       const searchableText = [
         String(order.id || ''),
         order.user?.fullName || '',
-        order.user?.email || '',
-        order.shippingAddress?.name || '',
         ...items.map((item) => item?.product?.title || ''),
       ]
         .join(' ')
@@ -98,31 +84,6 @@ const OrderTable = () => {
       return matchesStatus && (!query || searchableText.includes(query));
     });
   }, [orders, searchQuery, statusFilter]);
-
-  const handleMenuOpen = (
-    event: React.MouseEvent<HTMLButtonElement>,
-    orderId: number,
-    orderStatus: SellerOrderStatus,
-  ) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedOrderId(orderId);
-    setSelectedOrderStatus(orderStatus);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedOrderId(null);
-    setSelectedOrderStatus(null);
-  };
-
-  const handleStatusUpdate = async (orderStatus: SellerOrderStatus) => {
-    if (!selectedOrderId) return;
-    await dispatch(
-      updateSellerOrderStatus({ orderId: selectedOrderId, orderStatus }),
-    ).unwrap();
-    await dispatch(fetchSellerOrders()).unwrap();
-    handleMenuClose();
-  };
 
   return (
     <div className="space-y-5">
@@ -142,8 +103,8 @@ const OrderTable = () => {
               Order Management
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Track fulfilment, review buyer details, and update shipment
-              status.
+              Sellers can review order progress only. Customer phone and
+              address stay hidden for privacy.
             </Typography>
           </div>
 
@@ -189,6 +150,12 @@ const OrderTable = () => {
           </Alert>
         )}
 
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Warehouse and admin teams handle address-level fulfilment, returns,
+          exchanges, and all stock decisions. Seller panel is read-only for
+          orders.
+        </Alert>
+
         <TableContainer
           component={Paper}
           sx={{
@@ -206,21 +173,18 @@ const OrderTable = () => {
                 <TableCell sx={{ fontWeight: 700 }}>Amount</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Created</TableCell>
-                <TableCell sx={{ fontWeight: 700 }} align="right">
-                  Actions
-                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading && orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     No orders match the current filters.
                   </TableCell>
                 </TableRow>
@@ -244,15 +208,10 @@ const OrderTable = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {order.user?.fullName ||
-                          order.shippingAddress?.name ||
-                          'N/A'}
+                        {order.user?.fullName || 'Customer'}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {order.user?.email ||
-                          order.user?.mobileNumber ||
-                          order.shippingAddress?.mobileNumber ||
-                          '-'}
+                        Privacy masked
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -284,28 +243,6 @@ const OrderTable = () => {
                       />
                     </TableCell>
                     <TableCell>{getOrderDate(order)}</TableCell>
-                    <TableCell align="right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          size="small"
-                          startIcon={<Visibility />}
-                          variant="text"
-                          onClick={() => setViewOrder(order)}
-                        >
-                          View
-                        </Button>
-                        <IconButton
-                          onClick={(e) =>
-                            handleMenuOpen(e, order.id, order.orderStatus)
-                          }
-                          disabled={
-                            getNextStatusOptions(order.orderStatus).length === 0
-                          }
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </div>
-                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -313,26 +250,6 @@ const OrderTable = () => {
           </Table>
         </TableContainer>
       </Paper>
-
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        {getNextStatusOptions(selectedOrderStatus || undefined).map(
-          (status) => (
-            <MenuItem key={status} onClick={() => handleStatusUpdate(status)}>
-              Mark as {status}
-            </MenuItem>
-          ),
-        )}
-      </Menu>
-
-      <OrderDetailsDialog
-        order={viewOrder}
-        onClose={() => setViewOrder(null)}
-        getOrderDate={getOrderDate}
-      />
     </div>
   );
 };

@@ -430,14 +430,14 @@ const AddProductFormBody = ({
           <MenuItem value="NONE">No Warranty</MenuItem>
           <MenuItem value="BRAND">Brand Warranty</MenuItem>
           <MenuItem value="SELLER">Seller Warranty</MenuItem>
-          <MenuItem value="MANUFACTURER">Manufacturer Warranty</MenuItem>
         </TextField>
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 4 }}>
         <TextField
           fullWidth
-          label="Warranty Period"
-          {...formik.getFieldProps('warrantyPeriod')}
+          type="number"
+          label="Warranty Days"
+          {...formik.getFieldProps('warrantyDays')}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 4 }}>

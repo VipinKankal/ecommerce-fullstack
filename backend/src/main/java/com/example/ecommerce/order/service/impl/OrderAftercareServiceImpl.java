@@ -160,6 +160,16 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getSellerReturnRequests(Long sellerId) {
+        return requestRepository
+                .findBySellerIdAndRequestTypeOrderByRequestedAtDesc(sellerId, "RETURN")
+                .stream()
+                .map(this::toSellerReturnResponse)
+                .toList();
+    }
+
+    @Override
     public Map<String, Object> reviewReturnRequest(Long requestId, Map<String, Object> payload) throws Exception {
         OrderReturnExchangeRequest request = requireRequest(requestId, "RETURN");
         boolean approved = Boolean.TRUE.equals(payload.get("approved"));
@@ -225,6 +235,16 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
     public List<Map<String, Object>> getAdminExchangeRequests() {
         return requestRepository.findByRequestTypeOrderByRequestedAtDesc("EXCHANGE").stream()
                 .map(this::toExchangeResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getSellerExchangeRequests(Long sellerId) {
+        return requestRepository
+                .findBySellerIdAndRequestTypeOrderByRequestedAtDesc(sellerId, "EXCHANGE")
+                .stream()
+                .map(this::toSellerExchangeResponse)
                 .toList();
     }
 
@@ -469,6 +489,66 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
                 : toReturnResponse(request);
     }
 
+    private Map<String, Object> toSellerReturnResponse(OrderReturnExchangeRequest request) {
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("id", request.getId());
+        response.put("requestNumber", request.getRequestNumber());
+        response.put("orderId", request.getOrderId());
+        response.put("orderItemId", request.getOrderItemId());
+        response.put("customerName", maskCustomerName(request.getCustomerName()));
+        response.put("status", request.getStatus());
+        response.put("requestType", request.getRequestType());
+        response.put("quantityRequested", request.getQuantityRequested());
+        response.put("returnReason", request.getReasonCode());
+        response.put("productTitle", request.getProductTitle());
+        response.put("productImage", request.getProductImage());
+        response.put("requestedAt", request.getRequestedAt());
+        response.put("adminReviewedAt", request.getAdminReviewedAt());
+        response.put("pickupScheduledAt", request.getPickupScheduledAt());
+        response.put("receivedAt", request.getReceivedAt());
+        response.put("completedAt", request.getCompletedAt());
+        response.put("history", toHistory(request));
+        return response;
+    }
+
+    private Map<String, Object> toSellerExchangeResponse(OrderReturnExchangeRequest request) {
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("id", request.getId());
+        response.put("requestNumber", request.getRequestNumber());
+        response.put("oldOrderId", request.getOrderId());
+        response.put("oldOrderItemId", request.getOrderItemId());
+        response.put("customerName", maskCustomerName(request.getCustomerName()));
+        response.put("status", request.getStatus());
+        response.put("oldProductTitle", request.getProductTitle());
+        response.put("oldProductImage", request.getProductImage());
+        response.put("newProductTitle", request.getRequestedNewProductTitle());
+        response.put("newProductImage", request.getRequestedNewProductImage());
+        response.put("exchangeReason", request.getReasonCode());
+        response.put("requestedAt", request.getRequestedAt());
+        response.put("approvedAt", request.getApprovedAt());
+        response.put("pickupScheduledAt", request.getPickupScheduledAt());
+        response.put("receivedAt", request.getReceivedAt());
+        response.put("paymentCompletedAt", request.getPaymentCompletedAt());
+        response.put("exchangeCompletedAt", request.getCompletedAt());
+
+        LinkedHashMap<String, Object> priceSummary = new LinkedHashMap<>();
+        priceSummary.put("oldPrice", request.getOldPrice());
+        priceSummary.put("newPrice", request.getNewPrice());
+        priceSummary.put("priceDifference", request.getPriceDifference());
+        response.put("priceSummary", priceSummary);
+
+        LinkedHashMap<String, Object> replacementOrder = new LinkedHashMap<>();
+        replacementOrder.put("id", request.getReplacementOrderId());
+        replacementOrder.put("status", request.getStatus());
+        replacementOrder.put("createdAt", request.getReplacementCreatedAt());
+        replacementOrder.put("shippedAt", request.getReplacementShippedAt());
+        replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
+        response.put("replacementOrder", replacementOrder);
+
+        response.put("history", toHistory(request));
+        return response;
+    }
+
     private Map<String, Object> toReturnResponse(OrderReturnExchangeRequest request) {
         LinkedHashMap<String, Object> response = new LinkedHashMap<>();
         response.put("id", request.getId());
@@ -609,5 +689,16 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             item.put("createdAt", entry.getCreatedAt());
             return item;
         }).toList();
+    }
+
+    private String maskCustomerName(String value) {
+        if (value == null || value.isBlank()) {
+            return "Customer";
+        }
+        String trimmed = value.trim();
+        if (trimmed.length() == 1) {
+            return trimmed + "***";
+        }
+        return trimmed.charAt(0) + "***";
     }
 }

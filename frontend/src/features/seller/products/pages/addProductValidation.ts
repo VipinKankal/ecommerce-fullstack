@@ -19,6 +19,15 @@ export const addProductValidationSchema = Yup.object({
   mrpPrice: Yup.number().positive().required('MRP is required'),
   sellingPrice: Yup.number().positive().required('Selling price is required'),
   stockQuantity: Yup.number().min(0).required('Stock quantity is required'),
+  warrantyType: Yup.string().oneOf(['NONE', 'BRAND', 'SELLER']),
+  warrantyDays: Yup.number().when('warrantyType', {
+    is: (value: string) => value && value !== 'NONE',
+    then: (schema) =>
+      schema.min(1, 'Warranty days must be at least 1').required(
+        'Warranty days are required',
+      ),
+    otherwise: (schema) => schema.min(0),
+  }),
   category: Yup.string().required('Required'),
   category2: Yup.string().required('Required'),
   category3: Yup.string().test(

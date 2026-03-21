@@ -21,6 +21,24 @@ public class CartItemServiceImpl implements CartItemService {
         CartItem item = findCartItemById(id);
         User cartItemUser = item.getCart().getUser();
         if (cartItemUser.getId().equals(userId)) {
+            if (cartItem.getSize() != null && !cartItem.getSize().isBlank()) {
+                CartItem existingForSize = cartItemRepository.findByCartAndProductAndSize(
+                        item.getCart(),
+                        item.getProduct(),
+                        cartItem.getSize()
+                );
+                if (existingForSize != null && !existingForSize.getId().equals(item.getId())) {
+                    existingForSize.setQuantity(existingForSize.getQuantity() + item.getQuantity());
+                    existingForSize.setMrpPrice(existingForSize.getQuantity() * existingForSize.getProduct().getMrpPrice());
+                    existingForSize.setSellingPrice(existingForSize.getQuantity() * existingForSize.getProduct().getSellingPrice());
+                    cartItemRepository.save(existingForSize);
+                    item.getCart().getCartItems().remove(item);
+                    cartItemRepository.delete(item);
+                    cartItemRepository.flush();
+                    return existingForSize;
+                }
+                item.setSize(cartItem.getSize().trim());
+            }
             item.setQuantity(cartItem.getQuantity());
             item.setMrpPrice(item.getQuantity()*item.getProduct().getMrpPrice());
             item.setSellingPrice(item.getQuantity()*item.getProduct().getSellingPrice());

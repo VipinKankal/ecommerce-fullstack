@@ -1,9 +1,11 @@
 package com.example.ecommerce.catalog.service.impl;
 
+import com.example.ecommerce.common.domain.OrderStatus;
 import com.example.ecommerce.common.exceptions.ProductException;
 import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.Category;
 import com.example.ecommerce.modal.Product;
+import com.example.ecommerce.modal.ProductVariant;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.repository.CategoryRepository;
 import com.example.ecommerce.repository.ProductRepository;
@@ -23,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -32,8 +35,10 @@ public class ProductServiceImpl implements ProductService{
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final InventoryService inventoryService;
+    private final com.example.ecommerce.repository.OrderItemRepository orderItemRepository;
 
     @Override
+    @Transactional
     public Product createProduct(CreateProductRequest request, Seller seller) {
         Category category1 = categoryRepository.findByCategoryId(request.getCategory());
         if (category1== null){
@@ -75,12 +80,18 @@ public class ProductServiceImpl implements ProductService{
         product.setImages(request.getImages());
         product.setMrpPrice(request.getMrpPrice());
         product.setSize(request.getSize());
+        product.setActive(true);
+        product.setWarrantyType(normalizeWarrantyType(request.getWarrantyType()));
+        product.setWarrantyDays(normalizeWarrantyDays(request.getWarrantyType(), request.getWarrantyDays()));
+        product.setVariants(buildVariants(request.getVariants(), product));
         product.setDiscountPercentage(discountPercentage);
-        return inventoryService.initializeSellerOwnedStock(
+        Product savedProduct = inventoryService.initializeSellerOwnedStock(
                 product,
                 request.getQuantity(),
                 "Seller added product to catalog"
         );
+        initializeCollections(savedProduct);
+        return savedProduct;
     }
 
     private void validateSellerAccess(Product product, Long sellerId) throws ProductException {
@@ -99,13 +110,22 @@ public class ProductServiceImpl implements ProductService{
     }
 
     @Override
+    @Transactional
     public void deleteProduct(Long productId, Long sellerId) throws ProductException {
         Product product = findProductById(productId);
         validateSellerAccess(product, sellerId);
+        boolean hasActiveOrders = orderItemRepository.existsByProductIdAndOrderOrderStatusNotIn(
+                productId,
+                EnumSet.of(OrderStatus.CANCELLED, OrderStatus.DELIVERED)
+        );
+        if (hasActiveOrders) {
+            throw new ProductException("Product cannot be deleted while active orders exist");
+        }
         productRepository.delete(product);
     }
 
     @Override
+    @Transactional
     public Product updateProduct(Long productId, UpdateProductRequest request, Long sellerId) throws ProductException {
         Product existing = findProductById(productId);
         validateSellerAccess(existing, sellerId);
@@ -128,6 +148,20 @@ public class ProductServiceImpl implements ProductService{
         if (request.getSize() != null) {
             existing.setSize(request.getSize());
         }
+        if (request.getWarrantyType() != null) {
+            existing.setWarrantyType(normalizeWarrantyType(request.getWarrantyType()));
+        }
+        if (request.getWarrantyDays() != null || request.getWarrantyType() != null) {
+            existing.setWarrantyDays(
+                    normalizeWarrantyDays(
+                            existing.getWarrantyType(),
+                            request.getWarrantyDays() != null ? request.getWarrantyDays() : existing.getWarrantyDays()
+                    )
+            );
+        }
+        if (request.getActive() != null) {
+            existing.setActive(request.getActive());
+        }
         if (request.getMrpPrice() != null) {
             existing.setMrpPrice(request.getMrpPrice());
         }
@@ -141,15 +175,80 @@ public class ProductServiceImpl implements ProductService{
                 calculateDiscountPercentage(existing.getMrpPrice(), existing.getSellingPrice())
         );
 
+        Product savedProduct;
         if (sellerStockUpdated) {
-            return inventoryService.updateSellerStock(
+            savedProduct = inventoryService.updateSellerStock(
                     existing,
                     nextSellerStock,
                     "Seller updated available seller-side stock"
             );
+        } else {
+            savedProduct = productRepository.save(existing);
         }
 
-        return productRepository.save(existing);
+        initializeCollections(savedProduct);
+        return savedProduct;
+    }
+
+    @Override
+    @Transactional
+    public Product setProductActive(Long productId, Long sellerId, boolean active) throws ProductException {
+        Product product = findProductById(productId);
+        validateSellerAccess(product, sellerId);
+        product.setActive(active);
+        Product savedProduct = productRepository.save(product);
+        initializeCollections(savedProduct);
+        return savedProduct;
+    }
+
+    private String normalizeWarrantyType(String value) {
+        if (value == null || value.isBlank()) {
+            return "NONE";
+        }
+        String normalized = value.trim().toUpperCase();
+        if ("MANUFACTURER".equals(normalized)) {
+            return "BRAND";
+        }
+        if (!List.of("NONE", "BRAND", "SELLER").contains(normalized)) {
+            return "NONE";
+        }
+        return normalized;
+    }
+
+    private Integer normalizeWarrantyDays(String warrantyType, Integer warrantyDays) {
+        if ("NONE".equalsIgnoreCase(normalizeWarrantyType(warrantyType))) {
+            return 0;
+        }
+        if (warrantyDays == null) {
+            return 0;
+        }
+        return Math.max(warrantyDays, 0);
+    }
+
+    private List<ProductVariant> buildVariants(
+            List<CreateProductRequest.VariantRequest> variants,
+            Product product
+    ) {
+        if (variants == null || variants.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        return variants.stream()
+                .filter(variant -> variant != null)
+                .map(variant -> {
+                    ProductVariant productVariant = new ProductVariant();
+                    productVariant.setProduct(product);
+                    productVariant.setVariantType(variant.getVariantType());
+                    productVariant.setVariantValue(variant.getVariantValue());
+                    productVariant.setSize(variant.getSize() == null ? null : variant.getSize().trim());
+                    productVariant.setColor(variant.getColor() == null ? null : variant.getColor().trim());
+                    productVariant.setSku(variant.getSku() == null ? null : variant.getSku().trim());
+                    productVariant.setPrice(variant.getPrice());
+                    productVariant.setSellerStock(0);
+                    productVariant.setWarehouseStock(Math.max(variant.getQuantity() == null ? 0 : variant.getQuantity(), 0));
+                    return productVariant;
+                })
+                .toList();
     }
 
     @Override
@@ -163,10 +262,20 @@ public class ProductServiceImpl implements ProductService{
 
     @Override
     @Transactional(readOnly = true)
+    public Product findActiveProductById(Long productId) throws ProductException {
+        Product product = findProductById(productId);
+        if (!product.isActive()) {
+            throw new ProductException("Product not found with id " + productId);
+        }
+        return product;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<Product> searchProduct(String query) {
         List<Product> products = productRepository.searchProduct(query);
         products.forEach(this::initializeCollections);
-        return products;
+        return products.stream().filter(Product::isActive).toList();
     }
 
     @Override
@@ -226,6 +335,8 @@ public class ProductServiceImpl implements ProductService{
                 }
             }
 
+            predicates.add(cb.isTrue(root.get("active")));
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
@@ -262,6 +373,9 @@ public class ProductServiceImpl implements ProductService{
     private void initializeCollections(Product product) {
         if (product != null && product.getImages() != null) {
             product.getImages().size();
+        }
+        if (product != null && product.getVariants() != null) {
+            product.getVariants().size();
         }
     }
 }

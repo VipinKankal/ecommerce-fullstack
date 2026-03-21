@@ -19,7 +19,12 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         ensureLegacyStatusColumnsCompatible();
         ensureCheckoutPaymentColumns();
         ensureProductInventoryColumns();
+        ensureProductVariantTable();
+        ensureProductActivationColumn();
+        ensureProductWarrantyColumns();
+        ensureDeliveredAtColumn();
         ensureInventoryMovementTable();
+        ensureRestockNotificationTables();
         ensureOrderReturnExchangeTables();
     }
 
@@ -158,6 +163,60 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         );
     }
 
+    private void ensureProductVariantTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS product_variants (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "product_id BIGINT NULL," +
+                        "variant_type VARCHAR(255) NULL," +
+                        "variant_value VARCHAR(255) NULL," +
+                        "size VARCHAR(255) NULL," +
+                        "color VARCHAR(255) NULL," +
+                        "sku VARCHAR(255) NULL," +
+                        "price INT NULL," +
+                        "seller_stock INT NULL," +
+                        "warehouse_stock INT NULL," +
+                        "PRIMARY KEY (id)," +
+                        "CONSTRAINT fk_product_variant_product FOREIGN KEY (product_id) REFERENCES product (id)" +
+                        ")"
+        );
+    }
+
+    private void ensureProductActivationColumn() {
+        ensureColumn("product", "is_active", "BIT NOT NULL DEFAULT b'1'");
+        jdbcTemplate.execute(
+                "UPDATE product " +
+                        "SET is_active = b'1' " +
+                        "WHERE is_active IS NULL"
+        );
+    }
+
+    private void ensureProductWarrantyColumns() {
+        ensureColumn("product", "warranty_type", "VARCHAR(32) NULL");
+        ensureColumn("product", "warranty_days", "INT NOT NULL DEFAULT 0");
+
+        jdbcTemplate.execute(
+                "UPDATE product " +
+                        "SET warranty_type = CASE " +
+                        "WHEN warranty_type IS NULL OR warranty_type = '' THEN 'NONE' " +
+                        "WHEN UPPER(warranty_type) = 'MANUFACTURER' THEN 'BRAND' " +
+                        "ELSE UPPER(warranty_type) END, " +
+                        "warranty_days = CASE WHEN warranty_days IS NULL THEN 0 ELSE warranty_days END"
+        );
+    }
+
+    private void ensureDeliveredAtColumn() {
+        ensureColumn("orders", "delivered_at", "DATETIME(6) NULL");
+
+        jdbcTemplate.execute(
+                "UPDATE orders " +
+                        "SET delivered_at = delivery_date " +
+                        "WHERE delivered_at IS NULL " +
+                        "AND order_status = 'DELIVERED' " +
+                        "AND delivery_date IS NOT NULL"
+        );
+    }
+
     private void ensureInventoryMovementTable() {
         jdbcTemplate.execute(
                 "CREATE TABLE IF NOT EXISTS inventory_movements (" +
@@ -178,6 +237,39 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "created_at DATETIME(6) NULL," +
                         "PRIMARY KEY (id)," +
                         "CONSTRAINT fk_inventory_movement_product FOREIGN KEY (product_id) REFERENCES product (id)" +
+                        ")"
+        );
+    }
+
+    private void ensureRestockNotificationTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS product_restock_subscriptions (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "product_id BIGINT NULL," +
+                        "user_id BIGINT NULL," +
+                        "status VARCHAR(64) NOT NULL," +
+                        "created_at DATETIME(6) NOT NULL," +
+                        "notified_at DATETIME(6) NULL," +
+                        "converted_at DATETIME(6) NULL," +
+                        "PRIMARY KEY (id)," +
+                        "CONSTRAINT fk_restock_subscription_product FOREIGN KEY (product_id) REFERENCES product (id)," +
+                        "CONSTRAINT fk_restock_subscription_user FOREIGN KEY (user_id) REFERENCES user (id)" +
+                        ")"
+        );
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS product_restock_notification_logs (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "subscription_id BIGINT NULL," +
+                        "product_id BIGINT NULL," +
+                        "user_id BIGINT NULL," +
+                        "status VARCHAR(64) NOT NULL," +
+                        "note VARCHAR(1200) NULL," +
+                        "created_at DATETIME(6) NOT NULL," +
+                        "PRIMARY KEY (id)," +
+                        "CONSTRAINT fk_restock_log_subscription FOREIGN KEY (subscription_id) REFERENCES product_restock_subscriptions (id)," +
+                        "CONSTRAINT fk_restock_log_product FOREIGN KEY (product_id) REFERENCES product (id)," +
+                        "CONSTRAINT fk_restock_log_user FOREIGN KEY (user_id) REFERENCES user (id)" +
                         ")"
         );
     }

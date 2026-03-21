@@ -13,6 +13,9 @@ interface Props {
   onRemoveSelected: () => void;
   onMoveSelectedToWishlist: () => void;
   onRemoveItem: (id: number) => void;
+  onChangeItemQuantity: (id: number, nextQuantity: number) => void;
+  onChangeItemSize: (id: number, nextSize: string) => void;
+  updatingCartItemId?: number | null;
 }
 
 const CheckoutBagStep = ({
@@ -26,6 +29,9 @@ const CheckoutBagStep = ({
   onRemoveSelected,
   onMoveSelectedToWishlist,
   onRemoveItem,
+  onChangeItemQuantity,
+  onChangeItemSize,
+  updatingCartItemId,
 }: Props) => {
   return (
     <div className="space-y-4">
@@ -68,6 +74,9 @@ const CheckoutBagStep = ({
             deliveryEstimate={deliveryEstimate}
             onToggleSelect={onToggleSelectItem}
             onRemove={onRemoveItem}
+            onChangeQuantity={onChangeItemQuantity}
+            onChangeSize={onChangeItemSize}
+            quantityUpdating={updatingCartItemId === item.id}
           />
         ))}
       </div>

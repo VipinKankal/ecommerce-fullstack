@@ -22,7 +22,7 @@ public class CartItem {
     private Cart cart;
 
     @ManyToOne
-    @JsonIgnoreProperties({"category", "seller", "reviews", "hibernateLazyInitializer", "handler"})
+    @JsonIgnoreProperties({"category", "seller", "reviews", "variants", "hibernateLazyInitializer", "handler"})
     private Product product;
     private String size;
     private int quantity = 1;

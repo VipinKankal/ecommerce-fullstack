@@ -2,7 +2,11 @@ import React, { useEffect, useMemo } from 'react';
 import { Alert } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
-import { deleteItem, fetchUserCart } from 'State/features/customer/cart/slice';
+import {
+  deleteItem,
+  fetchUserCart,
+  updateItem,
+} from 'State/features/customer/cart/slice';
 import { orderSummary, productsList } from 'State/backend/MasterApiThunks';
 import CheckoutActionBar from '../components/CheckoutActionBar';
 import CheckoutAddressStep from '../components/CheckoutAddressStep';
@@ -77,6 +81,9 @@ const CheckoutPage = () => {
 
   const customer = useAppSelector((state) => state.customerAuth.user);
   const { cart, loading } = useAppSelector((state) => state.cart);
+  const [updatingCartItemId, setUpdatingCartItemId] = React.useState<
+    number | null
+  >(null);
   const masterApi = useAppSelector((state) => state.masterApi);
 
   const pathStep = location.pathname.split('/')[2];
@@ -142,6 +149,40 @@ const CheckoutPage = () => {
   const goToStep = (step: CheckoutStep) => {
     const path = step === 'BAG' ? 'cart' : step.toLowerCase();
     navigate(`/checkout/${path}`);
+  };
+
+  const handleChangeItemQuantity = async (
+    cartItemId: number,
+    nextQuantity: number,
+  ) => {
+    if (nextQuantity < 1) return;
+    setUpdatingCartItemId(cartItemId);
+    try {
+      await dispatch(
+        updateItem({
+          cartItemId,
+          cartItem: { quantity: nextQuantity },
+        }),
+      ).unwrap();
+    } finally {
+      setUpdatingCartItemId(null);
+    }
+  };
+
+  const handleChangeItemSize = async (cartItemId: number, nextSize: string) => {
+    const currentItem = cartItems.find((item) => item.id === cartItemId);
+    if (!currentItem || !nextSize || nextSize === currentItem.size) return;
+    setUpdatingCartItemId(cartItemId);
+    try {
+      await dispatch(
+        updateItem({
+          cartItemId,
+          cartItem: { quantity: currentItem.quantity, size: nextSize },
+        }),
+      ).unwrap();
+    } finally {
+      setUpdatingCartItemId(null);
+    }
   };
 
   const {
@@ -252,6 +293,9 @@ const CheckoutPage = () => {
                   handleMoveSelectedToWishlist(selectedItemIds)
                 }
                 onRemoveItem={(id) => dispatch(deleteItem({ cartItemId: id }))}
+                onChangeItemQuantity={handleChangeItemQuantity}
+                onChangeItemSize={handleChangeItemSize}
+                updatingCartItemId={updatingCartItemId}
               />
             )}
 

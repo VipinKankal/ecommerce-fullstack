@@ -68,6 +68,25 @@ export const transferSellerProductToWarehouse = createAsyncThunk<
   },
 );
 
+export const toggleSellerProductActive = createAsyncThunk<
+  Product,
+  { productId: number; active: boolean }
+>(
+  'sellerProduct/toggleSellerProductActive',
+  async ({ productId, active }, { rejectWithValue }) => {
+    try {
+      const response = await api.patch(API_ROUTES.sellerProducts.active(productId), {
+        active,
+      });
+      return response.data;
+    } catch (error: unknown) {
+      return rejectWithValue(
+        getErrorMessage(error, active ? 'Enable failed' : 'Disable failed'),
+      );
+    }
+  },
+);
+
 export const deleteSellerProduct = createAsyncThunk<
   number,
   { productId: number }

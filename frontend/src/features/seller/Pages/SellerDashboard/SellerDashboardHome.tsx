@@ -122,8 +122,8 @@ const SellerDashboardHome = () => {
               'Your Seller Panel'}
           </h1>
           <p className="max-w-2xl text-sm text-slate-300">
-            Manage catalog, operational orders, payouts, and compliance data
-            from one place.
+            Manage catalog, seller-owned stock, earnings, and limited order
+            actions from one place.
           </p>
         </div>
 
@@ -220,7 +220,7 @@ const SellerDashboardHome = () => {
               },
               {
                 title: 'Manage Orders',
-                desc: 'Update shipment flow and review current order pipeline.',
+                desc: 'Review pipeline and cancel only before shipment starts.',
                 to: '/seller/orders',
               },
               {

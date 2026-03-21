@@ -237,6 +237,7 @@ public class OrderController {
         response.setTotalSellingPrice(order.getTotalSellingPrice());
         response.setTotalItems(order.getTotalItems());
         response.setOrderDate(order.getOrderDate());
+        response.setDeliveredAt(order.getDeliveredAt());
         response.setCancelledAt(order.getCancelledAt());
         response.setCancelReasonCode(order.getCancelReasonCode());
         response.setCancelReasonText(order.getCancelReasonText());

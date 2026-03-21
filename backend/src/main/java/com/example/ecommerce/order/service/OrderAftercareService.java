@@ -26,6 +26,8 @@ public interface OrderAftercareService {
 
     List<Map<String, Object>> getAdminReturnRequests();
 
+    List<Map<String, Object>> getSellerReturnRequests(Long sellerId);
+
     Map<String, Object> reviewReturnRequest(Long requestId, Map<String, Object> payload) throws Exception;
 
     Map<String, Object> initiateRefund(Long requestId, String adminComment) throws Exception;
@@ -33,6 +35,8 @@ public interface OrderAftercareService {
     Map<String, Object> completeRefund(Long requestId, String adminComment) throws Exception;
 
     List<Map<String, Object>> getAdminExchangeRequests();
+
+    List<Map<String, Object>> getSellerExchangeRequests(Long sellerId);
 
     Map<String, Object> approveExchange(Long requestId, Map<String, Object> payload) throws Exception;
 

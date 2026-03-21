@@ -24,4 +24,7 @@ public class UpdateProductRequest {
     private String color;
     private List<String> images;
     private String size;
+    private String warrantyType;
+    private Integer warrantyDays;
+    private Boolean active;
 }

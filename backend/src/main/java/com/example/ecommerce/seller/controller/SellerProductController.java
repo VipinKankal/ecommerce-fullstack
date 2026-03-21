@@ -71,6 +71,21 @@ public class SellerProductController {
         return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
     }
 
+    @PatchMapping("/{productId}/active")
+    public ResponseEntity<ProductResponse> updateProductActiveState(
+            @PathVariable Long productId,
+            @RequestBody Map<String, Object> payload,
+            @RequestHeader("Authorization") String jwt
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        Object rawActive = payload == null ? null : payload.get("active");
+        boolean active = rawActive instanceof Boolean bool
+                ? bool
+                : Boolean.parseBoolean(String.valueOf(rawActive));
+        Product updatedProduct = productService.setProductActive(productId, seller.getId(), active);
+        return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
+    }
+
     @PostMapping("/{productId}/warehouse-transfer")
     public ResponseEntity<ProductResponse> transferStockToWarehouse(
             @PathVariable Long productId,

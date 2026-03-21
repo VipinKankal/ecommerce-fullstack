@@ -8,14 +8,20 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
+    @EntityGraph(attributePaths = {"category", "seller"})
+    Optional<Product> findById(Long id);
+
+    @EntityGraph(attributePaths = {"category", "seller"})
     List<Product> findBySellerId(Long id);
 
     @EntityGraph(attributePaths = {"category", "seller"})
     List<Product> findAllByOrderByCreatedAtDesc();
 
+    @EntityGraph(attributePaths = {"category", "seller"})
     @Query("SELECT p FROM Product p WHERE (:query is null or lower(p.title) LIKE lower(concat('%', :query, '%') ) ) OR (:query is null or lower(p.category.name) LIKE lower(concat('%', :query, '%') ) )")
     List<Product> searchProduct(@Param("query") String query);
 }

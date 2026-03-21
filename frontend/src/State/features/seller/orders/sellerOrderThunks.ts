@@ -11,6 +11,10 @@ export type SellerOrderStatus =
   | 'SHIPPED'
   | 'OUT_FOR_DELIVERY'
   | 'DELIVERED'
+  | 'RETURN_REQUESTED'
+  | 'RETURNED'
+  | 'EXCHANGE_REQUESTED'
+  | 'EXCHANGE_SHIPPED'
   | 'CANCELLED';
 
 export interface SellerOrderItem {
@@ -44,8 +48,6 @@ export interface SellerOrder {
   };
   user?: {
     fullName?: string;
-    email?: string;
-    mobileNumber?: string;
   };
   orderItems?: SellerOrderItem[];
 }

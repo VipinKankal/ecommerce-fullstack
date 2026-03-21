@@ -4,11 +4,17 @@ import {
 } from 'State/features/seller/orders/thunks';
 
 export const orderStatusOptions: SellerOrderStatus[] = [
+  'INITIATED',
   'PENDING',
+  'PLACED',
   'CONFIRMED',
   'SHIPPED',
   'OUT_FOR_DELIVERY',
   'DELIVERED',
+  'RETURN_REQUESTED',
+  'RETURNED',
+  'EXCHANGE_REQUESTED',
+  'EXCHANGE_SHIPPED',
   'CANCELLED',
 ];
 
@@ -16,15 +22,11 @@ export const getNextStatusOptions = (
   status?: SellerOrderStatus,
 ): SellerOrderStatus[] => {
   switch ((status || 'PENDING').toUpperCase() as SellerOrderStatus) {
+    case 'INITIATED':
     case 'PENDING':
     case 'PLACED':
-      return ['CONFIRMED', 'CANCELLED'];
     case 'CONFIRMED':
-      return ['SHIPPED', 'CANCELLED'];
-    case 'SHIPPED':
-      return ['OUT_FOR_DELIVERY'];
-    case 'OUT_FOR_DELIVERY':
-      return ['DELIVERED'];
+      return ['CANCELLED'];
     default:
       return [];
   }
@@ -35,11 +37,17 @@ export const getStatusColor = (status: string) => {
     case 'PENDING':
       return 'warning';
     case 'CONFIRMED':
+      return 'info';
     case 'SHIPPED':
     case 'OUT_FOR_DELIVERY':
+    case 'EXCHANGE_SHIPPED':
       return 'info';
     case 'DELIVERED':
+    case 'RETURNED':
       return 'success';
+    case 'RETURN_REQUESTED':
+    case 'EXCHANGE_REQUESTED':
+      return 'warning';
     case 'CANCELLED':
       return 'error';
     default:

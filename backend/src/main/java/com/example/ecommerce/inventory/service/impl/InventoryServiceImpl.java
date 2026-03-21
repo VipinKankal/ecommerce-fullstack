@@ -1,6 +1,7 @@
 package com.example.ecommerce.inventory.service.impl;
 
 import com.example.ecommerce.inventory.service.InventoryService;
+import com.example.ecommerce.inventory.service.RestockNotificationService;
 import com.example.ecommerce.modal.InventoryMovement;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.repository.InventoryMovementRepository;
@@ -21,6 +22,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final ProductRepository productRepository;
     private final InventoryMovementRepository inventoryMovementRepository;
+    private final RestockNotificationService restockNotificationService;
 
     @Override
     public Product initializeSellerOwnedStock(Product product, int initialSellerStock, String note) {
@@ -55,6 +57,7 @@ public class InventoryServiceImpl implements InventoryService {
         Product savedProduct = productRepository.save(product);
         recordMovement(savedProduct, null, null, "WAREHOUSE_TRANSFER", "SELLER", "WAREHOUSE",
                 quantity, "INBOUND", null, "SELLER", "ADMIN", note, null);
+        notifySubscribersIfRestocked(savedProduct);
         return savedProduct;
     }
 
@@ -83,6 +86,7 @@ public class InventoryServiceImpl implements InventoryService {
         Product savedProduct = productRepository.save(product);
         recordMovement(savedProduct, orderItemId, null, "ORDER_CANCELLED", "ORDER", "WAREHOUSE",
                 quantity, "RETURN", "CANCELLED", "CUSTOMER", "SYSTEM", note, null);
+        notifySubscribersIfRestocked(savedProduct);
     }
 
     @Override
@@ -104,6 +108,7 @@ public class InventoryServiceImpl implements InventoryService {
         Product savedProduct = productRepository.save(product);
         recordMovement(savedProduct, orderItemId, requestId, "RETURN_RESTOCK", "CUSTOMER", "WAREHOUSE",
                 quantity, "RETURN", orderStatus, addedBy, updatedBy, note, requestType);
+        notifySubscribersIfRestocked(savedProduct);
     }
 
     @Override
@@ -133,6 +138,11 @@ public class InventoryServiceImpl implements InventoryService {
         return inventoryMovementRepository.findByProductIdOrderByCreatedAtDesc(productId).stream()
                 .map(this::toMovementMap)
                 .toList();
+    }
+
+    @Override
+    public void notifySubscribersIfRestocked(Product product) {
+        restockNotificationService.notifySubscribersIfRestocked(product);
     }
 
     private Map<String, Object> toMovementMap(InventoryMovement movement) {

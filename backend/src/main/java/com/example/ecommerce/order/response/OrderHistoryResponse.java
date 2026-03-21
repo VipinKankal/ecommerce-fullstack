@@ -21,6 +21,7 @@ public class OrderHistoryResponse {
     private Integer totalSellingPrice;
     private Integer totalItems;
     private LocalDateTime orderDate;
+    private LocalDateTime deliveredAt;
     private LocalDateTime cancelledAt;
     private String cancelReasonCode;
     private String cancelReasonText;

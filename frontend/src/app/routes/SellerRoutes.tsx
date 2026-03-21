@@ -7,6 +7,8 @@ import Transaction from '../../features/seller/Pages/Transactions/Transaction';
 import Payment from '../../features/seller/Pages/Transactions/Payment';
 import Profile from '../../features/seller/Pages/Account/Profile';
 import SellerDashboardHome from '../../features/seller/Pages/SellerDashboard/SellerDashboardHome';
+import SellerReturnRequests from '../../features/seller/Pages/Aftercare/SellerReturnRequests';
+import SellerExchangeRequests from '../../features/seller/Pages/Aftercare/SellerExchangeRequests';
 
 const SellerRoutes = () => {
   return (
@@ -15,6 +17,8 @@ const SellerRoutes = () => {
       <Route path="/products" element={<Products />} />
       <Route path="/add-product" element={<AddProducts />} />
       <Route path="/orders" element={<Order />} />
+      <Route path="/returns" element={<SellerReturnRequests />} />
+      <Route path="/exchanges" element={<SellerExchangeRequests />} />
       <Route path="/payments" element={<Payment />} />
       <Route path="/transactions" element={<Transaction />} />
       <Route path="/account" element={<Profile />} />

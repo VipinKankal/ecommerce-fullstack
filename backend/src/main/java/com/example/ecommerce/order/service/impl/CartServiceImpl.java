@@ -3,9 +3,11 @@ package com.example.ecommerce.order.service.impl;
 import com.example.ecommerce.modal.Cart;
 import com.example.ecommerce.modal.CartItem;
 import com.example.ecommerce.modal.Product;
+import com.example.ecommerce.modal.ProductVariant;
 import com.example.ecommerce.modal.User;
 import com.example.ecommerce.repository.CartItemRepository;
 import com.example.ecommerce.repository.CartRepository;
+import com.example.ecommerce.repository.ProductVariantRepository;
 import com.example.ecommerce.order.service.CartService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,9 +20,23 @@ public class CartServiceImpl implements CartService {
 
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
+    private final ProductVariantRepository productVariantRepository;
 
     @Override
     public CartItem addItemToCart(User user, Product product, String size, int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("Quantity must be at least 1");
+        }
+        ProductVariant variant = resolveVariant(product, size);
+        int availableStock = variant != null
+                ? Math.max(variant.getWarehouseStock() == null ? 0 : variant.getWarehouseStock(), 0)
+                : product.getWarehouseStock();
+        if (availableStock <= 0) {
+            throw new IllegalArgumentException("Product is out of stock");
+        }
+        if (quantity > availableStock) {
+            throw new IllegalArgumentException("Only " + availableStock + " items left in stock");
+        }
 
         Cart cart=findUserCart(user);
 
@@ -41,7 +57,22 @@ public class CartServiceImpl implements CartService {
             cartItem.setCart(cart);
             return cartItemRepository.save(cartItem);
         }
-        return isPresent;
+        int nextQuantity = isPresent.getQuantity() + quantity;
+        if (nextQuantity > availableStock) {
+            throw new IllegalArgumentException("Only " + availableStock + " items left in stock");
+        }
+        isPresent.setQuantity(nextQuantity);
+        isPresent.setMrpPrice(nextQuantity * product.getMrpPrice());
+        isPresent.setSellingPrice(nextQuantity * product.getSellingPrice());
+        return cartItemRepository.save(isPresent);
+    }
+
+    private ProductVariant resolveVariant(Product product, String size) {
+        if (product == null || product.getId() == null || size == null || size.isBlank()) {
+            return null;
+        }
+        return productVariantRepository.findByProductIdAndSizeIgnoreCase(product.getId(), size.trim())
+                .orElse(null);
     }
 
     @Override

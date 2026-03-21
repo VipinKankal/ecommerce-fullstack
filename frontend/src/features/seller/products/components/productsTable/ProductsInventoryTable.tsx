@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Avatar,
   Box,
-  Button,
   Chip,
   CircularProgress,
   IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   Paper,
   Table,
   TableBody,
@@ -16,39 +19,75 @@ import {
   Typography,
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
+import VisibilityOffOutlinedIcon from '@mui/icons-material/VisibilityOffOutlined';
+import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
+import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import { Product } from 'shared/types/product.types';
 
 type ProductsInventoryTableProps = {
   loading: boolean;
   products: Product[];
   filteredProducts: Product[];
-  deletingId: number | null;
   transferringId: number | null;
+  togglingId: number | null;
   lowStockThreshold: number;
   getSafeImage: (image?: string) => string;
   getColorLabel: (color: unknown) => string;
   getCategoryLabel: (product: Product) => string;
   onOpenEdit: (row: Product) => void;
-  onDelete: (id?: number) => void | Promise<void>;
   onOpenTransfer: (product: Product) => void;
+  onToggleActive: (product: Product) => void | Promise<void>;
 };
 
 const ProductsInventoryTable = ({
   loading,
   products,
   filteredProducts,
-  deletingId,
   transferringId,
+  togglingId,
   lowStockThreshold,
   getSafeImage,
   getColorLabel,
   getCategoryLabel,
   onOpenEdit,
-  onDelete,
   onOpenTransfer,
+  onToggleActive,
 }: ProductsInventoryTableProps) => {
+  const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuProduct, setMenuProduct] = useState<Product | null>(null);
+
+  const handleOpenMenu = (
+    event: React.MouseEvent<HTMLElement>,
+    product: Product,
+  ) => {
+    setMenuAnchorEl(event.currentTarget);
+    setMenuProduct(product);
+  };
+
+  const handleCloseMenu = () => {
+    setMenuAnchorEl(null);
+    setMenuProduct(null);
+  };
+
+  const handleMenuEdit = () => {
+    if (!menuProduct) return;
+    onOpenEdit(menuProduct);
+    handleCloseMenu();
+  };
+
+  const handleMenuTransfer = () => {
+    if (!menuProduct) return;
+    onOpenTransfer(menuProduct);
+    handleCloseMenu();
+  };
+
+  const handleMenuToggleActive = () => {
+    if (!menuProduct) return;
+    onToggleActive(menuProduct);
+    handleCloseMenu();
+  };
+
   let tableRows: React.ReactNode;
 
   if (loading && products.length === 0) {
@@ -72,13 +111,16 @@ const ProductsInventoryTable = ({
       const sellerStock = Number(row.sellerStock ?? 0);
       const warehouseStock = Number(row.warehouseStock ?? row.quantity ?? 0);
       const colorLabel = getColorLabel(row.color);
+      const isInactive = row.active === false;
       const isOutOfStock = warehouseStock <= 0;
       const isLowStock =
         warehouseStock > 0 && warehouseStock <= lowStockThreshold;
       let stockChip = (
         <Chip size="small" color="success" label="Warehouse Ready" />
       );
-      if (isOutOfStock) {
+      if (isInactive) {
+        stockChip = <Chip size="small" color="default" label="Inactive" />;
+      } else if (isOutOfStock) {
         stockChip = <Chip size="small" color="error" label="Awaiting Transfer" />;
       } else if (isLowStock) {
         stockChip = <Chip size="small" color="warning" label="Low Warehouse Stock" />;
@@ -157,39 +199,11 @@ const ProductsInventoryTable = ({
 
           <TableCell align="right">
             <div className="flex items-center justify-end gap-2">
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={
-                  transferringId === row.id ? (
-                    <CircularProgress size={14} />
-                  ) : (
-                    <WarehouseOutlinedIcon fontSize="small" />
-                  )
-                }
-                onClick={() => onOpenTransfer(row)}
-                disabled={sellerStock <= 0 || transferringId === row.id}
-              >
-                Send to Warehouse
-              </Button>
               <IconButton
-                color="primary"
                 size="small"
-                onClick={() => onOpenEdit(row)}
+                onClick={(event) => handleOpenMenu(event, row)}
               >
-                <EditOutlinedIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                color="error"
-                size="small"
-                onClick={() => onDelete(row.id)}
-                disabled={deletingId === row.id}
-              >
-                {deletingId === row.id ? (
-                  <CircularProgress size={16} />
-                ) : (
-                  <DeleteOutlineRoundedIcon fontSize="small" />
-                )}
+                <MoreVertRoundedIcon fontSize="small" />
               </IconButton>
             </div>
           </TableCell>
@@ -223,6 +237,55 @@ const ProductsInventoryTable = ({
         </TableHead>
         <TableBody>{tableRows}</TableBody>
       </Table>
+      <Menu
+        anchorEl={menuAnchorEl}
+        open={Boolean(menuAnchorEl)}
+        onClose={handleCloseMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <MenuItem onClick={handleMenuEdit}>
+          <ListItemIcon>
+            <EditOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText>Edit</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={handleMenuTransfer}
+          disabled={
+            !menuProduct ||
+            Number(menuProduct.sellerStock ?? 0) <= 0 ||
+            menuProduct.active === false ||
+            transferringId === menuProduct.id
+          }
+        >
+          <ListItemIcon>
+            {menuProduct && transferringId === menuProduct.id ? (
+              <CircularProgress size={16} />
+            ) : (
+              <WarehouseOutlinedIcon fontSize="small" />
+            )}
+          </ListItemIcon>
+          <ListItemText>Send to Warehouse</ListItemText>
+        </MenuItem>
+        <MenuItem
+          onClick={handleMenuToggleActive}
+          disabled={!menuProduct || togglingId === menuProduct.id}
+        >
+          <ListItemIcon>
+            {menuProduct && togglingId === menuProduct.id ? (
+              <CircularProgress size={16} />
+            ) : menuProduct?.active === false ? (
+              <VisibilityOutlinedIcon fontSize="small" />
+            ) : (
+              <VisibilityOffOutlinedIcon fontSize="small" />
+            )}
+          </ListItemIcon>
+          <ListItemText>
+            {menuProduct?.active === false ? 'Enable' : 'Disable'}
+          </ListItemText>
+        </MenuItem>
+      </Menu>
     </TableContainer>
   );
 };

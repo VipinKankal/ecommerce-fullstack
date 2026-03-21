@@ -101,9 +101,8 @@ const AddProducts = () => {
         shippingClass: values.shippingClass,
         returnable: values.returnable,
         returnWindowDays: Number(values.returnWindowDays || 0),
-        warrantyType:
-          values.warrantyType === 'NO_WARRANTY' ? 'NONE' : values.warrantyType,
-        warrantyPeriod: values.warrantyPeriod.trim() || undefined,
+        warrantyType: values.warrantyType,
+        warrantyDays: Number(values.warrantyDays || 0),
         replacementAvailable: values.replacementAvailable,
         manufacturerName: values.manufacturerName.trim(),
         manufacturerAddress: values.manufacturerAddress.trim() || undefined,

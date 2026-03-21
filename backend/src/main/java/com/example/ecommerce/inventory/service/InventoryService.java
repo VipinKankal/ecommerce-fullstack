@@ -37,4 +37,6 @@ public interface InventoryService {
     );
 
     List<Map<String, Object>> getMovementsForProduct(Long productId);
+
+    void notifySubscribersIfRestocked(Product product);
 }

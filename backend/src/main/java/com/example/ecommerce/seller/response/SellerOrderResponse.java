@@ -30,6 +30,7 @@ public class SellerOrderResponse {
     private LocalDateTime cancelledAt;
     private LocalDateTime orderDate;
     private LocalDateTime deliveryDate;
+    private LocalDateTime deliveredAt;
     private CustomerSummary user;
     private AddressSummary shippingAddress;
     private List<OrderItemSummary> orderItems = new ArrayList<>();

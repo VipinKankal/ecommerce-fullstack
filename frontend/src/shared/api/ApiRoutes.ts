@@ -116,6 +116,10 @@ export const API_ROUTES = {
     list: "/products",
     search: "/products/search",
     byId: (productId: number | string) => `/products/${productId}`,
+    notifyMe: (productId: number | string) =>
+      `/api/products/${productId}/notify-me`,
+    notifyMeStatus: (productId: number | string) =>
+      `/api/products/${productId}/notify-me/status`,
     listAlias: "/api/products",
     searchAlias: "/api/products/search",
     byIdAlias: (productId: number | string) => `/api/products/${productId}`,
@@ -144,6 +148,8 @@ export const API_ROUTES = {
   sellerProducts: {
     base: "/api/sellers/products",
     byId: (productId: number | string) => `/api/sellers/products/${productId}`,
+    active: (productId: number | string) =>
+      `/api/sellers/products/${productId}/active`,
     transferToWarehouse: (productId: number | string) =>
       `/api/sellers/products/${productId}/warehouse-transfer`,
     movements: (productId: number | string) =>
@@ -155,6 +161,11 @@ export const API_ROUTES = {
     updateStatus: (orderId: number | string, orderStatus: string) =>
       `/api/seller/orders/${orderId}/status/${orderStatus}`,
     deliveryHistory: (orderId: number | string) => `/api/seller/orders/${orderId}/delivery-history`,
+  },
+
+  sellerAftercare: {
+    returns: "/api/seller/aftercare/returns",
+    exchanges: "/api/seller/aftercare/exchanges",
   },
 
   transactions: {

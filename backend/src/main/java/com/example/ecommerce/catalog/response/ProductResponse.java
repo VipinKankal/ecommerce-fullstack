@@ -19,6 +19,8 @@ public class ProductResponse {
     private Integer quantity;
     private Integer sellerStock;
     private Integer warehouseStock;
+    private String warrantyType;
+    private Integer warrantyDays;
     private String color;
     private List<String> images = new ArrayList<>();
     private Integer numRatings;
@@ -27,6 +29,8 @@ public class ProductResponse {
     private LocalDateTime createdAt;
     private String size;
     private String sizes;
+    private Boolean active;
+    private List<VariantSummary> variants = new ArrayList<>();
 
     @Data
     public static class CategorySummary {
@@ -41,6 +45,19 @@ public class ProductResponse {
         private Long id;
         private String sellerName;
         private String email;
+    }
+
+    @Data
+    public static class VariantSummary {
+        private Long id;
+        private String variantType;
+        private String variantValue;
+        private String size;
+        private String color;
+        private String sku;
+        private Integer price;
+        private Integer sellerStock;
+        private Integer warehouseStock;
     }
 }
 

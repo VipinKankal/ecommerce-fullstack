@@ -19,8 +19,8 @@ import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import {
-  deleteSellerProduct,
   fetchSellerProducts,
+  toggleSellerProductActive,
   transferSellerProductToWarehouse,
   updateSellerProduct,
 } from 'State/features/seller/products/thunks';
@@ -45,19 +45,22 @@ const ProductsTable = () => {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('ALL');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [transferringId, setTransferringId] = useState<number | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [transferProduct, setTransferProduct] = useState<Product | null>(null);
   const [transferQuantity, setTransferQuantity] = useState('1');
   const [editForm, setEditForm] = useState<ProductEditFormState>({
     title: '',
+    brand: '',
     description: '',
     sellingPrice: '',
     mrpPrice: '',
     quantity: '',
     color: '',
     sizes: '',
+    warrantyType: 'NONE',
+    warrantyDays: '0',
   });
 
   useEffect(() => {
@@ -147,12 +150,15 @@ const ProductsTable = () => {
     setEditProduct(row);
     setEditForm({
       title: row.title || '',
+      brand: row.brand || '',
       description: row.description || '',
       sellingPrice: String(row.sellingPrice ?? ''),
       mrpPrice: String(row.mrpPrice ?? ''),
       quantity: String(row.sellerStock ?? 0),
       color: getColorLabel(row.color),
       sizes: (row as ProductWithOptionalSize).size || row.sizes || '',
+      warrantyType: row.warrantyType || 'NONE',
+      warrantyDays: String(row.warrantyDays ?? 0),
     });
   };
 
@@ -170,14 +176,21 @@ const ProductsTable = () => {
     setTransferQuantity('1');
   };
 
-  const handleDelete = async (productId?: number) => {
-    if (!productId) return;
-    setDeletingId(productId);
+  const handleToggleActive = async (product: Product) => {
+    if (!product.id) return;
+    setTogglingId(product.id);
     try {
-      await dispatch(deleteSellerProduct({ productId })).unwrap();
+      await dispatch(
+        toggleSellerProductActive({
+          productId: product.id,
+          active: product.active === false,
+        }),
+      ).unwrap();
       await dispatch(fetchSellerProducts()).unwrap();
+    } catch {
+      // Slice error state already captures the backend rejection message.
     } finally {
-      setDeletingId(null);
+      setTogglingId(null);
     }
   };
 
@@ -187,9 +200,11 @@ const ProductsTable = () => {
     const parsedSellingPrice = Number(editForm.sellingPrice);
     const parsedMrpPrice = Number(editForm.mrpPrice);
     const parsedQuantity = Number(editForm.quantity);
+    const parsedWarrantyDays = Number(editForm.warrantyDays);
 
     const updatePayload = {
       title: editForm.title.trim() || editProduct.title,
+      brand: editForm.brand.trim() || editProduct.brand,
       color: editForm.color.trim() || getColorLabel(editProduct.color),
       description: editForm.description.trim() || editProduct.description,
       images: editProduct.images ?? [],
@@ -204,19 +219,32 @@ const ProductsTable = () => {
       mrpPrice: Number.isFinite(parsedMrpPrice)
         ? parsedMrpPrice
         : editProduct.mrpPrice,
+      warrantyType: editForm.warrantyType || editProduct.warrantyType || 'NONE',
+      warrantyDays: Number.isFinite(parsedWarrantyDays)
+        ? parsedWarrantyDays
+        : editProduct.warrantyDays ?? 0,
       quantity: Number.isFinite(parsedQuantity)
         ? parsedQuantity
         : editProduct.sellerStock ?? 0,
+      size:
+        editForm.sizes.trim() ||
+        (editProduct as ProductWithOptionalSize).size ||
+        editProduct.sizes ||
+        '',
     };
 
-    await dispatch(
-      updateSellerProduct({
-        productId: editProduct.id,
-        product: updatePayload as ProductUpdatePayload,
-      }),
-    ).unwrap();
-    await dispatch(fetchSellerProducts()).unwrap();
-    closeEdit();
+    try {
+      await dispatch(
+        updateSellerProduct({
+          productId: editProduct.id,
+          product: updatePayload as ProductUpdatePayload,
+        }),
+      ).unwrap();
+      await dispatch(fetchSellerProducts()).unwrap();
+      closeEdit();
+    } catch {
+      // Slice error state already captures the backend rejection message.
+    }
   };
 
   const handleTransferSubmit = async () => {
@@ -346,19 +374,24 @@ const ProductsTable = () => {
           </Alert>
         )}
 
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Sellers can update their own catalog and seller stock. Use Disable to
+          hide a product from customers without removing order history.
+        </Alert>
+
         <ProductsInventoryTable
           loading={loading}
           products={products}
           filteredProducts={filteredProducts}
-          deletingId={deletingId}
           transferringId={transferringId}
+          togglingId={togglingId}
           lowStockThreshold={LOW_STOCK_THRESHOLD}
           getSafeImage={getSafeImage}
           getColorLabel={getColorLabel}
           getCategoryLabel={getCategoryLabel}
           onOpenEdit={openEdit}
-          onDelete={handleDelete}
           onOpenTransfer={openTransfer}
+          onToggleActive={handleToggleActive}
         />
       </Paper>
 

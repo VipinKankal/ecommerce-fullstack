@@ -27,4 +27,18 @@ public class CreateProductRequest {
     private String category2;
     private String category3;
     private String size;
+    private String warrantyType;
+    private Integer warrantyDays;
+    private List<VariantRequest> variants;
+
+    @Data
+    public static class VariantRequest {
+        private String variantType;
+        private String variantValue;
+        private String size;
+        private String color;
+        private String sku;
+        private Integer price;
+        private Integer quantity;
+    }
 }

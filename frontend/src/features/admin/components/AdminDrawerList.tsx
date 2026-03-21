@@ -29,6 +29,8 @@ import {
   Dashboard,
   Inventory2Outlined,
   Inventory2,
+  StoreOutlined,
+  Store,
   ShoppingBagOutlined,
   ShoppingBag,
   InsightsOutlined,
@@ -66,6 +68,12 @@ const menu = [
     path: '/admin/products',
     icon: <Inventory2Outlined />,
     activeIcon: <Inventory2 />,
+  },
+  {
+    name: 'Warehouse Stock',
+    path: '/admin/warehouse-stock',
+    icon: <StoreOutlined />,
+    activeIcon: <Store />,
   },
   {
     name: 'Orders',

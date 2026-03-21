@@ -82,6 +82,7 @@ public class CartController {
 
         CartItem cartItem = new CartItem();
         cartItem.setQuantity(request.getQuantity());
+        cartItem.setSize(request.getSize());
         cartItemService.updateCartItem(user.getId(), cartItemId, cartItem);
         Cart cart = cartService.findUserCart(user);
 
