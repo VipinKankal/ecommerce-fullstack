@@ -74,14 +74,15 @@ const PaymentMethodList = ({
                 UPI (PhonePe)
               </p>
               <p className="text-xs text-gray-500">
-                You will be redirected to PhonePe to complete payment.
+                If PhonePe session creates successfully, you will be redirected
+                there to complete payment.
               </p>
             </div>
           </div>
           {paymentMethod === 'PHONEPE' && (
             <Alert className="mt-4" severity="info">
-              PhonePe payment create hone ke baad aap payment page par redirect
-              ho jaoge.
+              PhonePe available hua to redirect hoga. Agar backend config
+              missing hui to exact error neeche show hoga.
             </Alert>
           )}
           {paymentMethod === 'COD' && (

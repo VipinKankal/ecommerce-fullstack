@@ -4,6 +4,7 @@ import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { getErrorMessage } from 'State/backend/masterApi/shared';
 
 export type SellerOrderStatus =
+  | 'INITIATED'
   | 'PENDING'
   | 'PLACED'
   | 'CONFIRMED'
@@ -26,6 +27,9 @@ export interface SellerOrder {
   totalMrpPrice: number;
   totalItems: number;
   paymentStatus?: string;
+  paymentMethod?: string;
+  paymentType?: string;
+  provider?: string;
   createdAt?: string;
   orderDate?: string;
   deliveryDate?: string;

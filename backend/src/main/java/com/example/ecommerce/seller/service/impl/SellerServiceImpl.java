@@ -28,6 +28,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class SellerServiceImpl implements SellerService {
+    private static final String SELLER_ALREADY_REGISTERED_MESSAGE =
+            "This email is already registered as a seller. Please log in instead.";
 
     private final SellerRepository sellerRepository;
     private final JwtProvider jwtProvider;
@@ -48,7 +50,7 @@ public class SellerServiceImpl implements SellerService {
         String normalizedEmail = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
         Seller sellerExist = sellerRepository.findByEmail(normalizedEmail);
         if (sellerExist != null) {
-            throw new Exception("seller already exist, used different email");
+            throw new IllegalArgumentException(SELLER_ALREADY_REGISTERED_MESSAGE);
         }
 
         Seller newSeller = new Seller();
@@ -164,8 +166,11 @@ public class SellerServiceImpl implements SellerService {
         if (request.getMobileNumber() != null) {
             existingSeller.setMobileNumber(request.getMobileNumber());
         }
-        if (request.getEmail() != null) {
-            existingSeller.setEmail(request.getEmail().trim().toLowerCase());
+        if (request.getEmail() != null
+                && !request.getEmail().trim().equalsIgnoreCase(existingSeller.getEmail())) {
+            throw new IllegalArgumentException(
+                    "Use seller email verification flow to update the primary login email."
+            );
         }
         if (request.getDateOfBirth() != null) {
             existingSeller.setDateOfBirth(request.getDateOfBirth());
@@ -244,6 +249,7 @@ public class SellerServiceImpl implements SellerService {
 
         return sellerRepository.save(existingSeller);
     }
+
     @Override
     public void deleteSeller(Long id) throws Exception {
         Seller seller = getSellerById(id);

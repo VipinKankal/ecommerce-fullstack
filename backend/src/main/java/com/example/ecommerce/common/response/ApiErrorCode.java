@@ -1,0 +1,13 @@
+package com.example.ecommerce.common.response;
+
+public enum ApiErrorCode {
+    AUTH_REQUIRED,
+    INVALID_CREDENTIALS,
+    ACCESS_DENIED,
+    RESOURCE_NOT_FOUND,
+    VALIDATION_ERROR,
+    DUPLICATE_RESOURCE,
+    RATE_LIMIT_EXCEEDED,
+    INTERNAL_ERROR,
+    SERVICE_UNAVAILABLE
+}

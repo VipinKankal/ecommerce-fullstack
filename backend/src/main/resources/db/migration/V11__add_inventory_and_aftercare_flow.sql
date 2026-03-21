@@ -1,0 +1,100 @@
+ALTER TABLE product
+    ADD COLUMN seller_stock INT NOT NULL DEFAULT 0,
+    ADD COLUMN warehouse_stock INT NOT NULL DEFAULT 0;
+
+UPDATE product
+SET warehouse_stock = quantity,
+    seller_stock = 0;
+
+CREATE TABLE inventory_movements (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    product_id BIGINT NULL,
+    order_item_id BIGINT NULL,
+    request_id BIGINT NULL,
+    request_type VARCHAR(255) NULL,
+    action VARCHAR(255) NULL,
+    from_location VARCHAR(255) NULL,
+    to_location VARCHAR(255) NULL,
+    quantity INT NULL,
+    movement_type VARCHAR(255) NULL,
+    order_status VARCHAR(255) NULL,
+    added_by VARCHAR(255) NULL,
+    updated_by VARCHAR(255) NULL,
+    note VARCHAR(1200) NULL,
+    created_at DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT fk_inventory_movement_product
+        FOREIGN KEY (product_id) REFERENCES product (id)
+);
+
+CREATE TABLE order_return_exchange_requests (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    request_number VARCHAR(255) NULL,
+    request_type VARCHAR(255) NULL,
+    status VARCHAR(255) NULL,
+    order_id BIGINT NULL,
+    order_item_id BIGINT NULL,
+    customer_id BIGINT NULL,
+    customer_name VARCHAR(255) NULL,
+    seller_id BIGINT NULL,
+    product_id BIGINT NULL,
+    product_title VARCHAR(255) NULL,
+    product_image VARCHAR(255) NULL,
+    quantity_requested INT NULL,
+    reason_code VARCHAR(255) NULL,
+    customer_comment VARCHAR(2000) NULL,
+    admin_comment VARCHAR(1200) NULL,
+    rejection_reason VARCHAR(1200) NULL,
+    courier_id BIGINT NULL,
+    courier_name VARCHAR(255) NULL,
+    requested_new_product_id BIGINT NULL,
+    requested_new_product_title VARCHAR(255) NULL,
+    requested_new_product_image VARCHAR(255) NULL,
+    requested_variant VARCHAR(255) NULL,
+    product_photo VARCHAR(1200) NULL,
+    old_price INT NULL,
+    new_price INT NULL,
+    price_difference INT NULL,
+    balance_mode VARCHAR(255) NULL,
+    payment_reference VARCHAR(255) NULL,
+    refund_status VARCHAR(255) NULL,
+    refund_eligible_after DATETIME(6) NULL,
+    wallet_credit_status VARCHAR(255) NULL,
+    bank_refund_status VARCHAR(255) NULL,
+    bank_account_holder_name VARCHAR(255) NULL,
+    bank_account_number VARCHAR(255) NULL,
+    bank_ifsc_code VARCHAR(255) NULL,
+    bank_name VARCHAR(255) NULL,
+    bank_upi_id VARCHAR(255) NULL,
+    replacement_order_id BIGINT NULL,
+    requested_at DATETIME(6) NULL,
+    approved_at DATETIME(6) NULL,
+    admin_reviewed_at DATETIME(6) NULL,
+    pickup_scheduled_at DATETIME(6) NULL,
+    pickup_completed_at DATETIME(6) NULL,
+    received_at DATETIME(6) NULL,
+    refund_initiated_at DATETIME(6) NULL,
+    refund_completed_at DATETIME(6) NULL,
+    payment_completed_at DATETIME(6) NULL,
+    wallet_credit_completed_at DATETIME(6) NULL,
+    bank_refund_initiated_at DATETIME(6) NULL,
+    bank_refund_completed_at DATETIME(6) NULL,
+    replacement_created_at DATETIME(6) NULL,
+    replacement_shipped_at DATETIME(6) NULL,
+    replacement_delivered_at DATETIME(6) NULL,
+    completed_at DATETIME(6) NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_order_return_exchange_request_number UNIQUE (request_number)
+);
+
+CREATE TABLE order_return_exchange_request_history (
+    request_id BIGINT NOT NULL,
+    history_index INT NOT NULL,
+    status VARCHAR(255) NULL,
+    note VARCHAR(1200) NULL,
+    updated_by VARCHAR(255) NULL,
+    created_at DATETIME(6) NULL,
+    PRIMARY KEY (request_id, history_index),
+    CONSTRAINT fk_order_return_exchange_request_history_request
+        FOREIGN KEY (request_id) REFERENCES order_return_exchange_requests (id)
+);

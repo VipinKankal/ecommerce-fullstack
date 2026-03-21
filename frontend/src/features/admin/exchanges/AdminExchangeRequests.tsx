@@ -92,22 +92,39 @@ const AdminExchangeRequests = () => {
     setLoading(true);
     setError(null);
     try {
-      const [requestResponse, courierResponse] = await Promise.all([
+      const [requestResponse, courierResponse] = await Promise.allSettled([
         api.get(API_ROUTES.admin.exchanges.base),
         api.get(API_ROUTES.adminCouriers.base),
       ]);
-      setRequests(
-        Array.isArray(requestResponse.data) ? requestResponse.data : [],
-      );
-      setCouriers(
-        (Array.isArray(courierResponse.data) ? courierResponse.data : []).map(
-          mapCourier,
-        ),
-      );
+
+      if (requestResponse.status === 'fulfilled') {
+        setRequests(
+          Array.isArray(requestResponse.value.data)
+            ? requestResponse.value.data
+            : [],
+        );
+      } else {
+        setRequests([]);
+        setError(
+          readErrorMessage(
+            requestResponse.reason,
+            'Failed to load exchange requests',
+          ),
+        );
+      }
+
+      if (courierResponse.status === 'fulfilled') {
+        setCouriers(
+          (Array.isArray(courierResponse.value.data)
+            ? courierResponse.value.data
+            : []
+          ).map(mapCourier),
+        );
+      } else {
+        setCouriers([]);
+      }
     } catch (requestError: unknown) {
-      setError(
-        readErrorMessage(requestError, 'Failed to load exchange requests'),
-      );
+      setError(readErrorMessage(requestError, 'Failed to load exchange requests'));
     } finally {
       setLoading(false);
     }

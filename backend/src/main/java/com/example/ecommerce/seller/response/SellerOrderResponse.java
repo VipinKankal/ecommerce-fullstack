@@ -1,7 +1,10 @@
 package com.example.ecommerce.seller.response;
 
 import com.example.ecommerce.common.domain.OrderStatus;
+import com.example.ecommerce.common.domain.PaymentMethod;
+import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
+import com.example.ecommerce.common.domain.PaymentType;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -15,6 +18,9 @@ public class SellerOrderResponse {
     private Long sellerId;
     private OrderStatus orderStatus;
     private PaymentStatus paymentStatus;
+    private PaymentMethod paymentMethod;
+    private PaymentType paymentType;
+    private PaymentProvider provider;
     private Double totalMrpPrice;
     private Integer totalSellingPrice;
     private Double discount;

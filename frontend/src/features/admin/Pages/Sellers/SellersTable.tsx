@@ -88,6 +88,24 @@ const SellersTable = () => {
       sellerName: seller.sellerName || 'N/A',
       email: seller.email || 'N/A',
       mobile: seller.mobileNumber || seller.mobile || 'N/A',
+      businessEmail:
+        seller.storeDetails?.supportEmail || seller.email || 'N/A',
+      businessMobile:
+        seller.storeDetails?.supportPhone ||
+        seller.pickupAddress?.mobileNumber ||
+        seller.mobileNumber ||
+        seller.mobile ||
+        'N/A',
+      businessAddress:
+        [
+          seller.pickupAddress?.address,
+          seller.pickupAddress?.locality,
+          seller.pickupAddress?.city,
+          seller.pickupAddress?.state,
+          seller.pickupAddress?.pinCode,
+        ]
+          .filter(Boolean)
+          .join(', ') || 'N/A',
       gstin:
         seller.GSTIN ||
         seller.gstin ||
@@ -128,6 +146,9 @@ const SellersTable = () => {
         seller.email,
         seller.mobile,
         seller.businessName,
+        seller.businessEmail,
+        seller.businessMobile,
+        seller.businessAddress,
         seller.gstin,
       ]
         .join(' ')
@@ -325,8 +346,15 @@ const SellersTable = () => {
                       >
                         {seller.email}
                       </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block' }}
+                      >
+                        Primary: {seller.mobile}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {seller.mobile}
+                        Business: {seller.businessEmail}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -340,8 +368,15 @@ const SellersTable = () => {
                       >
                         {seller.businessType}
                       </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block' }}
+                      >
+                        Contact: {seller.businessMobile}
+                      </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        GST: {seller.gstin}
+                        GST: {seller.gstin} | {seller.businessAddress}
                       </Typography>
                     </TableCell>
                     <TableCell>

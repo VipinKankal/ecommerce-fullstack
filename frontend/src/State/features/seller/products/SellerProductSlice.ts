@@ -3,6 +3,7 @@ import {
   fetchSellerProducts,
   createProduct,
   updateSellerProduct,
+  transferSellerProductToWarehouse,
   deleteSellerProduct,
 } from './sellerProductThunks';
 import { Product } from 'shared/types/product.types';
@@ -48,6 +49,17 @@ const sellerProductSlice = createSlice({
         state.error = null;
       })
       .addCase(updateSellerProduct.fulfilled, (state, action) => {
+        state.loading = false;
+        state.products = state.products.map((p) =>
+          p.id === action.payload.id ? action.payload : p,
+        );
+      })
+
+      .addCase(transferSellerProductToWarehouse.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(transferSellerProductToWarehouse.fulfilled, (state, action) => {
         state.loading = false;
         state.products = state.products.map((p) =>
           p.id === action.payload.id ? action.payload : p,

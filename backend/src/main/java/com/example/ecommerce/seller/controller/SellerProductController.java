@@ -1,6 +1,8 @@
 package com.example.ecommerce.seller.controller;
 
 import com.example.ecommerce.common.mapper.ResponseMapper;
+import com.example.ecommerce.common.response.ApiResponse;
+import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.catalog.request.CreateProductRequest;
@@ -16,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,6 +27,7 @@ import java.util.List;
 public class SellerProductController {
     private final ProductService productService;
     private final SellerService sellerService;
+    private final InventoryService inventoryService;
 
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getProductsBySellerId(
@@ -45,13 +49,15 @@ public class SellerProductController {
     }
 
     @DeleteMapping("/{productId}")
-    public ResponseEntity<Void> deleteProduct(
+    public ResponseEntity<ApiResponse> deleteProduct(
             @PathVariable Long productId,
             @RequestHeader("Authorization") String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         productService.deleteProduct(productId, seller.getId());
-        return new ResponseEntity<>(HttpStatus.OK);
+        ApiResponse response = new ApiResponse();
+        response.setMessage("Product deleted successfully");
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @PutMapping("/{productId}")
@@ -63,5 +69,43 @@ public class SellerProductController {
         Seller seller = sellerService.getSellerProfile(jwt);
         Product updatedProduct = productService.updateProduct(productId, incoming, seller.getId());
         return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
+    }
+
+    @PostMapping("/{productId}/warehouse-transfer")
+    public ResponseEntity<ProductResponse> transferStockToWarehouse(
+            @PathVariable Long productId,
+            @RequestBody(required = false) Map<String, Object> payload,
+            @RequestHeader("Authorization") String jwt
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        Product product = productService.findProductById(productId);
+        if (product.getSeller() == null || !seller.getId().equals(product.getSeller().getId())) {
+            throw new Exception("Unauthorized product access");
+        }
+
+        Object rawQuantity = payload == null ? null : payload.get("quantity");
+        int quantity = rawQuantity instanceof Number number
+                ? number.intValue()
+                : Integer.parseInt(String.valueOf(rawQuantity));
+
+        Product updatedProduct = inventoryService.transferSellerStockToWarehouse(
+                product,
+                quantity,
+                "Seller sent stock to warehouse"
+        );
+        return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
+    }
+
+    @GetMapping("/{productId}/movements")
+    public ResponseEntity<List<Map<String, Object>>> getProductMovements(
+            @PathVariable Long productId,
+            @RequestHeader("Authorization") String jwt
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        Product product = productService.findProductById(productId);
+        if (product.getSeller() == null || !seller.getId().equals(product.getSeller().getId())) {
+            throw new Exception("Unauthorized product access");
+        }
+        return ResponseEntity.ok(inventoryService.getMovementsForProduct(productId));
     }
 }

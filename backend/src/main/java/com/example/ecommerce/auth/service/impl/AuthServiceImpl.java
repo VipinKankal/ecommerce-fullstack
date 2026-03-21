@@ -40,6 +40,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+    private static final String SELLER_NOT_REGISTERED_MESSAGE =
+            "No seller account found with this email. Please register first.";
+    private static final String CUSTOMER_NOT_REGISTERED_MESSAGE =
+            "No customer account found with this email. Please sign up first.";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -77,12 +81,12 @@ public class AuthServiceImpl implements AuthService {
         if (resolvedRole == UserRole.ROLE_SELLER) {
             Seller seller = sellerRepository.findByEmail(email);
             if (seller == null) {
-                throw new Exception("seller not found");
+                throw new IllegalArgumentException(SELLER_NOT_REGISTERED_MESSAGE);
             }
         } else if (loginStyleRequest) {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user == null) {
-                throw new Exception("user not exist with provided email");
+                throw new IllegalArgumentException(CUSTOMER_NOT_REGISTERED_MESSAGE);
             }
         }
 

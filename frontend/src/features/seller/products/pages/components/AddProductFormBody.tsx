@@ -340,7 +340,7 @@ const AddProductFormBody = ({
         </Typography>
       </Grid>
       {[
-        ['stockQuantity', 'Stock Quantity'],
+        ['stockQuantity', 'Seller Stock'],
         ['minOrderQuantity', 'Min Order Quantity'],
         ['maxOrderQuantity', 'Max Order Quantity'],
         ['reservedQuantity', 'Reserved Quantity'],

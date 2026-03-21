@@ -102,6 +102,8 @@ export const API_ROUTES = {
 
   payment: {
     byId: (paymentId: number | string) => `/api/payment/${paymentId}`,
+    statusByOrder: (paymentOrderId: number | string) =>
+      `/api/payment/orders/${paymentOrderId}/status`,
     createOrder: "/api/payments/create-order",
     retry: (orderId: number | string) => `/api/payments/retry/${orderId}`,
     manualUpiList: "/api/payments/manual-upi-qr",
@@ -129,6 +131,8 @@ export const API_ROUTES = {
     verifyEmail: (otp: string) => `/sellers/verifyEmail/${otp}`,
     signup: "/sellers",
     profile: "/sellers/profile",
+    requestEmailChangeOtp: "/sellers/email/change/request-otp",
+    verifyEmailChangeOtp: "/sellers/email/change/verify",
     byId: (id: number | string) => `/sellers/${id}`,
     list: "/sellers",
     patch: "/sellers",
@@ -140,6 +144,10 @@ export const API_ROUTES = {
   sellerProducts: {
     base: "/api/sellers/products",
     byId: (productId: number | string) => `/api/sellers/products/${productId}`,
+    transferToWarehouse: (productId: number | string) =>
+      `/api/sellers/products/${productId}/warehouse-transfer`,
+    movements: (productId: number | string) =>
+      `/api/sellers/products/${productId}/movements`,
   },
 
   sellerOrders: {

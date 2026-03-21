@@ -58,6 +58,9 @@ export type OrderLite = {
   id: number;
   orderStatus?: string;
   paymentStatus?: string;
+  paymentMethod?: string;
+  paymentType?: string;
+  provider?: string;
   fulfillmentStatus?: string;
   shipmentStatus?: string;
   deliveryTaskStatus?: string;
@@ -66,6 +69,7 @@ export type OrderLite = {
   cancelReasonCode?: string;
   cancelReasonText?: string;
   cancelledAt?: string;
+  orderDate?: string;
   shippingAddress?: AddressLite;
   orderItems?: OrderItemLite[];
   estimatedDelivery?: string;
@@ -82,6 +86,39 @@ export type CancelReasonOption = { code: string; label: string };
 export const cancelAllowed = new Set(['PENDING', 'PLACED', 'CONFIRMED']);
 export const prettyLabel = (value?: string | null) =>
   (value || '').replaceAll('_', ' ');
+
+export const resolvePaymentTypeLabel = (order: OrderLite | null) => {
+  const paymentType = (order?.paymentType || '').toUpperCase();
+  const paymentMethod = (order?.paymentMethod || '').toUpperCase();
+
+  if (paymentType === 'CASH' || paymentMethod === 'COD') return 'Cash';
+  if (paymentType === 'UPI' || paymentMethod === 'UPI') return 'UPI';
+  if (paymentType === 'CARD' || paymentMethod === 'CARD') return 'Card';
+  return paymentType || paymentMethod || '';
+};
+
+export const resolveCustomerPaymentMessage = (order: OrderLite | null) => {
+  const paymentMethod = (order?.paymentMethod || '').toUpperCase();
+  const provider = (order?.provider || '').toUpperCase();
+
+  if (paymentMethod === 'COD') {
+    return 'Your order is Cash on Delivery.';
+  }
+
+  if (paymentMethod === 'UPI' && provider === 'PHONEPE') {
+    return 'Your order will be paid via PhonePe UPI.';
+  }
+
+  if (paymentMethod === 'UPI') {
+    return 'Your order will be paid via UPI.';
+  }
+
+  if (paymentMethod === 'CARD') {
+    return 'Your order will be paid online by card.';
+  }
+
+  return '';
+};
 
 export const resolveCustomerStatus = (order: OrderLite | null) => {
   const rawOrderStatus = (order?.orderStatus || 'PENDING').toUpperCase();

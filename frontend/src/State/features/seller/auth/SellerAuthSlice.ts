@@ -5,7 +5,9 @@ import {
   registerSeller,
   verifySellerEmail,
   fetchSellerProfile,
+  requestSellerEmailChangeOtp,
   updateSellerProfile,
+  verifySellerEmailChangeOtp,
   logout,
 } from './SellerAuthThunks';
 import {
@@ -159,6 +161,30 @@ const sellerAuthSlice = createSlice({
         },
       )
       .addCase(updateSellerProfile.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(requestSellerEmailChangeOtp.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(requestSellerEmailChangeOtp.fulfilled, (state) => {
+        state.loading = false;
+        state.message = 'OTP sent to the new seller email';
+      })
+      .addCase(requestSellerEmailChangeOtp.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      .addCase(verifySellerEmailChangeOtp.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(verifySellerEmailChangeOtp.fulfilled, (state) => {
+        state.loading = false;
+        state.message = 'Seller email updated successfully';
+      })
+      .addCase(verifySellerEmailChangeOtp.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload as string;
       })

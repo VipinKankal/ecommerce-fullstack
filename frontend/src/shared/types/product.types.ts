@@ -9,6 +9,8 @@ export interface Product {
   sellingPrice: number;
   discountPercent: number;
   quantity: number;
+  sellerStock?: number;
+  warehouseStock?: number;
   color: string;
   images: string[];
   numRatings?: number;

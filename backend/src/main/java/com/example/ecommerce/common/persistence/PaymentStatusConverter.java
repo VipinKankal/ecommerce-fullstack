@@ -18,9 +18,9 @@ public class PaymentStatusConverter implements AttributeConverter<PaymentStatus,
                 dbData,
                 PaymentStatus.class,
                 PaymentStatus.PENDING,
-                "CAPTURED", "COMPLETED",
-                "PAID", "COMPLETED",
-                "SUCCESS", "COMPLETED",
+                "CAPTURED", "SUCCESS",
+                "PAID", "SUCCESS",
+                "COMPLETED", "SUCCESS",
                 "CREATED", "PENDING"
         );
     }

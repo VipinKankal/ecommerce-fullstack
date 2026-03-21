@@ -3,7 +3,10 @@ import { Alert, Button, CircularProgress } from '@mui/material';
 import { teal } from '@mui/material/colors';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppDispatch } from 'app/store/Store';
-import { paymentById } from 'State/backend/MasterApiThunks';
+import {
+  paymentById,
+  paymentStatusByOrder,
+} from 'State/backend/MasterApiThunks';
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
   if (typeof error === 'string' && error.trim()) {
@@ -36,6 +39,7 @@ const PaymentSuccess = () => {
 
   useEffect(() => {
     const verifyPayment = async () => {
+      const provider = (searchParams.get('provider') || '').toUpperCase();
       const paymentId =
         searchParams.get('razorpay_payment_id') ||
         searchParams.get('payment_id') ||
@@ -44,23 +48,74 @@ const PaymentSuccess = () => {
         searchParams.get('razorpay_payment_link_id') ||
         searchParams.get('payment_link_id') ||
         searchParams.get('paymentLinkId');
-
-      if (!paymentId || !paymentLinkId) {
-        setMessage('Payment callback is missing required parameters.');
-        setLoading(false);
-        return;
-      }
+      const shouldUseOrderStatus =
+        provider === 'PHONEPE' ||
+        Boolean(searchParams.get('merchantTransactionId')) ||
+        (!paymentId && !paymentLinkId && Boolean(paymentOrderId));
 
       try {
-        const response = await dispatch(
+        if (shouldUseOrderStatus && paymentOrderId) {
+          let latestResponse: Record<string, unknown> | null = null;
+          for (let attempt = 0; attempt < 4; attempt += 1) {
+            latestResponse = (await dispatch(
+              paymentStatusByOrder(paymentOrderId),
+            ).unwrap()) as Record<string, unknown>;
+
+            const status = String(latestResponse?.paymentStatus || '').toUpperCase();
+            if (status === 'SUCCESS' || status === 'FAILED') {
+              break;
+            }
+            if (attempt < 3) {
+              await new Promise((resolve) => globalThis.setTimeout(resolve, 1500));
+            }
+          }
+
+          setOrderId(
+            (latestResponse?.orderId as number | string | null | undefined) ||
+              null,
+          );
+          const normalizedStatus = String(
+            latestResponse?.paymentStatus || '',
+          ).toUpperCase();
+          if (normalizedStatus === 'SUCCESS') {
+            setSuccess(true);
+            setMessage(
+              String(latestResponse?.message || 'Payment successful. Your order has been confirmed.'),
+            );
+          } else if (normalizedStatus === 'FAILED') {
+            setSuccess(false);
+            setMessage(
+              String(latestResponse?.message || 'Payment failed. Please retry.'),
+            );
+          } else {
+            setSuccess(false);
+            setMessage(
+              String(
+                latestResponse?.message ||
+                  'Payment is still pending. Please wait a moment and refresh.',
+              ),
+            );
+          }
+          return;
+        }
+
+        if (!paymentId || !paymentLinkId) {
+          setMessage('Payment callback is missing required parameters.');
+          return;
+        }
+
+        const response = (await dispatch(
           paymentById({
             paymentId,
             paymentLinkId,
           }),
-        ).unwrap();
-        setOrderId(response?.orderId || null);
-        setSuccess(true);
-        setMessage('Payment successful. Your order has been confirmed.');
+        ).unwrap()) as Record<string, unknown>;
+        setOrderId((response?.orderId as number | string | null | undefined) || null);
+        const normalizedStatus = String(response?.paymentStatus || '').toUpperCase();
+        setSuccess(normalizedStatus === '' || normalizedStatus === 'SUCCESS');
+        setMessage(
+          String(response?.message || 'Payment successful. Your order has been confirmed.'),
+        );
       } catch (error: unknown) {
         setMessage(getErrorMessage(error, 'Payment verification failed.'));
       } finally {

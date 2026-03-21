@@ -17,9 +17,12 @@ public class PaymentMethodConverter implements AttributeConverter<PaymentMethod,
         return LegacyEnumValueNormalizer.normalize(
                 dbData,
                 PaymentMethod.class,
-                PaymentMethod.RAZORPAY,
-                "CARD", "STRIPE",
-                "ONLINE", "RAZORPAY"
+                PaymentMethod.UPI,
+                "RAZORPAY", "UPI",
+                "PHONEPE", "UPI",
+                "ONLINE", "UPI",
+                "STRIPE", "CARD",
+                "CASH", "COD"
         );
     }
 }

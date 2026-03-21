@@ -5,34 +5,11 @@ import { useNavigate } from 'react-router-dom';
 import { userOrderHistory } from 'State/backend/MasterApiThunks';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import OrderItem from './OrderItem';
-
-type ProductLite = {
-  id: number;
-  title?: string;
-  description?: string;
-  images?: string[];
-};
-
-type OrderItemLite = {
-  id?: number;
-  product?: ProductLite;
-  size?: string;
-};
-
-type OrderLite = {
-  id: number;
-  orderStatus?: string;
-  paymentStatus?: string;
-  fulfillmentStatus?: string;
-  shipmentStatus?: string;
-  deliveryTaskStatus?: string;
-  deliveryStatusReason?: string;
-  orderDate?: string;
-  cancelledAt?: string;
-  cancelReasonText?: string;
-  deliveryWindow?: string;
-  orderItems?: OrderItemLite[];
-};
+import {
+  type OrderLite,
+  resolveCustomerPaymentMessage,
+  resolvePaymentTypeLabel,
+} from './orderDetailsTypes';
 
 const deriveDisplayStatus = (order: OrderLite) => {
   const shipmentStatus = (order.shipmentStatus || '').toUpperCase();
@@ -60,6 +37,21 @@ const deriveDisplayStatus = (order: OrderLite) => {
 
 const isInProgressStatus = (status: string) =>
   !['DELIVERED', 'CANCELLED'].includes(status);
+
+const formatPaymentSummary = (order: OrderLite) => {
+  const paymentTypeLabel = resolvePaymentTypeLabel(order);
+  const customerMessage = resolveCustomerPaymentMessage(order);
+
+  if (paymentTypeLabel && customerMessage) {
+    return `Payment Type: ${paymentTypeLabel} | ${customerMessage}`;
+  }
+
+  if (paymentTypeLabel) {
+    return `Payment Type: ${paymentTypeLabel}`;
+  }
+
+  return customerMessage;
+};
 
 const Orders = () => {
   const dispatch = useAppDispatch();
@@ -211,6 +203,7 @@ const Orders = () => {
               image={item.product?.images?.[0]}
               orderStatus={order.displayStatus}
               statusDate={formatStatusDate(order)}
+              paymentSummary={formatPaymentSummary(order)}
               cancelReasonText={
                 order.cancelReasonText || order.deliveryStatusReason
               }

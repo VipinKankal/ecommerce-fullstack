@@ -237,6 +237,10 @@ const OrderTable = () => {
                       <Typography variant="caption" color="text.secondary">
                         Payment: {order.paymentStatus || 'PENDING'}
                       </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {order.paymentMethod || 'N/A'}
+                        {order.provider ? ` | ${order.provider}` : ''}
+                      </Typography>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>

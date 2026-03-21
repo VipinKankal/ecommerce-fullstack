@@ -71,7 +71,7 @@ const ProductEditDialog = ({
         />
         <TextField
           fullWidth
-          label="Quantity"
+          label="Seller Stock"
           type="number"
           value={editForm.quantity}
           onChange={(e) =>

@@ -1,9 +1,15 @@
 package com.example.ecommerce.modal;
 
 import com.example.ecommerce.common.domain.OrderStatus;
+import com.example.ecommerce.common.domain.PaymentMethod;
+import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
+import com.example.ecommerce.common.domain.PaymentType;
 import com.example.ecommerce.common.persistence.OrderStatusConverter;
+import com.example.ecommerce.common.persistence.PaymentMethodConverter;
+import com.example.ecommerce.common.persistence.PaymentProviderConverter;
 import com.example.ecommerce.common.persistence.PaymentStatusConverter;
+import com.example.ecommerce.common.persistence.PaymentTypeConverter;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
@@ -56,6 +62,15 @@ public class Order {
     private OrderStatus orderStatus;
 
     private int totalItems;
+
+    @Convert(converter = PaymentMethodConverter.class)
+    private PaymentMethod paymentMethod;
+
+    @Convert(converter = PaymentTypeConverter.class)
+    private PaymentType paymentType;
+
+    @Convert(converter = PaymentProviderConverter.class)
+    private PaymentProvider provider;
 
     @Convert(converter = PaymentStatusConverter.class)
     private PaymentStatus paymentStatus = PaymentStatus.PENDING;

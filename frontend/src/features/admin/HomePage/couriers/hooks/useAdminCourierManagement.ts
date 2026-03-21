@@ -129,8 +129,17 @@ export const useAdminCourierManagement = () => {
   const handleCreateCourier = async () => {
     setError(null);
     try {
-      await createCourierApi(newCourier);
+      const createdCourier = await createCourierApi({
+        ...newCourier,
+        status: statusUpdate,
+        codSettlementFrequency: codFrequency,
+        salaryConfig,
+      });
+      if (createdCourier?.id !== undefined && createdCourier?.id !== null) {
+        setSelectedCourierId(String(createdCourier.id));
+      }
       setNewCourier(emptyCourierForm);
+      setSalaryConfig(emptySalaryForm);
       await loadWorkspace();
     } catch (requestError: unknown) {
       setError(readErrorMessage(requestError, 'Failed to create courier'));

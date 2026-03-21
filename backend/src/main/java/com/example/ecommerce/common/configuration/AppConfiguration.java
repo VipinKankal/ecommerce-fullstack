@@ -36,7 +36,9 @@ public class AppConfiguration {
             HttpSecurity http,
             JwtTokenValidator jwtTokenValidator,
             ApiRateLimitFilter apiRateLimitFilter,
-            AuditLoggingFilter auditLoggingFilter
+            AuditLoggingFilter auditLoggingFilter,
+            ApiAuthenticationEntryPoint apiAuthenticationEntryPoint,
+            ApiAccessDeniedHandler apiAccessDeniedHandler
     ) throws Exception {
 
         http.sessionManagement(management ->
@@ -46,7 +48,8 @@ public class AppConfiguration {
                                 "/api/auth/signup",
                                 "/api/auth/signin",
                                 "/api/auth/sent/login-signup-otp",
-                                "/api/admin/auth/login"
+                                "/api/admin/auth/login",
+                                "/api/payment/phonepe/webhook"
                         ).permitAll()
                         .requestMatchers(
                                 "/products/**",
@@ -70,14 +73,18 @@ public class AppConfiguration {
                 ).addFilterBefore(apiRateLimitFilter, BasicAuthenticationFilter.class)
                 .addFilterBefore(jwtTokenValidator, BasicAuthenticationFilter.class)
                 .addFilterAfter(auditLoggingFilter, BasicAuthenticationFilter.class)
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .authenticationEntryPoint(apiAuthenticationEntryPoint)
+                        .accessDeniedHandler(apiAccessDeniedHandler)
+                )
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()));
         return http.build();
     }
 
     @Bean
-    public JwtTokenValidator jwtTokenValidator(JwtProvider jwtProvider) {
-        return new JwtTokenValidator(jwtProvider);
+    public JwtTokenValidator jwtTokenValidator(JwtProvider jwtProvider, ApiResponseWriter apiResponseWriter) {
+        return new JwtTokenValidator(jwtProvider, apiResponseWriter);
     }
 
     private CorsConfigurationSource corsConfigurationSource() {

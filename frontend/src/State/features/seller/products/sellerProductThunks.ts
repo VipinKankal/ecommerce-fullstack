@@ -48,6 +48,26 @@ export const updateSellerProduct = createAsyncThunk<
   },
 );
 
+export const transferSellerProductToWarehouse = createAsyncThunk<
+  Product,
+  { productId: number; quantity: number }
+>(
+  'sellerProduct/transferSellerProductToWarehouse',
+  async ({ productId, quantity }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        API_ROUTES.sellerProducts.transferToWarehouse(productId),
+        { quantity },
+      );
+      return response.data;
+    } catch (error: unknown) {
+      return rejectWithValue(
+        getErrorMessage(error, 'Warehouse transfer failed'),
+      );
+    }
+  },
+);
+
 export const deleteSellerProduct = createAsyncThunk<
   number,
   { productId: number }

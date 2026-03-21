@@ -15,7 +15,7 @@ import { statusTone } from 'features/courier/courierData';
 import { CourierProfile } from 'features/courier/courierTypes';
 import { NewCourierForm, SalaryConfigForm } from '../../types';
 
-const replacementSeparator = ' \uFFFD ';
+const replacementSeparator = ' | ';
 
 type AdminCourierCouriersSectionProps = {
   codFrequency: string;
@@ -55,8 +55,13 @@ const AdminCourierCouriersSection = ({
   <div className="grid grid-cols-1 2xl:grid-cols-[1.05fr_1fr] gap-6">
     <Paper className="p-5 rounded-3xl border border-slate-200 shadow-none space-y-4">
       <Typography variant="h6" sx={{ fontWeight: 800 }}>
-        Add Courier
+        Add Courier With Salary Configuration
       </Typography>
+      <Typography variant="body2" color="text.secondary">
+        Create the courier profile, default status, COD frequency, and salary
+        configuration in a single form.
+      </Typography>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {Object.entries(newCourier).map(([key, value]) => (
           <TextField
@@ -73,6 +78,54 @@ const AdminCourierCouriersSection = ({
           />
         ))}
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <FormControl size="small" fullWidth>
+          <InputLabel>Status</InputLabel>
+          <Select
+            value={statusUpdate}
+            label="Status"
+            onChange={(event) => setStatusUpdate(String(event.target.value))}
+          >
+            <MenuItem value="ACTIVE">ACTIVE</MenuItem>
+            <MenuItem value="INACTIVE">INACTIVE</MenuItem>
+            <MenuItem value="SUSPENDED">SUSPENDED</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl size="small" fullWidth>
+          <InputLabel>COD Frequency</InputLabel>
+          <Select
+            value={codFrequency}
+            label="COD Frequency"
+            onChange={(event) => setCodFrequency(String(event.target.value))}
+          >
+            <MenuItem value="DAILY">DAILY</MenuItem>
+            <MenuItem value="WEEKLY">WEEKLY</MenuItem>
+            <MenuItem value="CUSTOM">CUSTOM</MenuItem>
+          </Select>
+        </FormControl>
+      </div>
+
+      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+        Salary Configuration
+      </Typography>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {Object.entries(salaryConfig).map(([key, value]) => (
+          <TextField
+            key={key}
+            size="small"
+            label={key}
+            value={value}
+            onChange={(event) =>
+              setSalaryConfig((current) => ({
+                ...current,
+                [key]: event.target.value,
+              }))
+            }
+          />
+        ))}
+      </div>
+
       <Button variant="contained" onClick={onCreateCourier}>
         Create Courier
       </Button>
@@ -132,7 +185,7 @@ const AdminCourierCouriersSection = ({
 
     <Paper className="p-5 rounded-3xl border border-slate-200 shadow-none space-y-4">
       <Typography variant="h6" sx={{ fontWeight: 800 }}>
-        Courier Controls
+        Existing Courier Controls
       </Typography>
       <FormControl fullWidth size="small">
         <InputLabel>Courier</InputLabel>

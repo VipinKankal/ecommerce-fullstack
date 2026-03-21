@@ -1,0 +1,290 @@
+package com.example.ecommerce.common.configuration;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class InventorySchemaCompatibilityInitializer implements ApplicationRunner {
+
+    private final JdbcTemplate jdbcTemplate;
+
+    @Override
+    public void run(ApplicationArguments args) {
+        ensureLegacyStatusColumnsCompatible();
+        ensureCheckoutPaymentColumns();
+        ensureProductInventoryColumns();
+        ensureInventoryMovementTable();
+        ensureOrderReturnExchangeTables();
+    }
+
+    private void ensureLegacyStatusColumnsCompatible() {
+        ensureColumnType("orders", "order_status", "VARCHAR(64) NULL");
+        ensureColumnType("orders", "payment_status", "VARCHAR(64) NULL");
+        ensureColumnType("orders", "status", "VARCHAR(64) NULL");
+        ensureColumnType("payment_order", "status", "VARCHAR(64) NULL");
+        ensureColumnType("payment_order", "payment_method", "VARCHAR(64) NULL");
+
+        jdbcTemplate.execute(
+                "UPDATE orders " +
+                        "SET order_status = CASE CAST(order_status AS CHAR) " +
+                        "WHEN '0' THEN 'PENDING' " +
+                        "WHEN '1' THEN 'PLACED' " +
+                        "WHEN '2' THEN 'CONFIRMED' " +
+                        "WHEN '3' THEN 'SHIPPED' " +
+                        "WHEN '4' THEN 'OUT_FOR_DELIVERY' " +
+                        "WHEN '5' THEN 'DELIVERED' " +
+                        "WHEN '6' THEN 'CANCELLED' " +
+                        "WHEN 'COMPLETE' THEN 'DELIVERED' " +
+                        "WHEN 'COMPLETED' THEN 'DELIVERED' " +
+                        "WHEN 'PAYMENT_PENDING' THEN 'INITIATED' " +
+                        "ELSE order_status END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE orders " +
+                        "SET payment_status = CASE CAST(payment_status AS CHAR) " +
+                        "WHEN '0' THEN 'PENDING' " +
+                        "WHEN '1' THEN 'PROCESSING' " +
+                        "WHEN '2' THEN 'SUCCESS' " +
+                        "WHEN '3' THEN 'FAILED' " +
+                        "WHEN 'CAPTURED' THEN 'SUCCESS' " +
+                        "WHEN 'PAID' THEN 'SUCCESS' " +
+                        "WHEN 'COMPLETED' THEN 'SUCCESS' " +
+                        "WHEN 'CREATED' THEN 'PENDING' " +
+                        "ELSE payment_status END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE orders " +
+                        "SET status = CASE CAST(status AS CHAR) " +
+                        "WHEN '0' THEN 'PENDING' " +
+                        "WHEN '1' THEN 'PROCESSING' " +
+                        "WHEN '2' THEN 'SUCCESS' " +
+                        "WHEN '3' THEN 'FAILED' " +
+                        "WHEN 'CAPTURED' THEN 'SUCCESS' " +
+                        "WHEN 'PAID' THEN 'SUCCESS' " +
+                        "WHEN 'COMPLETED' THEN 'SUCCESS' " +
+                        "WHEN 'CREATED' THEN 'PENDING' " +
+                        "ELSE status END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET status = CASE CAST(status AS CHAR) " +
+                        "WHEN '0' THEN 'PENDING' " +
+                        "WHEN '1' THEN 'SUCCESS' " +
+                        "WHEN '2' THEN 'FAILED' " +
+                        "WHEN 'CAPTURED' THEN 'SUCCESS' " +
+                        "WHEN 'PAID' THEN 'SUCCESS' " +
+                        "WHEN 'COMPLETED' THEN 'SUCCESS' " +
+                        "WHEN 'CREATED' THEN 'PENDING' " +
+                        "ELSE status END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET payment_method = CASE CAST(payment_method AS CHAR) " +
+                        "WHEN '0' THEN 'RAZORPAY' " +
+                        "WHEN '1' THEN 'STRIPE' " +
+                        "WHEN 'CARD' THEN 'STRIPE' " +
+                        "WHEN 'ONLINE' THEN 'RAZORPAY' " +
+                        "ELSE payment_method END"
+        );
+    }
+
+    private void ensureCheckoutPaymentColumns() {
+        ensureColumn("orders", "payment_method", "VARCHAR(64) NULL");
+        ensureColumn("orders", "payment_type", "VARCHAR(64) NULL");
+        ensureColumn("orders", "provider", "VARCHAR(64) NULL");
+
+        ensureColumn("payment_order", "payment_type", "VARCHAR(64) NULL");
+        ensureColumn("payment_order", "provider", "VARCHAR(64) NULL");
+        ensureColumn("payment_order", "merchant_transaction_id", "VARCHAR(128) NULL");
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET payment_method = CASE CAST(payment_method AS CHAR) " +
+                        "WHEN 'RAZORPAY' THEN 'UPI' " +
+                        "WHEN 'PHONEPE' THEN 'UPI' " +
+                        "WHEN 'ONLINE' THEN 'UPI' " +
+                        "WHEN 'STRIPE' THEN 'CARD' " +
+                        "ELSE payment_method END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET payment_type = CASE CAST(payment_method AS CHAR) " +
+                        "WHEN 'COD' THEN 'CASH' " +
+                        "WHEN 'UPI' THEN 'UPI' " +
+                        "WHEN 'CARD' THEN 'CARD' " +
+                        "ELSE payment_type END " +
+                        "WHERE payment_type IS NULL"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET provider = CASE " +
+                        "WHEN provider IS NOT NULL AND provider <> '' THEN provider " +
+                        "WHEN payment_method = 'UPI' THEN 'PHONEPE' " +
+                        "WHEN payment_method = 'CARD' THEN 'STRIPE' " +
+                        "ELSE provider END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET merchant_transaction_id = payment_link_id " +
+                        "WHERE merchant_transaction_id IS NULL " +
+                        "AND payment_link_id IS NOT NULL " +
+                        "AND payment_link_id <> ''"
+        );
+    }
+
+    private void ensureProductInventoryColumns() {
+        ensureColumn("product", "seller_stock", "INT NOT NULL DEFAULT 0");
+        ensureColumn("product", "warehouse_stock", "INT NOT NULL DEFAULT 0");
+
+        jdbcTemplate.execute(
+                "UPDATE product " +
+                        "SET warehouse_stock = CASE " +
+                        "WHEN warehouse_stock IS NULL OR warehouse_stock = 0 THEN quantity " +
+                        "ELSE warehouse_stock END, " +
+                        "seller_stock = CASE WHEN seller_stock IS NULL THEN 0 ELSE seller_stock END"
+        );
+    }
+
+    private void ensureInventoryMovementTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS inventory_movements (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "product_id BIGINT NULL," +
+                        "order_item_id BIGINT NULL," +
+                        "request_id BIGINT NULL," +
+                        "request_type VARCHAR(255) NULL," +
+                        "action VARCHAR(255) NULL," +
+                        "from_location VARCHAR(255) NULL," +
+                        "to_location VARCHAR(255) NULL," +
+                        "quantity INT NULL," +
+                        "movement_type VARCHAR(255) NULL," +
+                        "order_status VARCHAR(255) NULL," +
+                        "added_by VARCHAR(255) NULL," +
+                        "updated_by VARCHAR(255) NULL," +
+                        "note VARCHAR(1200) NULL," +
+                        "created_at DATETIME(6) NULL," +
+                        "PRIMARY KEY (id)," +
+                        "CONSTRAINT fk_inventory_movement_product FOREIGN KEY (product_id) REFERENCES product (id)" +
+                        ")"
+        );
+    }
+
+    private void ensureOrderReturnExchangeTables() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS order_return_exchange_requests (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "request_number VARCHAR(255) NULL," +
+                        "request_type VARCHAR(255) NULL," +
+                        "status VARCHAR(255) NULL," +
+                        "order_id BIGINT NULL," +
+                        "order_item_id BIGINT NULL," +
+                        "customer_id BIGINT NULL," +
+                        "customer_name VARCHAR(255) NULL," +
+                        "seller_id BIGINT NULL," +
+                        "product_id BIGINT NULL," +
+                        "product_title VARCHAR(255) NULL," +
+                        "product_image VARCHAR(255) NULL," +
+                        "quantity_requested INT NULL," +
+                        "reason_code VARCHAR(255) NULL," +
+                        "customer_comment VARCHAR(2000) NULL," +
+                        "admin_comment VARCHAR(1200) NULL," +
+                        "rejection_reason VARCHAR(1200) NULL," +
+                        "courier_id BIGINT NULL," +
+                        "courier_name VARCHAR(255) NULL," +
+                        "requested_new_product_id BIGINT NULL," +
+                        "requested_new_product_title VARCHAR(255) NULL," +
+                        "requested_new_product_image VARCHAR(255) NULL," +
+                        "requested_variant VARCHAR(255) NULL," +
+                        "product_photo VARCHAR(1200) NULL," +
+                        "old_price INT NULL," +
+                        "new_price INT NULL," +
+                        "price_difference INT NULL," +
+                        "balance_mode VARCHAR(255) NULL," +
+                        "payment_reference VARCHAR(255) NULL," +
+                        "refund_status VARCHAR(255) NULL," +
+                        "refund_eligible_after DATETIME(6) NULL," +
+                        "wallet_credit_status VARCHAR(255) NULL," +
+                        "bank_refund_status VARCHAR(255) NULL," +
+                        "bank_account_holder_name VARCHAR(255) NULL," +
+                        "bank_account_number VARCHAR(255) NULL," +
+                        "bank_ifsc_code VARCHAR(255) NULL," +
+                        "bank_name VARCHAR(255) NULL," +
+                        "bank_upi_id VARCHAR(255) NULL," +
+                        "replacement_order_id BIGINT NULL," +
+                        "requested_at DATETIME(6) NULL," +
+                        "approved_at DATETIME(6) NULL," +
+                        "admin_reviewed_at DATETIME(6) NULL," +
+                        "pickup_scheduled_at DATETIME(6) NULL," +
+                        "pickup_completed_at DATETIME(6) NULL," +
+                        "received_at DATETIME(6) NULL," +
+                        "refund_initiated_at DATETIME(6) NULL," +
+                        "refund_completed_at DATETIME(6) NULL," +
+                        "payment_completed_at DATETIME(6) NULL," +
+                        "wallet_credit_completed_at DATETIME(6) NULL," +
+                        "bank_refund_initiated_at DATETIME(6) NULL," +
+                        "bank_refund_completed_at DATETIME(6) NULL," +
+                        "replacement_created_at DATETIME(6) NULL," +
+                        "replacement_shipped_at DATETIME(6) NULL," +
+                        "replacement_delivered_at DATETIME(6) NULL," +
+                        "completed_at DATETIME(6) NULL," +
+                        "PRIMARY KEY (id)," +
+                        "CONSTRAINT uk_order_return_exchange_request_number UNIQUE (request_number)" +
+                        ")"
+        );
+
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS order_return_exchange_request_history (" +
+                        "request_id BIGINT NOT NULL," +
+                        "history_index INT NOT NULL," +
+                        "status VARCHAR(255) NULL," +
+                        "note VARCHAR(1200) NULL," +
+                        "updated_by VARCHAR(255) NULL," +
+                        "created_at DATETIME(6) NULL," +
+                        "PRIMARY KEY (request_id, history_index)," +
+                        "CONSTRAINT fk_order_return_exchange_request_history_request " +
+                        "FOREIGN KEY (request_id) REFERENCES order_return_exchange_requests (id)" +
+                        ")"
+        );
+    }
+
+    private boolean columnExists(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.columns " +
+                        "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+                Integer.class,
+                tableName,
+                columnName
+        );
+        return count != null && count > 0;
+    }
+
+    private void ensureColumnType(String tableName, String columnName, String columnDefinition) {
+        if (columnExists(tableName, columnName)) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE " + tableName + " MODIFY COLUMN " + columnName + " " + columnDefinition
+            );
+        }
+    }
+
+    private void ensureColumn(String tableName, String columnName, String columnDefinition) {
+        if (!columnExists(tableName, columnName)) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnDefinition
+            );
+            log.info("Added missing column {}.{}", tableName, columnName);
+        }
+    }
+}

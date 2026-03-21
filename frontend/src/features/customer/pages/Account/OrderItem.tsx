@@ -6,6 +6,7 @@ type AccountOrderItem = {
   image?: string;
   orderStatus: string;
   statusDate?: string;
+  paymentSummary?: string;
   cancelReasonText?: string;
   orderId: number;
   onOpen?: (orderId: number, orderItemId?: number) => void;
@@ -32,6 +33,7 @@ const OrderItem = ({
   image,
   orderStatus,
   statusDate,
+  paymentSummary,
   orderId,
   onOpen,
   id,
@@ -70,6 +72,9 @@ const OrderItem = ({
           <p className="text-[10px] text-gray-400 mt-3 font-bold uppercase tracking-tighter">
             Order ID: #{orderId}
           </p>
+          {paymentSummary && (
+            <p className="text-[11px] text-gray-500 mt-1">{paymentSummary}</p>
+          )}
         </div>
 
         <div className="mt-3 md:mt-0 md:text-right">

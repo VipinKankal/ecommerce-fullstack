@@ -1,10 +1,14 @@
 package com.example.ecommerce.common.configuration;
 
+import com.example.ecommerce.common.response.ApiEnvelopeFactory;
+import com.example.ecommerce.common.response.ApiErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -16,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
+@RequiredArgsConstructor
 public class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> RATE_LIMITED_PATHS = Set.of(
@@ -26,6 +31,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Window> buckets = new ConcurrentHashMap<>();
     private final AtomicInteger requestCounter = new AtomicInteger(0);
+    private final ApiResponseWriter apiResponseWriter;
 
     @Value("${app.rate-limit.max-requests-per-minute:30}")
     private int maxRequestsPerMinute;
@@ -55,9 +61,13 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
         });
 
         if (current != null && current.count > maxRequestsPerMinute) {
-            response.setStatus(429);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"message\":\"Too many requests. Please try again later.\"}");
+            apiResponseWriter.writeError(
+                    response,
+                    HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many requests. Please try again later.",
+                    ApiErrorCode.RATE_LIMIT_EXCEEDED,
+                    ApiEnvelopeFactory.buildPathDetails(request.getRequestURI())
+            );
             return;
         }
 

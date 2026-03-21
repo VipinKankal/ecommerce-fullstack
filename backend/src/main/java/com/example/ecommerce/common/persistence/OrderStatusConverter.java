@@ -19,7 +19,8 @@ public class OrderStatusConverter implements AttributeConverter<OrderStatus, Str
                 OrderStatus.class,
                 OrderStatus.PENDING,
                 "COMPLETE", "DELIVERED",
-                "COMPLETED", "DELIVERED"
+                "COMPLETED", "DELIVERED",
+                "PAYMENT_PENDING", "INITIATED"
         );
     }
 }

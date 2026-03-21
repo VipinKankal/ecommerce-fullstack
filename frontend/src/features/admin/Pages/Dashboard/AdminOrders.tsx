@@ -24,6 +24,9 @@ type AdminOrderRow = {
   sellerName?: string;
   orderStatus?: string;
   paymentStatus?: string;
+  paymentMethod?: string;
+  paymentType?: string;
+  provider?: string;
   totalSellingPrice?: number;
   totalItems?: number;
 };
@@ -151,6 +154,14 @@ const AdminOrders = () => {
                       label={order.paymentStatus || 'N/A'}
                       color={getPaymentStatusColor(order.paymentStatus)}
                     />
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mt: 0.5 }}
+                    >
+                      {order.paymentMethod || 'N/A'}
+                      {order.provider ? ` | ${order.provider}` : ''}
+                    </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>

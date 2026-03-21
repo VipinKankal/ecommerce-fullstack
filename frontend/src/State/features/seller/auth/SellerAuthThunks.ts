@@ -50,11 +50,29 @@ type SellerProfile = {
   role?: string;
 };
 
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message ||
-  (error as { message?: string })?.message ||
-  fallback;
+const readErrorMessage = (error: unknown, fallback: string) => {
+  const safeError = error as {
+    response?: {
+      data?:
+        | {
+            message?: string;
+            error?: { code?: string; details?: unknown } | string;
+          }
+        | string;
+    };
+    message?: string;
+  };
+  const serverData = safeError.response?.data;
+  if (typeof serverData === 'string') {
+    return serverData || fallback;
+  }
+  return (
+    serverData?.message ||
+    (typeof serverData?.error === 'string' ? serverData.error : undefined) ||
+    safeError.message ||
+    fallback
+  );
+};
 
 export const sendLoginSignupOtp = createAsyncThunk(
   'auth/sendLoginSignupOtp',
@@ -199,6 +217,42 @@ export const updateSellerProfile = createAsyncThunk(
     } catch (error: unknown) {
       return rejectWithValue(
         readErrorMessage(error, 'Failed to update seller profile'),
+      );
+    }
+  },
+);
+
+export const requestSellerEmailChangeOtp = createAsyncThunk(
+  'seller/requestEmailChangeOtp',
+  async (newEmail: string, { rejectWithValue }) => {
+    try {
+      const response = await api.post(API_ROUTES.sellers.requestEmailChangeOtp, {
+        newEmail,
+      });
+      return response.data;
+    } catch (error: unknown) {
+      return rejectWithValue(
+        readErrorMessage(error, 'Failed to request seller email change OTP'),
+      );
+    }
+  },
+);
+
+export const verifySellerEmailChangeOtp = createAsyncThunk(
+  'seller/verifyEmailChangeOtp',
+  async (payload: { newEmail: string; otp: string }, { rejectWithValue }) => {
+    try {
+      const response = await api.post(
+        API_ROUTES.sellers.verifyEmailChangeOtp,
+        payload,
+      );
+      if (response.data?.jwt) {
+        setAuthToken(response.data.jwt, 'seller');
+      }
+      return response.data;
+    } catch (error: unknown) {
+      return rejectWithValue(
+        readErrorMessage(error, 'Failed to verify seller email change OTP'),
       );
     }
   },

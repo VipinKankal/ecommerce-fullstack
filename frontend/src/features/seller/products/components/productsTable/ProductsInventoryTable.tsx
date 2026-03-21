@@ -2,12 +2,11 @@ import React from 'react';
 import {
   Avatar,
   Box,
+  Button,
   Chip,
   CircularProgress,
   IconButton,
   Paper,
-  Stack,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -18,43 +17,44 @@ import {
 } from '@mui/material';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import { Product } from 'shared/types/product.types';
 
 type ProductsInventoryTableProps = {
   loading: boolean;
   products: Product[];
   filteredProducts: Product[];
-  togglingId: number | null;
   deletingId: number | null;
+  transferringId: number | null;
   lowStockThreshold: number;
   getSafeImage: (image?: string) => string;
   getColorLabel: (color: unknown) => string;
   getCategoryLabel: (product: Product) => string;
   onOpenEdit: (row: Product) => void;
   onDelete: (id?: number) => void | Promise<void>;
-  onStockToggle: (product: Product, checked: boolean) => void | Promise<void>;
+  onOpenTransfer: (product: Product) => void;
 };
 
 const ProductsInventoryTable = ({
   loading,
   products,
   filteredProducts,
-  togglingId,
   deletingId,
+  transferringId,
   lowStockThreshold,
   getSafeImage,
   getColorLabel,
   getCategoryLabel,
   onOpenEdit,
   onDelete,
-  onStockToggle,
+  onOpenTransfer,
 }: ProductsInventoryTableProps) => {
   let tableRows: React.ReactNode;
 
   if (loading && products.length === 0) {
     tableRows = (
       <TableRow>
-        <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+        <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
           <CircularProgress />
         </TableCell>
       </TableRow>
@@ -62,29 +62,27 @@ const ProductsInventoryTable = ({
   } else if (filteredProducts.length === 0) {
     tableRows = (
       <TableRow>
-        <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+        <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
           No products match the current filters.
         </TableCell>
       </TableRow>
     );
   } else {
     tableRows = filteredProducts.map((row) => {
-      const quantity = Number(row.quantity || 0);
+      const sellerStock = Number(row.sellerStock ?? 0);
+      const warehouseStock = Number(row.warehouseStock ?? row.quantity ?? 0);
       const colorLabel = getColorLabel(row.color);
-      const isOutOfStock = quantity <= 0;
-      const isLowStock = quantity > 0 && quantity <= lowStockThreshold;
-      let stockChip = <Chip size="small" color="success" label="In Stock" />;
+      const isOutOfStock = warehouseStock <= 0;
+      const isLowStock =
+        warehouseStock > 0 && warehouseStock <= lowStockThreshold;
+      let stockChip = (
+        <Chip size="small" color="success" label="Warehouse Ready" />
+      );
       if (isOutOfStock) {
-        stockChip = <Chip size="small" color="error" label="Out of Stock" />;
+        stockChip = <Chip size="small" color="error" label="Awaiting Transfer" />;
       } else if (isLowStock) {
-        stockChip = <Chip size="small" color="warning" label="Low Stock" />;
+        stockChip = <Chip size="small" color="warning" label="Low Warehouse Stock" />;
       }
-      const actionIcon =
-        deletingId === row.id ? (
-          <CircularProgress size={16} />
-        ) : (
-          <DeleteOutlineRoundedIcon fontSize="small" />
-        );
 
       return (
         <TableRow key={row.id} hover>
@@ -144,44 +142,56 @@ const ProductsInventoryTable = ({
             </Typography>
           </TableCell>
 
+          <TableCell>{sellerStock}</TableCell>
+
           <TableCell>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {quantity}
+              {warehouseStock}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              units available
+              sellable units
             </Typography>
           </TableCell>
 
-          <TableCell>
-            <Stack direction="row" spacing={1} alignItems="center">
-              {stockChip}
-              <Switch
-                checked={!isOutOfStock}
-                color="success"
-                size="small"
-                disabled={togglingId === row.id}
-                onChange={(_, checked) => onStockToggle(row, checked)}
-              />
-            </Stack>
-          </TableCell>
+          <TableCell>{stockChip}</TableCell>
 
           <TableCell align="right">
-            <IconButton
-              color="primary"
-              size="small"
-              onClick={() => onOpenEdit(row)}
-            >
-              <EditOutlinedIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              color="error"
-              size="small"
-              onClick={() => onDelete(row.id)}
-              disabled={deletingId === row.id}
-            >
-              {actionIcon}
-            </IconButton>
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={
+                  transferringId === row.id ? (
+                    <CircularProgress size={14} />
+                  ) : (
+                    <WarehouseOutlinedIcon fontSize="small" />
+                  )
+                }
+                onClick={() => onOpenTransfer(row)}
+                disabled={sellerStock <= 0 || transferringId === row.id}
+              >
+                Send to Warehouse
+              </Button>
+              <IconButton
+                color="primary"
+                size="small"
+                onClick={() => onOpenEdit(row)}
+              >
+                <EditOutlinedIcon fontSize="small" />
+              </IconButton>
+              <IconButton
+                color="error"
+                size="small"
+                onClick={() => onDelete(row.id)}
+                disabled={deletingId === row.id}
+              >
+                {deletingId === row.id ? (
+                  <CircularProgress size={16} />
+                ) : (
+                  <DeleteOutlineRoundedIcon fontSize="small" />
+                )}
+              </IconButton>
+            </div>
           </TableCell>
         </TableRow>
       );
@@ -203,7 +213,8 @@ const ProductsInventoryTable = ({
             <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>Price</TableCell>
-            <TableCell sx={{ fontWeight: 700 }}>Stock</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Seller Stock</TableCell>
+            <TableCell sx={{ fontWeight: 700 }}>Warehouse Stock</TableCell>
             <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
             <TableCell sx={{ fontWeight: 700 }} align="right">
               Actions

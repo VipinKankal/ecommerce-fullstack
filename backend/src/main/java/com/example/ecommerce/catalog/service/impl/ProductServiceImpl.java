@@ -1,6 +1,7 @@
 package com.example.ecommerce.catalog.service.impl;
 
 import com.example.ecommerce.common.exceptions.ProductException;
+import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.Category;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.Seller;
@@ -30,6 +31,7 @@ public class ProductServiceImpl implements ProductService{
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final InventoryService inventoryService;
 
     @Override
     public Product createProduct(CreateProductRequest request, Seller seller) {
@@ -73,9 +75,12 @@ public class ProductServiceImpl implements ProductService{
         product.setImages(request.getImages());
         product.setMrpPrice(request.getMrpPrice());
         product.setSize(request.getSize());
-        product.setQuantity(request.getQuantity());
         product.setDiscountPercentage(discountPercentage);
-        return productRepository.save(product);
+        return inventoryService.initializeSellerOwnedStock(
+                product,
+                request.getQuantity(),
+                "Seller added product to catalog"
+        );
     }
 
     private void validateSellerAccess(Product product, Long sellerId) throws ProductException {
@@ -129,13 +134,20 @@ public class ProductServiceImpl implements ProductService{
         if (request.getSellingPrice() != null) {
             existing.setSellingPrice(request.getSellingPrice());
         }
-        if (request.getQuantity() != null) {
-            existing.setQuantity(request.getQuantity());
-        }
+        boolean sellerStockUpdated = request.getQuantity() != null;
+        Integer nextSellerStock = request.getQuantity();
 
         existing.setDiscountPercentage(
                 calculateDiscountPercentage(existing.getMrpPrice(), existing.getSellingPrice())
         );
+
+        if (sellerStockUpdated) {
+            return inventoryService.updateSellerStock(
+                    existing,
+                    nextSellerStock,
+                    "Seller updated available seller-side stock"
+            );
+        }
 
         return productRepository.save(existing);
     }

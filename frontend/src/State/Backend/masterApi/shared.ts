@@ -5,8 +5,11 @@ type ApiErrorShape = {
   response?: {
     data?: {
       message?: string;
-      error?: string;
-    };
+      error?: {
+        code?: string;
+        details?: unknown;
+      } | string;
+    } | string;
   };
   message?: string;
 };
@@ -16,9 +19,15 @@ const asApiError = (error: unknown): ApiErrorShape =>
 
 export const getErrorMessage = (error: unknown, fallback: string) => {
   const safeError = asApiError(error);
+  const serverData = safeError.response?.data;
+
+  if (typeof serverData === 'string') {
+    return serverData || fallback;
+  }
+
   return (
-    safeError.response?.data?.message ||
-    safeError.response?.data?.error ||
+    serverData?.message ||
+    (typeof serverData?.error === 'string' ? serverData.error : undefined) ||
     safeError.message ||
     fallback
   );

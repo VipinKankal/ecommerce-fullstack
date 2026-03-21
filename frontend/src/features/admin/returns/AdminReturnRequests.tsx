@@ -99,18 +99,35 @@ const AdminReturnRequests = () => {
     setLoading(true);
     setError(null);
     try {
-      const [requestResponse, courierResponse] = await Promise.all([
+      const [requestResponse, courierResponse] = await Promise.allSettled([
         api.get('/api/admin/returns'),
         api.get('/api/admin/couriers'),
       ]);
-      setRequests(
-        Array.isArray(requestResponse.data) ? requestResponse.data : [],
-      );
-      setCouriers(
-        (Array.isArray(courierResponse.data) ? courierResponse.data : []).map(
-          mapCourier,
-        ),
-      );
+
+      if (requestResponse.status === 'fulfilled') {
+        setRequests(
+          Array.isArray(requestResponse.value.data) ? requestResponse.value.data : [],
+        );
+      } else {
+        setRequests([]);
+        setError(
+          getErrorMessage(
+            requestResponse.reason,
+            'Failed to load return requests',
+          ),
+        );
+      }
+
+      if (courierResponse.status === 'fulfilled') {
+        setCouriers(
+          (Array.isArray(courierResponse.value.data)
+            ? courierResponse.value.data
+            : []
+          ).map(mapCourier),
+        );
+      } else {
+        setCouriers([]);
+      }
     } catch (error: unknown) {
       setError(getErrorMessage(error, 'Failed to load return requests'));
     } finally {

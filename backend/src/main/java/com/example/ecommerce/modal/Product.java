@@ -30,6 +30,8 @@ public class Product {
     private int sellingPrice;
     private int discountPercentage;
     private int quantity;
+    private int sellerStock;
+    private int warehouseStock;
     private String color;
 
     @ElementCollection
@@ -50,4 +52,16 @@ public class Product {
     @JsonIgnore
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Review> reviews = new ArrayList<>();
+
+    @PrePersist
+    @PreUpdate
+    private void syncStockFields() {
+        if (sellerStock < 0) {
+            sellerStock = 0;
+        }
+        if (warehouseStock < 0) {
+            warehouseStock = 0;
+        }
+        quantity = warehouseStock;
+    }
 }

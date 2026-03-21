@@ -5,7 +5,14 @@ import { Address } from 'shared/types/user.types';
 
 const readErrorMessage = (error: unknown, fallback: string) => {
   const safeError = error as {
-    response?: { data?: { message?: string; error?: string } | string };
+    response?: {
+      data?:
+        | {
+            message?: string;
+            error?: { code?: string; details?: unknown } | string;
+          }
+        | string;
+    };
     message?: string;
   };
   const serverData = safeError.response?.data;
@@ -13,7 +20,10 @@ const readErrorMessage = (error: unknown, fallback: string) => {
     return serverData || fallback;
   }
   return (
-    serverData?.message || serverData?.error || safeError.message || fallback
+    serverData?.message ||
+    (typeof serverData?.error === 'string' ? serverData.error : undefined) ||
+    safeError.message ||
+    fallback
   );
 };
 

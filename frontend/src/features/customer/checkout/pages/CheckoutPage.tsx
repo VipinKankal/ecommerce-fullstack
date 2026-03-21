@@ -132,8 +132,8 @@ const CheckoutPage = () => {
       },
       {
         id: 'PHONEPE' as const,
-        title: 'UPI (PhonePe)',
-        sub: 'Pay online using UPI',
+        title: 'PhonePe UPI',
+        sub: 'Pay now using direct PhonePe checkout',
       },
     ],
     [],

@@ -1,5 +1,7 @@
 package com.example.ecommerce.common.configuration;
 
+import com.example.ecommerce.common.response.ApiEnvelopeFactory;
+import com.example.ecommerce.common.response.ApiErrorCode;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -17,9 +19,11 @@ import java.util.List;
 
 public class JwtTokenValidator extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
+    private final ApiResponseWriter apiResponseWriter;
 
-    public JwtTokenValidator(JwtProvider jwtProvider) {
+    public JwtTokenValidator(JwtProvider jwtProvider, ApiResponseWriter apiResponseWriter) {
         this.jwtProvider = jwtProvider;
+        this.apiResponseWriter = apiResponseWriter;
     }
 
     @Override
@@ -32,7 +36,14 @@ public class JwtTokenValidator extends OncePerRequestFilter {
 
         if (jwt != null) {
             if (!jwt.startsWith("Bearer ")) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                SecurityContextHolder.clearContext();
+                apiResponseWriter.writeError(
+                        response,
+                        org.springframework.http.HttpStatus.UNAUTHORIZED,
+                        "Authorization header must use a Bearer token.",
+                        ApiErrorCode.AUTH_REQUIRED,
+                        ApiEnvelopeFactory.buildPathDetails(request.getRequestURI())
+                );
                 return;
             }
 
@@ -48,7 +59,13 @@ public class JwtTokenValidator extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (Exception e) {
                 SecurityContextHolder.clearContext();
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                apiResponseWriter.writeError(
+                        response,
+                        org.springframework.http.HttpStatus.UNAUTHORIZED,
+                        "Invalid or expired authentication token.",
+                        ApiErrorCode.AUTH_REQUIRED,
+                        ApiEnvelopeFactory.buildPathDetails(request.getRequestURI())
+                );
                 return;
             }
         }

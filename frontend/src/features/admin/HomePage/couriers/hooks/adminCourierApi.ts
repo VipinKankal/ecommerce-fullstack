@@ -23,6 +23,16 @@ type AdminCourierWorkspaceData = {
   petrolClaims: PetrolClaimItem[];
 };
 
+type CreateCourierPayload = NewCourierForm & {
+  status?: string;
+  codSettlementFrequency?: string;
+  salaryConfig?: SalaryConfigForm;
+};
+
+type CreatedCourierRecord = {
+  id?: number | string;
+};
+
 export const loadAdminCourierWorkspaceApi =
   async (): Promise<AdminCourierWorkspaceData> => {
     const [courierRes, orderRes, dispatchRes, codRes, petrolRes] =
@@ -71,8 +81,27 @@ export const loadAdminCourierWorkspaceApi =
     };
   };
 
-export const createCourierApi = async (payload: NewCourierForm) => {
-  await api.post(API_ROUTES.adminCouriers.base, payload);
+export const createCourierApi = async (
+  payload: CreateCourierPayload,
+): Promise<CreatedCourierRecord | null> => {
+  const response = await api.post(API_ROUTES.adminCouriers.base, {
+    ...payload,
+    salaryConfig: payload.salaryConfig
+      ? {
+          monthlyBase: Number(payload.salaryConfig.monthlyBase),
+          perDeliveryRate: Number(payload.salaryConfig.perDeliveryRate),
+          petrolAllowanceMonthlyCap: Number(
+            payload.salaryConfig.petrolAllowanceMonthlyCap,
+          ),
+          targetDeliveries: Number(payload.salaryConfig.targetDeliveries),
+          incentiveAmount: Number(payload.salaryConfig.incentiveAmount),
+          latePenalty: Number(payload.salaryConfig.latePenalty),
+          failedPenalty: Number(payload.salaryConfig.failedPenalty),
+          codMismatchPenalty: Number(payload.salaryConfig.codMismatchPenalty),
+        }
+      : undefined,
+  });
+  return response.data || null;
 };
 
 export const updateCourierSalaryApi = async (

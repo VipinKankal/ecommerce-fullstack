@@ -53,7 +53,7 @@ const getStatusChipColor = (
 
 const AdminManualUpiPayments = () => {
   const dispatch = useAppDispatch();
-  const { loading, error, responses } = useAppSelector(
+  const { loading, error, lastAction, responses } = useAppSelector(
     (state) => state.masterApi,
   );
   const [selected, setSelected] = useState<ManualUpiPaymentRow | null>(null);
@@ -74,6 +74,11 @@ const AdminManualUpiPayments = () => {
     () => rows.filter((row) => row.status === 'PENDING_VERIFICATION').length,
     [rows],
   );
+
+  const shouldShowError =
+    Boolean(error) &&
+    (lastAction === 'manualUpiPaymentsList' ||
+      lastAction === 'verifyManualUpiPayment');
 
   const handleVerify = async (status: 'VERIFIED' | 'REJECTED') => {
     if (!selected?.id) return;
@@ -105,7 +110,7 @@ const AdminManualUpiPayments = () => {
         <Chip color="warning" label={`${pendingCount} pending`} />
       </div>
 
-      {error && <Alert severity="error">{error}</Alert>}
+      {shouldShowError && <Alert severity="error">{error}</Alert>}
 
       <TableContainer
         component={Paper}
@@ -219,7 +224,7 @@ const AdminManualUpiPayments = () => {
                   Order #{selected.orderId}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {selected.customerName} · {selected.customerEmail}
+                  {selected.customerName} | {selected.customerEmail}
                 </Typography>
               </div>
               <div>

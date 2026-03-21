@@ -64,6 +64,11 @@ const OrderDetailsDialog = ({
                     {order.paymentStatus || 'PENDING'}
                   </Typography>
                   <Typography variant="body2">
+                    <strong>Payment Method:</strong> {order.paymentMethod || 'N/A'}
+                    {order.paymentType ? ` | ${order.paymentType}` : ''}
+                    {order.provider ? ` | ${order.provider}` : ''}
+                  </Typography>
+                  <Typography variant="body2">
                     <strong>Total Items:</strong>{' '}
                     {order.totalItems || order.orderItems?.length || 0}
                   </Typography>

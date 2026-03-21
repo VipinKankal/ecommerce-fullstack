@@ -21,3 +21,19 @@ export const paymentById = createAsyncThunk(
     }
   },
 );
+
+export const paymentStatusByOrder = createAsyncThunk(
+  'masterApi/paymentStatusByOrder',
+  async (paymentOrderId: number | string, { rejectWithValue }) => {
+    try {
+      const response = await api.get(
+        API_ROUTES.payment.statusByOrder(paymentOrderId),
+      );
+      return response.data;
+    } catch (error: unknown) {
+      return rejectWithValue(
+        getErrorMessage(error, 'Failed to load checkout payment status'),
+      );
+    }
+  },
+);

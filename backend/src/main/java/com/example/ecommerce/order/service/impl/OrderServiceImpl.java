@@ -1,7 +1,11 @@
 package com.example.ecommerce.order.service.impl;
 
 import com.example.ecommerce.common.domain.OrderStatus;
+import com.example.ecommerce.common.domain.PaymentMethod;
+import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
+import com.example.ecommerce.common.domain.PaymentType;
+import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.*;
 import com.example.ecommerce.repository.AddressRepository;
 import com.example.ecommerce.repository.CartRepository;
@@ -23,10 +27,20 @@ public class OrderServiceImpl implements OrderService {
     private final AddressRepository addressRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartRepository cartRepository;
+    private final InventoryService inventoryService;
 
     @Override
     @Transactional
-    public Set<Order> createOrder(User user, Address shippingAddress, Cart cart) {
+    public Set<Order> createOrder(
+            User user,
+            Address shippingAddress,
+            Cart cart,
+            OrderStatus orderStatus,
+            PaymentStatus paymentStatus,
+            PaymentMethod paymentMethod,
+            PaymentType paymentType,
+            PaymentProvider provider
+    ) {
         Address address = addressRepository.save(shippingAddress);
         // brand 1 == 4 shirts
         // brand 2 == 3 pants
@@ -51,8 +65,11 @@ public class OrderServiceImpl implements OrderService {
             createOrder.setTotalSellingPrice(totalOrderPrice);
             createOrder.setTotalItems(totalItem);
             createOrder.setShippingAddress(address);
-            createOrder.setOrderStatus(OrderStatus.PENDING);
-            createOrder.getPaymentDetails().setStatus(PaymentStatus.PENDING);
+            createOrder.setOrderStatus(orderStatus);
+            createOrder.setPaymentStatus(paymentStatus);
+            createOrder.setPaymentMethod(paymentMethod);
+            createOrder.setPaymentType(paymentType);
+            createOrder.setProvider(provider);
 
             Order savedOrder = orderRepository.save(createOrder);
             orders.add(savedOrder);
@@ -69,6 +86,11 @@ public class OrderServiceImpl implements OrderService {
                 orderItem.setSellingPrice(item.getSellingPrice());
                 savedOrder.getOrderItems().add(orderItem);
                 OrderItem savedOrderItem = orderItemRepository.save(orderItem);
+                inventoryService.deductWarehouseStockForOrder(
+                        item.getProduct(),
+                        item.getQuantity(),
+                        savedOrderItem.getId()
+                );
                 orderItems.add(savedOrderItem);
             }
         }

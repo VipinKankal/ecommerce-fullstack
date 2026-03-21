@@ -47,10 +47,10 @@ const SellerDetailsDialog = ({
                   <strong>Name:</strong> {selectedSeller.sellerName}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Email:</strong> {selectedSeller.email}
+                  <strong>Primary Login Email:</strong> {selectedSeller.email}
                 </Typography>
                 <Typography variant="body2">
-                  <strong>Mobile:</strong> {selectedSeller.mobile}
+                  <strong>Primary Mobile:</strong> {selectedSeller.mobile}
                 </Typography>
                 <Typography variant="body2">
                   <strong>Business:</strong> {selectedSeller.businessName}
@@ -89,23 +89,15 @@ const SellerDetailsDialog = ({
                 </Typography>
                 <Typography variant="body2">
                   <strong>Support Email:</strong>{' '}
-                  {selectedSeller.storeDetails?.supportEmail || 'N/A'}
+                  {selectedSeller.businessEmail}
                 </Typography>
                 <Typography variant="body2">
                   <strong>Support Phone:</strong>{' '}
-                  {selectedSeller.storeDetails?.supportPhone || 'N/A'}
+                  {selectedSeller.businessMobile}
                 </Typography>
                 <Typography variant="body2">
                   <strong>Pickup Address:</strong>{' '}
-                  {[
-                    selectedSeller.pickupAddress?.address,
-                    selectedSeller.pickupAddress?.locality,
-                    selectedSeller.pickupAddress?.city,
-                    selectedSeller.pickupAddress?.state,
-                    selectedSeller.pickupAddress?.pinCode,
-                  ]
-                    .filter(Boolean)
-                    .join(', ') || 'N/A'}
+                  {selectedSeller.businessAddress}
                 </Typography>
               </Stack>
             </Paper>

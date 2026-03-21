@@ -35,6 +35,8 @@ public final class ResponseMapper {
         response.setDiscountPercent(product.getDiscountPercentage());
         response.setDiscountPercentage(product.getDiscountPercentage());
         response.setQuantity(product.getQuantity());
+        response.setSellerStock(product.getSellerStock());
+        response.setWarehouseStock(product.getWarehouseStock());
         response.setColor(product.getColor());
         response.setImages(product.getImages() == null ? Collections.emptyList() : product.getImages());
         response.setNumRatings(product.getNumRatings());
@@ -121,6 +123,9 @@ public final class ResponseMapper {
         response.setSellerId(order.getSellerId());
         response.setOrderStatus(order.getOrderStatus());
         response.setPaymentStatus(order.getPaymentStatus());
+        response.setPaymentMethod(order.getPaymentMethod());
+        response.setPaymentType(order.getPaymentType());
+        response.setProvider(order.getProvider());
         response.setTotalMrpPrice(order.getTotalMrpPrice());
         response.setTotalSellingPrice(order.getTotalSellingPrice());
         response.setDiscount(order.getDiscount());

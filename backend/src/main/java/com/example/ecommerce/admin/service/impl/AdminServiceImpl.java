@@ -155,6 +155,8 @@ public class AdminServiceImpl implements AdminService {
         response.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
         response.setSellerName(product.getSeller() != null ? product.getSeller().getSellerName() : null);
         response.setQuantity(product.getQuantity());
+        response.setSellerStock(product.getSellerStock());
+        response.setWarehouseStock(product.getWarehouseStock());
         response.setSellingPrice(product.getSellingPrice());
         response.setMrpPrice(product.getMrpPrice());
         response.setCreatedAt(product.getCreatedAt());
@@ -173,6 +175,9 @@ public class AdminServiceImpl implements AdminService {
         );
         response.setOrderStatus(order.getOrderStatus());
         response.setPaymentStatus(order.getPaymentStatus());
+        response.setPaymentMethod(order.getPaymentMethod());
+        response.setPaymentType(order.getPaymentType());
+        response.setProvider(order.getProvider());
         response.setTotalSellingPrice(order.getTotalSellingPrice());
         response.setTotalItems(order.getTotalItems());
         response.setOrderDate(order.getOrderDate());

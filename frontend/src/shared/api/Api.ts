@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
 
 const BASE_URL = (
   process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'
@@ -23,6 +23,49 @@ export const publicApi = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+type ApiErrorPayload = {
+  code?: string;
+  details?: unknown;
+} | null;
+
+type ApiEnvelope<T = unknown> = {
+  success: boolean;
+  status: number;
+  message: string;
+  data: T;
+  error: ApiErrorPayload;
+  timestamp: string;
+};
+
+const isApiEnvelope = (value: unknown): value is ApiEnvelope => {
+  if (typeof value !== 'object' || value === null) return false;
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.success === 'boolean' &&
+    typeof candidate.status === 'number' &&
+    typeof candidate.message === 'string' &&
+    'data' in candidate &&
+    'error' in candidate &&
+    typeof candidate.timestamp === 'string'
+  );
+};
+
+const attachApiEnvelopeInterceptor = (client: AxiosInstance) => {
+  client.interceptors.response.use((response: AxiosResponse) => {
+    if (!isApiEnvelope(response.data)) {
+      return response;
+    }
+
+    const envelope = response.data;
+    response.data = envelope.data;
+    return response;
+  });
+};
+
+attachApiEnvelopeInterceptor(api);
+attachApiEnvelopeInterceptor(publicApi);
 
 export const getAuthRole = () => {
   if (globalThis.sessionStorage === undefined) return null;

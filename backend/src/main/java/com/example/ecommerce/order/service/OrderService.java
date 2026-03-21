@@ -1,13 +1,26 @@
 package com.example.ecommerce.order.service;
 
 import com.example.ecommerce.common.domain.OrderStatus;
+import com.example.ecommerce.common.domain.PaymentMethod;
+import com.example.ecommerce.common.domain.PaymentProvider;
+import com.example.ecommerce.common.domain.PaymentStatus;
+import com.example.ecommerce.common.domain.PaymentType;
 import com.example.ecommerce.modal.*;
 
 import java.util.List;
 import java.util.Set;
 
 public interface OrderService {
-    Set<Order> createOrder(User user, Address shippingAddress, Cart cart);
+    Set<Order> createOrder(
+            User user,
+            Address shippingAddress,
+            Cart cart,
+            OrderStatus orderStatus,
+            PaymentStatus paymentStatus,
+            PaymentMethod paymentMethod,
+            PaymentType paymentType,
+            PaymentProvider provider
+    );
     Order findOrderById(long id) throws Exception;
     List<Order> usersOrderHistory(Long userId);
     List<Order> sellersOrder(Long sellerId);

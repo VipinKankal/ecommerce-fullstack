@@ -1,4 +1,5 @@
 export type SellerAddress = {
+  mobileNumber?: string;
   address?: string;
   locality?: string;
   city?: string;
@@ -31,6 +32,9 @@ export type SellerListItem = {
   sellerName: string;
   email: string;
   mobile: string;
+  businessEmail: string;
+  businessMobile: string;
+  businessAddress: string;
   gstin: string;
   businessName: string;
   businessType: string;

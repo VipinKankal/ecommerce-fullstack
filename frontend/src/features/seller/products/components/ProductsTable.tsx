@@ -1,6 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   InputAdornment,
   MenuItem,
   Paper,
@@ -11,10 +16,12 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import SellOutlinedIcon from '@mui/icons-material/SellOutlined';
+import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import {
   deleteSellerProduct,
   fetchSellerProducts,
+  transferSellerProductToWarehouse,
   updateSellerProduct,
 } from 'State/features/seller/products/thunks';
 import { Product } from 'shared/types/product.types';
@@ -39,8 +46,10 @@ const ProductsTable = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('ALL');
   const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [togglingId, setTogglingId] = useState<number | null>(null);
+  const [transferringId, setTransferringId] = useState<number | null>(null);
   const [editProduct, setEditProduct] = useState<Product | null>(null);
+  const [transferProduct, setTransferProduct] = useState<Product | null>(null);
+  const [transferQuantity, setTransferQuantity] = useState('1');
   const [editForm, setEditForm] = useState<ProductEditFormState>({
     title: '',
     description: '',
@@ -56,29 +65,29 @@ const ProductsTable = () => {
   }, [dispatch]);
 
   const productStats = useMemo(() => {
-    const inStock = products.filter(
-      (product) => Number(product.quantity) > 0,
-    ).length;
-    const lowStock = products.filter(
-      (product) =>
-        Number(product.quantity) > 0 &&
-        Number(product.quantity) <= LOW_STOCK_THRESHOLD,
-    ).length;
-    const outOfStock = products.filter(
-      (product) => Number(product.quantity) <= 0,
+    const warehouseValues = products.map((product) =>
+      Number(product.warehouseStock ?? product.quantity ?? 0),
+    );
+    const sellerValues = products.map((product) =>
+      Number(product.sellerStock ?? 0),
+    );
+    const inStock = warehouseValues.filter((value) => value > 0).length;
+    const lowStock = warehouseValues.filter(
+      (value) => value > 0 && value <= LOW_STOCK_THRESHOLD,
     ).length;
     const estimatedValue = products.reduce(
       (total, product) =>
         total +
-        Number(product.quantity || 0) * Number(product.sellingPrice || 0),
+        Number(product.warehouseStock ?? product.quantity ?? 0) *
+          Number(product.sellingPrice || 0),
       0,
     );
 
     return {
       total: products.length,
+      sellerStock: sellerValues.reduce((sum, value) => sum + value, 0),
       inStock,
       lowStock,
-      outOfStock,
       estimatedValue,
     };
   }, [products]);
@@ -94,7 +103,9 @@ const ProductsTable = () => {
         product.category?.categoryId ||
         ''
       ).toLowerCase();
-      const quantity = Number(product.quantity || 0);
+      const warehouseStock = Number(
+        product.warehouseStock ?? product.quantity ?? 0,
+      );
 
       const matchesQuery =
         !query ||
@@ -105,11 +116,11 @@ const ProductsTable = () => {
 
       const matchesStock =
         stockFilter === 'ALL' ||
-        (stockFilter === 'IN_STOCK' && quantity > LOW_STOCK_THRESHOLD) ||
+        (stockFilter === 'IN_STOCK' && warehouseStock > LOW_STOCK_THRESHOLD) ||
         (stockFilter === 'LOW_STOCK' &&
-          quantity > 0 &&
-          quantity <= LOW_STOCK_THRESHOLD) ||
-        (stockFilter === 'OUT_OF_STOCK' && quantity <= 0);
+          warehouseStock > 0 &&
+          warehouseStock <= LOW_STOCK_THRESHOLD) ||
+        (stockFilter === 'OUT_OF_STOCK' && warehouseStock <= 0);
 
       return matchesQuery && matchesStock;
     });
@@ -139,7 +150,7 @@ const ProductsTable = () => {
       description: row.description || '',
       sellingPrice: String(row.sellingPrice ?? ''),
       mrpPrice: String(row.mrpPrice ?? ''),
-      quantity: String(row.quantity ?? ''),
+      quantity: String(row.sellerStock ?? 0),
       color: getColorLabel(row.color),
       sizes: (row as ProductWithOptionalSize).size || row.sizes || '',
     });
@@ -147,6 +158,16 @@ const ProductsTable = () => {
 
   const closeEdit = () => {
     setEditProduct(null);
+  };
+
+  const openTransfer = (product: Product) => {
+    setTransferProduct(product);
+    setTransferQuantity('1');
+  };
+
+  const closeTransfer = () => {
+    setTransferProduct(null);
+    setTransferQuantity('1');
   };
 
   const handleDelete = async (productId?: number) => {
@@ -157,32 +178,6 @@ const ProductsTable = () => {
       await dispatch(fetchSellerProducts()).unwrap();
     } finally {
       setDeletingId(null);
-    }
-  };
-
-  const handleStockToggle = async (product: Product, checked: boolean) => {
-    if (!product.id) return;
-    setTogglingId(product.id);
-    try {
-      await dispatch(
-        updateSellerProduct({
-          productId: product.id,
-          product: {
-            title: product.title,
-            color: getColorLabel(product.color),
-            description: product.description,
-            images: product.images ?? [],
-            sizes:
-              (product as ProductWithOptionalSize).size ?? product.sizes ?? '',
-            sellingPrice: product.sellingPrice,
-            mrpPrice: product.mrpPrice,
-            quantity: checked ? Math.max(Number(product.quantity || 0), 1) : 0,
-          } as ProductUpdatePayload,
-        }),
-      ).unwrap();
-      await dispatch(fetchSellerProducts()).unwrap();
-    } finally {
-      setTogglingId(null);
     }
   };
 
@@ -211,7 +206,7 @@ const ProductsTable = () => {
         : editProduct.mrpPrice,
       quantity: Number.isFinite(parsedQuantity)
         ? parsedQuantity
-        : editProduct.quantity,
+        : editProduct.sellerStock ?? 0,
     };
 
     await dispatch(
@@ -222,6 +217,26 @@ const ProductsTable = () => {
     ).unwrap();
     await dispatch(fetchSellerProducts()).unwrap();
     closeEdit();
+  };
+
+  const handleTransferSubmit = async () => {
+    if (!transferProduct?.id) return;
+    const quantity = Number(transferQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) return;
+
+    setTransferringId(transferProduct.id);
+    try {
+      await dispatch(
+        transferSellerProductToWarehouse({
+          productId: transferProduct.id,
+          quantity,
+        }),
+      ).unwrap();
+      await dispatch(fetchSellerProducts()).unwrap();
+      closeTransfer();
+    } finally {
+      setTransferringId(null);
+    }
   };
 
   return (
@@ -235,22 +250,22 @@ const ProductsTable = () => {
             icon: <Inventory2OutlinedIcon />,
           },
           {
-            title: 'In Stock',
-            value: productStats.inStock,
-            tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+            title: 'Seller Stock Units',
+            value: productStats.sellerStock,
+            tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
             icon: <SellOutlinedIcon />,
           },
           {
-            title: 'Low Stock',
+            title: 'Low Warehouse Stock',
             value: productStats.lowStock,
             tone: 'bg-amber-50 text-amber-700 border-amber-100',
             icon: <WarningAmberRoundedIcon />,
           },
           {
-            title: 'Inventory Value',
+            title: 'Warehouse Value',
             value: `Rs ${productStats.estimatedValue}`,
-            tone: 'bg-violet-50 text-violet-700 border-violet-100',
-            icon: <Inventory2OutlinedIcon />,
+            tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+            icon: <WarehouseOutlinedIcon />,
           },
         ].map((stat) => (
           <div
@@ -287,7 +302,8 @@ const ProductsTable = () => {
               Product Inventory
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Search products, track stock health, and maintain listing quality.
+              Seller stock stays with you until you send units to the warehouse.
+              Only warehouse stock is sellable to customers.
             </Typography>
           </div>
 
@@ -311,15 +327,15 @@ const ProductsTable = () => {
             <TextField
               size="small"
               select
-              label="Stock"
+              label="Warehouse Stock"
               value={stockFilter}
               onChange={(e) => setStockFilter(e.target.value as StockFilter)}
-              sx={{ minWidth: 160 }}
+              sx={{ minWidth: 180 }}
             >
               <MenuItem value="ALL">All Products</MenuItem>
               <MenuItem value="IN_STOCK">In Stock</MenuItem>
               <MenuItem value="LOW_STOCK">Low Stock</MenuItem>
-              <MenuItem value="OUT_OF_STOCK">Out of Stock</MenuItem>
+              <MenuItem value="OUT_OF_STOCK">Awaiting Transfer</MenuItem>
             </TextField>
           </div>
         </div>
@@ -334,15 +350,15 @@ const ProductsTable = () => {
           loading={loading}
           products={products}
           filteredProducts={filteredProducts}
-          togglingId={togglingId}
           deletingId={deletingId}
+          transferringId={transferringId}
           lowStockThreshold={LOW_STOCK_THRESHOLD}
           getSafeImage={getSafeImage}
           getColorLabel={getColorLabel}
           getCategoryLabel={getCategoryLabel}
           onOpenEdit={openEdit}
           onDelete={handleDelete}
-          onStockToggle={handleStockToggle}
+          onOpenTransfer={openTransfer}
         />
       </Paper>
 
@@ -353,6 +369,38 @@ const ProductsTable = () => {
         onClose={closeEdit}
         onSave={saveEdit}
       />
+
+      <Dialog open={Boolean(transferProduct)} onClose={closeTransfer} fullWidth maxWidth="xs">
+        <DialogTitle>Send Stock to Warehouse</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Move seller-owned stock into warehouse stock for customer orders.
+          </Typography>
+          <TextField
+            fullWidth
+            label="Transfer Quantity"
+            type="number"
+            value={transferQuantity}
+            onChange={(event) => setTransferQuantity(event.target.value)}
+            inputProps={{ min: 1 }}
+            helperText={`Available seller stock: ${transferProduct?.sellerStock ?? 0}`}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeTransfer}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleTransferSubmit}
+            disabled={
+              !transferProduct ||
+              transferringId === transferProduct.id ||
+              Number(transferQuantity) <= 0
+            }
+          >
+            Send
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };

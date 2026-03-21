@@ -3,7 +3,12 @@ import { Alert, Chip } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import { statusTone } from 'features/courier/courierData';
-import { OrderLite, prettyLabel } from '../../orderDetailsTypes';
+import {
+  OrderLite,
+  prettyLabel,
+  resolveCustomerPaymentMessage,
+  resolvePaymentTypeLabel,
+} from '../../orderDetailsTypes';
 
 type OrderDetailsHeaderSectionProps = {
   customerStatus: string;
@@ -121,6 +126,18 @@ const OrderDetailsHeaderSection = ({
         <div className="text-xs text-gray-500">
           Timeline: {trackingCompleted}/{trackingTotal} milestones complete
         </div>
+        <div className="text-xs text-gray-500">
+          Payment Method: {order.paymentMethod || 'N/A'}
+          {resolvePaymentTypeLabel(order)
+            ? ` | Type: ${resolvePaymentTypeLabel(order)}`
+            : ''}
+          {order.provider ? ` | Provider: ${order.provider}` : ''}
+        </div>
+        {resolveCustomerPaymentMessage(order) && (
+          <div className="text-xs font-medium text-gray-700">
+            {resolveCustomerPaymentMessage(order)}
+          </div>
+        )}
         {(returnRefundLoading || exchangeLoading) && (
           <div className="text-xs text-gray-500">
             Checking refund and exchange updates...

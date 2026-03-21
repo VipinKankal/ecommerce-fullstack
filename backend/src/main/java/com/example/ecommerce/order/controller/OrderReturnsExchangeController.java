@@ -1,11 +1,12 @@
 package com.example.ecommerce.order.controller;
 
 import com.example.ecommerce.modal.User;
+import com.example.ecommerce.order.service.OrderAftercareService;
 import com.example.ecommerce.user.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -17,93 +18,113 @@ import java.util.Map;
 public class OrderReturnsExchangeController {
 
     private final UserService userService;
+    private final OrderAftercareService orderAftercareService;
 
     @GetMapping("/returns")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<List<Object>> getReturnRequests(
+    public ResponseEntity<List<Map<String, Object>>> getReturnRequests(
             @RequestHeader("Authorization") String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            throw new InsufficientAuthenticationException("Authentication required");
         }
-        return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(orderAftercareService.getCustomerReturnRequests(user.getId()));
+    }
+
+    @GetMapping("/return-exchange")
+    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
+    public ResponseEntity<List<Map<String, Object>>> getReturnExchangeRequests(
+            @RequestHeader("Authorization") String jwt
+    ) throws Exception {
+        User user = userService.findUserByJwtToken(jwt);
+        if (user == null) {
+            throw new InsufficientAuthenticationException("Authentication required");
+        }
+        return ResponseEntity.ok(orderAftercareService.getCustomerReturnExchangeRequests(user.getId()));
     }
 
     @PostMapping("/returns/items/{orderItemId}")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<Map<String, String>> createReturnRequest(
+    public ResponseEntity<Map<String, Object>> createReturnRequest(
             @PathVariable Long orderItemId,
             @RequestHeader("Authorization") String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
-        userService.findUserByJwtToken(jwt);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(Map.of(
-                "message", "Return request backend is not implemented yet for order item " + orderItemId
-        ));
+        User user = userService.findUserByJwtToken(jwt);
+        return ResponseEntity.ok(orderAftercareService.createReturnRequest(user, orderItemId, payload));
+    }
+
+    @PostMapping("/return-exchange/items/{orderItemId}")
+    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
+    public ResponseEntity<Map<String, Object>> createReturnExchangeRequest(
+            @PathVariable Long orderItemId,
+            @RequestHeader("Authorization") String jwt,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) throws Exception {
+        User user = userService.findUserByJwtToken(jwt);
+        return ResponseEntity.ok(orderAftercareService.createReturnExchangeRequest(user, orderItemId, payload));
     }
 
     @GetMapping("/exchanges")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<List<Object>> getExchangeRequests(
+    public ResponseEntity<List<Map<String, Object>>> getExchangeRequests(
             @RequestHeader("Authorization") String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         if (user == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            throw new InsufficientAuthenticationException("Authentication required");
         }
-        return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(orderAftercareService.getCustomerExchangeRequests(user.getId()));
     }
 
     @PostMapping("/exchanges/items/{orderItemId}")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<Map<String, String>> createExchangeRequest(
+    public ResponseEntity<Map<String, Object>> createExchangeRequest(
             @PathVariable Long orderItemId,
             @RequestHeader("Authorization") String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
-        userService.findUserByJwtToken(jwt);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(Map.of(
-                "message", "Exchange request backend is not implemented yet for order item " + orderItemId
-        ));
+        User user = userService.findUserByJwtToken(jwt);
+        return ResponseEntity.ok(orderAftercareService.createExchangeRequest(user, orderItemId, payload));
     }
 
     @PatchMapping("/exchanges/{requestId}/difference-payment")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<Map<String, String>> submitDifferencePayment(
+    public ResponseEntity<Map<String, Object>> submitDifferencePayment(
             @PathVariable Long requestId,
             @RequestHeader("Authorization") String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
-        userService.findUserByJwtToken(jwt);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(Map.of(
-                "message", "Exchange difference payment flow is not implemented yet for request " + requestId
-        ));
+        User user = userService.findUserByJwtToken(jwt);
+        String paymentReference = payload == null || payload.get("paymentReference") == null
+                ? null
+                : String.valueOf(payload.get("paymentReference"));
+        return ResponseEntity.ok(orderAftercareService.submitDifferencePayment(user, requestId, paymentReference));
     }
 
     @PatchMapping("/exchanges/{requestId}/balance-mode")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<Map<String, String>> selectBalanceMode(
+    public ResponseEntity<Map<String, Object>> selectBalanceMode(
             @PathVariable Long requestId,
             @RequestHeader("Authorization") String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
-        userService.findUserByJwtToken(jwt);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(Map.of(
-                "message", "Exchange balance mode flow is not implemented yet for request " + requestId
-        ));
+        User user = userService.findUserByJwtToken(jwt);
+        String balanceMode = payload == null || payload.get("balanceMode") == null
+                ? null
+                : String.valueOf(payload.get("balanceMode"));
+        return ResponseEntity.ok(orderAftercareService.selectBalanceMode(user, requestId, balanceMode));
     }
 
     @PatchMapping("/exchanges/{requestId}/bank-details")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<Map<String, String>> submitBankDetails(
+    public ResponseEntity<Map<String, Object>> submitBankDetails(
             @PathVariable Long requestId,
             @RequestHeader("Authorization") String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
-        userService.findUserByJwtToken(jwt);
-        return ResponseEntity.status(HttpStatus.NOT_IMPLEMENTED).body(Map.of(
-                "message", "Exchange bank details flow is not implemented yet for request " + requestId
-        ));
+        User user = userService.findUserByJwtToken(jwt);
+        return ResponseEntity.ok(orderAftercareService.submitBankDetails(user, requestId, payload));
     }
 }

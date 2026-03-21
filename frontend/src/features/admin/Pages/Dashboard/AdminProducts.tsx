@@ -20,6 +20,8 @@ type AdminProductRow = {
   categoryName?: string;
   sellerName?: string;
   quantity?: number;
+  sellerStock?: number;
+  warehouseStock?: number;
   sellingPrice?: number;
   mrpPrice?: number;
 };
@@ -64,20 +66,21 @@ const AdminProducts = () => {
               <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Category</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Seller</TableCell>
-              <TableCell sx={{ fontWeight: 700 }}>Stock</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Seller Stock</TableCell>
+              <TableCell sx={{ fontWeight: 700 }}>Warehouse Stock</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Price</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading && products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                   No products found.
                 </TableCell>
               </TableRow>
@@ -98,7 +101,8 @@ const AdminProducts = () => {
                   <TableCell>
                     {product.sellerName || 'Unassigned Seller'}
                   </TableCell>
-                  <TableCell>{product.quantity}</TableCell>
+                  <TableCell>{product.sellerStock ?? 0}</TableCell>
+                  <TableCell>{product.warehouseStock ?? product.quantity}</TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
                       Rs {product.sellingPrice}

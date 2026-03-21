@@ -17,6 +17,8 @@ public class ProductResponse {
     private Integer discountPercent;
     private Integer discountPercentage;
     private Integer quantity;
+    private Integer sellerStock;
+    private Integer warehouseStock;
     private String color;
     private List<String> images = new ArrayList<>();
     private Integer numRatings;

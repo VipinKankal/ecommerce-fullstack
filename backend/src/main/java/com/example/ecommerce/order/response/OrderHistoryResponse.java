@@ -1,4 +1,7 @@
 package com.example.ecommerce.order.response;
+import com.example.ecommerce.common.domain.PaymentMethod;
+import com.example.ecommerce.common.domain.PaymentProvider;
+import com.example.ecommerce.common.domain.PaymentType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,6 +14,10 @@ import java.util.List;
 public class OrderHistoryResponse {
     private Long id;
     private String orderStatus;
+    private String paymentStatus;
+    private PaymentMethod paymentMethod;
+    private PaymentType paymentType;
+    private PaymentProvider provider;
     private Integer totalSellingPrice;
     private Integer totalItems;
     private LocalDateTime orderDate;
