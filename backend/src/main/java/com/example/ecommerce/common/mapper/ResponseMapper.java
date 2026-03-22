@@ -38,6 +38,7 @@ public final class ResponseMapper {
         response.setQuantity(product.getQuantity());
         response.setSellerStock(product.getSellerStock());
         response.setWarehouseStock(product.getWarehouseStock());
+        response.setLowStockThreshold(product.getLowStockThreshold());
         response.setWarrantyType(product.getWarrantyType());
         response.setWarrantyDays(product.getWarrantyDays());
         response.setColor(product.getColor());

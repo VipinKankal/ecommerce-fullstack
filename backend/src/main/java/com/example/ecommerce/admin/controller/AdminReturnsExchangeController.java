@@ -46,6 +46,25 @@ public class AdminReturnsExchangeController {
         return ResponseEntity.ok(orderAftercareService.initiateRefund(requestId, adminComment));
     }
 
+    @PatchMapping("/returns/{requestId}/pickup")
+    public ResponseEntity<Map<String, Object>> markReturnPickup(
+            @PathVariable Long requestId,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) throws Exception {
+        String adminComment = payload == null || payload.get("adminComment") == null
+                ? null
+                : String.valueOf(payload.get("adminComment"));
+        return ResponseEntity.ok(orderAftercareService.markReturnPickup(requestId, adminComment));
+    }
+
+    @PatchMapping("/returns/{requestId}/receive")
+    public ResponseEntity<Map<String, Object>> receiveReturn(
+            @PathVariable Long requestId,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) throws Exception {
+        return ResponseEntity.ok(orderAftercareService.receiveReturn(requestId, payload == null ? Map.of() : payload));
+    }
+
     @PatchMapping("/returns/{requestId}/refund/complete")
     public ResponseEntity<Map<String, Object>> completeRefund(
             @PathVariable Long requestId,
@@ -84,14 +103,41 @@ public class AdminReturnsExchangeController {
         return ResponseEntity.ok(orderAftercareService.rejectExchange(requestId, note));
     }
 
-    @PatchMapping("/exchanges/{requestId}/replacement-order")
-    public ResponseEntity<Map<String, Object>> createReplacementOrder(
+    @PatchMapping("/exchanges/{requestId}/pickup")
+    public ResponseEntity<Map<String, Object>> markExchangePickup(
             @PathVariable Long requestId,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         String adminComment = payload == null || payload.get("adminComment") == null
                 ? null
                 : String.valueOf(payload.get("adminComment"));
-        return ResponseEntity.ok(orderAftercareService.createReplacementOrder(requestId, adminComment));
+        return ResponseEntity.ok(orderAftercareService.markExchangePickup(requestId, adminComment));
+    }
+
+    @PatchMapping("/exchanges/{requestId}/receive")
+    public ResponseEntity<Map<String, Object>> receiveExchange(
+            @PathVariable Long requestId,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) throws Exception {
+        return ResponseEntity.ok(orderAftercareService.receiveExchange(requestId, payload == null ? Map.of() : payload));
+    }
+
+    @PatchMapping("/exchanges/{requestId}/replacement-order")
+    public ResponseEntity<Map<String, Object>> createReplacementOrder(
+            @PathVariable Long requestId,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) throws Exception {
+        return ResponseEntity.ok(orderAftercareService.createReplacementOrder(requestId, payload == null ? Map.of() : payload));
+    }
+
+    @PatchMapping("/exchanges/{requestId}/replacement-delivered")
+    public ResponseEntity<Map<String, Object>> completeReplacementDelivery(
+            @PathVariable Long requestId,
+            @RequestBody(required = false) Map<String, Object> payload
+    ) throws Exception {
+        String adminComment = payload == null || payload.get("adminComment") == null
+                ? null
+                : String.valueOf(payload.get("adminComment"));
+        return ResponseEntity.ok(orderAftercareService.completeReplacementDelivery(requestId, adminComment));
     }
 }

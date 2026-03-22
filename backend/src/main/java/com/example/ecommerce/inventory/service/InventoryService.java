@@ -12,6 +12,8 @@ public interface InventoryService {
 
     Product transferSellerStockToWarehouse(Product product, int quantity, String note);
 
+    Product receiveSellerStockAtWarehouse(Product product, int quantity, Long requestId, String note);
+
     void deductWarehouseStockForOrder(Product product, int quantity, Long orderItemId);
 
     void restoreWarehouseStockFromCancellation(Product product, int quantity, Long orderItemId, String note);

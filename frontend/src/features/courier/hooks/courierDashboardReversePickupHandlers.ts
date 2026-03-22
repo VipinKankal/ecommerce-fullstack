@@ -194,7 +194,9 @@ export const createReversePickupHandlers = ({
   };
 
   const getPickedStatus = (task: CourierAssignmentItem) =>
-    task.reverseType === 'EXCHANGE' ? 'OLD_PRODUCT_PICKED' : 'RETURN_PICKED';
+    task.reverseType === 'EXCHANGE'
+      ? 'EXCHANGE_IN_TRANSIT'
+      : 'RETURN_IN_TRANSIT';
 
   const syncPickedReverseTask = (
     selectedTask: CourierAssignmentItem,
@@ -213,7 +215,7 @@ export const createReversePickupHandlers = ({
           ...task,
           proofPhotoUrl: reversePickupForm.proofPhotoUrl,
           statusNote: reversePickupForm.note,
-          reversePickupTaskStatus: 'PICKED',
+          reversePickupTaskStatus: 'COMPLETED',
           reversePickedAt: new Date().toISOString(),
           returnStatus: pickedStatus,
         };

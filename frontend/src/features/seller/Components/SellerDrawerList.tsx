@@ -17,6 +17,8 @@ import {
   Logout,
   AutorenewOutlined,
   Autorenew,
+  CompareArrowsOutlined,
+  CompareArrows,
 } from '@mui/icons-material';
 import { useAppDispatch } from 'State/features/store/Store';
 import { useNavigate } from 'react-router-dom';
@@ -41,6 +43,12 @@ const menu = [
     path: '/seller/orders',
     icon: <ShoppingBagOutlined />,
     activeIcon: <ShoppingBag />,
+  },
+  {
+    name: 'Transfers',
+    path: '/seller/transfers',
+    icon: <CompareArrowsOutlined />,
+    activeIcon: <CompareArrows />,
   },
   {
     name: 'Returns',

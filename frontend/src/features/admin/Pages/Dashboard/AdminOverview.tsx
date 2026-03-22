@@ -40,6 +40,12 @@ type DashboardSummaryResponse = {
   pendingSellers?: number;
   totalTransactions?: number;
   grossMerchandiseValue?: number;
+  todayInbound?: number;
+  todayShipped?: number;
+  pendingReturns?: number;
+  pendingExchanges?: number;
+  pendingTransfers?: number;
+  lowStockAlerts?: number;
 };
 
 type SalesReportResponse = {
@@ -71,6 +77,12 @@ const toDashboardSummary = (
     pendingSellers: toNumber(record.pendingSellers),
     totalTransactions: toNumber(record.totalTransactions),
     grossMerchandiseValue: toNumber(record.grossMerchandiseValue),
+    todayInbound: toNumber(record.todayInbound),
+    todayShipped: toNumber(record.todayShipped),
+    pendingReturns: toNumber(record.pendingReturns),
+    pendingExchanges: toNumber(record.pendingExchanges),
+    pendingTransfers: toNumber(record.pendingTransfers),
+    lowStockAlerts: toNumber(record.lowStockAlerts),
   };
 };
 
@@ -136,6 +148,12 @@ const AdminOverview = () => {
         dashboardSummary?.grossMerchandiseValue ||
         salesReport?.totalRevenue ||
         0,
+      todayInbound: dashboardSummary?.todayInbound || 0,
+      todayShipped: dashboardSummary?.todayShipped || 0,
+      pendingReturns: dashboardSummary?.pendingReturns || 0,
+      pendingExchanges: dashboardSummary?.pendingExchanges || 0,
+      pendingTransfers: dashboardSummary?.pendingTransfers || 0,
+      lowStockAlerts: dashboardSummary?.lowStockAlerts || 0,
     };
   }, [dashboardSummary, salesReport, sellers, transactions]);
 
@@ -217,6 +235,54 @@ const AdminOverview = () => {
               </p>
             </div>
             <p className="text-sm font-semibold opacity-80">{card.title}</p>
+            <p className="mt-1 text-3xl font-black tracking-tight">
+              {card.value}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
+        {[
+          {
+            title: 'Today Inbound',
+            value: stats.todayInbound,
+            tone: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+          },
+          {
+            title: 'Today Shipped',
+            value: stats.todayShipped,
+            tone: 'bg-sky-50 text-sky-700 border-sky-100',
+          },
+          {
+            title: 'Pending Returns',
+            value: stats.pendingReturns,
+            tone: 'bg-amber-50 text-amber-700 border-amber-100',
+          },
+          {
+            title: 'Pending Exchanges',
+            value: stats.pendingExchanges,
+            tone: 'bg-orange-50 text-orange-700 border-orange-100',
+          },
+          {
+            title: 'Pending Transfers',
+            value: stats.pendingTransfers,
+            tone: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+          },
+          {
+            title: 'Low Stock Alerts',
+            value: stats.lowStockAlerts,
+            tone: 'bg-rose-50 text-rose-700 border-rose-100',
+          },
+        ].map((card) => (
+          <div
+            key={card.title}
+            className={`rounded-3xl border p-5 shadow-sm ${card.tone}`}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.2em] opacity-70">
+              Warehouse
+            </p>
+            <p className="mt-3 text-sm font-semibold opacity-80">{card.title}</p>
             <p className="mt-1 text-3xl font-black tracking-tight">
               {card.value}
             </p>
@@ -306,17 +372,17 @@ const AdminOverview = () => {
             Operational Next Steps
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Current backend supports seller oversight and transaction
-            visibility. User, product moderation, and reports still need
-            dedicated admin APIs.
+            Warehouse-heavy metrics are now available alongside seller and
+            payment visibility, so admin can monitor inbound, shipped, aftercare,
+            and low-stock pressure from one screen.
           </Typography>
 
           <div className="space-y-3">
             {[
               'Review pending seller approvals',
-              'Monitor payment-linked orders',
-              'Add admin APIs for product and order moderation',
-              'Build reporting endpoints for analytics',
+              'Clear pending transfers and inbound receipts',
+              'Resolve return and exchange backlog',
+              'Refill products with low-stock alerts first',
             ].map((item) => (
               <div
                 key={item}

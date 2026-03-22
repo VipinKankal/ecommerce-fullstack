@@ -20,12 +20,15 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         ensureCheckoutPaymentColumns();
         ensureProductInventoryColumns();
         ensureProductVariantTable();
+        ensureProductWarehouseOpsColumns();
         ensureProductActivationColumn();
         ensureProductWarrantyColumns();
         ensureDeliveredAtColumn();
         ensureInventoryMovementTable();
         ensureRestockNotificationTables();
         ensureOrderReturnExchangeTables();
+        ensureWarehouseTransferRequestTable();
+        ensureAuditLogTable();
     }
 
     private void ensureLegacyStatusColumnsCompatible() {
@@ -182,6 +185,19 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         );
     }
 
+    private void ensureProductWarehouseOpsColumns() {
+        ensureColumn("product", "low_stock_threshold", "INT NOT NULL DEFAULT 10");
+        ensureColumn("warehouse_transfer_requests", "pickup_proof_url", "VARCHAR(1200) NULL");
+        ensureColumn("warehouse_transfer_requests", "receive_proof_url", "VARCHAR(1200) NULL");
+        ensureColumn("order_return_exchange_requests", "qc_result", "VARCHAR(255) NULL");
+        ensureColumn("order_return_exchange_requests", "warehouse_proof_url", "VARCHAR(1200) NULL");
+        jdbcTemplate.execute(
+                "UPDATE product SET low_stock_threshold = CASE " +
+                        "WHEN low_stock_threshold IS NULL OR low_stock_threshold < 0 THEN 10 " +
+                        "ELSE low_stock_threshold END"
+        );
+    }
+
     private void ensureProductActivationColumn() {
         ensureColumn("product", "is_active", "BIT NOT NULL DEFAULT b'1'");
         jdbcTemplate.execute(
@@ -207,13 +223,21 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
 
     private void ensureDeliveredAtColumn() {
         ensureColumn("orders", "delivered_at", "DATETIME(6) NULL");
+        ensureColumn("orders", "shipped_at", "DATETIME(6) NULL");
 
         jdbcTemplate.execute(
                 "UPDATE orders " +
-                        "SET delivered_at = delivery_date " +
+                "SET delivered_at = delivery_date " +
                         "WHERE delivered_at IS NULL " +
                         "AND order_status = 'DELIVERED' " +
                         "AND delivery_date IS NOT NULL"
+        );
+        jdbcTemplate.execute(
+                "UPDATE orders " +
+                        "SET shipped_at = order_date " +
+                        "WHERE shipped_at IS NULL " +
+                        "AND order_status = 'SHIPPED' " +
+                        "AND order_date IS NOT NULL"
         );
     }
 
@@ -301,6 +325,8 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "requested_new_product_image VARCHAR(255) NULL," +
                         "requested_variant VARCHAR(255) NULL," +
                         "product_photo VARCHAR(1200) NULL," +
+                        "qc_result VARCHAR(255) NULL," +
+                        "warehouse_proof_url VARCHAR(1200) NULL," +
                         "old_price INT NULL," +
                         "new_price INT NULL," +
                         "price_difference INT NULL," +
@@ -330,6 +356,7 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "bank_refund_completed_at DATETIME(6) NULL," +
                         "replacement_created_at DATETIME(6) NULL," +
                         "replacement_shipped_at DATETIME(6) NULL," +
+                        "replacement_proof_url VARCHAR(1200) NULL," +
                         "replacement_delivered_at DATETIME(6) NULL," +
                         "completed_at DATETIME(6) NULL," +
                         "PRIMARY KEY (id)," +
@@ -348,6 +375,81 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "PRIMARY KEY (request_id, history_index)," +
                         "CONSTRAINT fk_order_return_exchange_request_history_request " +
                         "FOREIGN KEY (request_id) REFERENCES order_return_exchange_requests (id)" +
+                        ")"
+        );
+        ensureColumn("order_return_exchange_requests", "replacement_proof_url", "VARCHAR(1200) NULL");
+    }
+
+    private void ensureWarehouseTransferRequestTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS warehouse_transfer_requests (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "product_id BIGINT NULL," +
+                        "seller_id BIGINT NULL," +
+                        "quantity INT NOT NULL," +
+                        "status VARCHAR(64) NOT NULL," +
+                        "seller_note VARCHAR(1200) NULL," +
+                        "admin_note VARCHAR(1200) NULL," +
+                        "rejection_reason VARCHAR(1200) NULL," +
+                        "pickup_proof_url VARCHAR(1200) NULL," +
+                        "receive_proof_url VARCHAR(1200) NULL," +
+                        "pickup_mode VARCHAR(64) NULL," +
+                        "estimated_weight_kg DOUBLE NULL," +
+                        "package_count INT NULL," +
+                        "preferred_vehicle VARCHAR(64) NULL," +
+                        "suggested_vehicle VARCHAR(64) NULL," +
+                        "estimated_pickup_hours INT NULL," +
+                        "estimated_logistics_charge INT NULL," +
+                        "package_type VARCHAR(64) NULL," +
+                        "pickup_ready_at DATETIME(6) NULL," +
+                        "pickup_address_verified BIT NULL," +
+                        "transport_mode VARCHAR(64) NULL," +
+                        "assigned_courier_name VARCHAR(255) NULL," +
+                        "transporter_name VARCHAR(255) NULL," +
+                        "invoice_number VARCHAR(255) NULL," +
+                        "challan_number VARCHAR(255) NULL," +
+                        "requested_at DATETIME(6) NOT NULL," +
+                        "approved_at DATETIME(6) NULL," +
+                        "picked_up_at DATETIME(6) NULL," +
+                        "received_at DATETIME(6) NULL," +
+                        "cancelled_at DATETIME(6) NULL," +
+                        "PRIMARY KEY (id)," +
+                        "CONSTRAINT fk_warehouse_transfer_product FOREIGN KEY (product_id) REFERENCES product (id)," +
+                        "CONSTRAINT fk_warehouse_transfer_seller FOREIGN KEY (seller_id) REFERENCES seller (id)" +
+                        ")"
+        );
+        ensureColumn("warehouse_transfer_requests", "pickup_mode", "VARCHAR(64) NULL");
+        ensureColumn("warehouse_transfer_requests", "estimated_weight_kg", "DOUBLE NULL");
+        ensureColumn("warehouse_transfer_requests", "package_count", "INT NULL");
+        ensureColumn("warehouse_transfer_requests", "preferred_vehicle", "VARCHAR(64) NULL");
+        ensureColumn("warehouse_transfer_requests", "suggested_vehicle", "VARCHAR(64) NULL");
+        ensureColumn("warehouse_transfer_requests", "estimated_pickup_hours", "INT NULL");
+        ensureColumn("warehouse_transfer_requests", "estimated_logistics_charge", "INT NULL");
+        ensureColumn("warehouse_transfer_requests", "package_type", "VARCHAR(64) NULL");
+        ensureColumn("warehouse_transfer_requests", "pickup_ready_at", "DATETIME(6) NULL");
+        ensureColumn("warehouse_transfer_requests", "pickup_address_verified", "BIT NULL");
+        ensureColumn("warehouse_transfer_requests", "transport_mode", "VARCHAR(64) NULL");
+        ensureColumn("warehouse_transfer_requests", "assigned_courier_name", "VARCHAR(255) NULL");
+        ensureColumn("warehouse_transfer_requests", "transporter_name", "VARCHAR(255) NULL");
+        ensureColumn("warehouse_transfer_requests", "invoice_number", "VARCHAR(255) NULL");
+        ensureColumn("warehouse_transfer_requests", "challan_number", "VARCHAR(255) NULL");
+    }
+
+    private void ensureAuditLogTable() {
+        jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS audit_log_entries (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "method VARCHAR(16) NOT NULL," +
+                        "path VARCHAR(255) NOT NULL," +
+                        "status INT NOT NULL," +
+                        "actor VARCHAR(255) NOT NULL," +
+                        "ip_address VARCHAR(64) NULL," +
+                        "duration_ms BIGINT NOT NULL," +
+                        "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
+                        "PRIMARY KEY (id)," +
+                        "INDEX idx_audit_log_entries_created_at (created_at)," +
+                        "INDEX idx_audit_log_entries_actor (actor)," +
+                        "INDEX idx_audit_log_entries_path (path)" +
                         ")"
         );
     }

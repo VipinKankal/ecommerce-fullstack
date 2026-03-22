@@ -9,6 +9,7 @@ import Profile from '../../features/seller/Pages/Account/Profile';
 import SellerDashboardHome from '../../features/seller/Pages/SellerDashboard/SellerDashboardHome';
 import SellerReturnRequests from '../../features/seller/Pages/Aftercare/SellerReturnRequests';
 import SellerExchangeRequests from '../../features/seller/Pages/Aftercare/SellerExchangeRequests';
+import SellerTransfers from '../../features/seller/Pages/Transfers/SellerTransfers';
 
 const SellerRoutes = () => {
   return (
@@ -17,6 +18,7 @@ const SellerRoutes = () => {
       <Route path="/products" element={<Products />} />
       <Route path="/add-product" element={<AddProducts />} />
       <Route path="/orders" element={<Order />} />
+      <Route path="/transfers" element={<SellerTransfers />} />
       <Route path="/returns" element={<SellerReturnRequests />} />
       <Route path="/exchanges" element={<SellerExchangeRequests />} />
       <Route path="/payments" element={<Payment />} />

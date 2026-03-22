@@ -60,6 +60,11 @@ public class OrderReturnExchangeRequest {
     @Column(length = 1200)
     private String productPhoto;
 
+    private String qcResult;
+
+    @Column(length = 1200)
+    private String warehouseProofUrl;
+
     private Integer oldPrice;
     private Integer newPrice;
     private Integer priceDifference;
@@ -93,6 +98,8 @@ public class OrderReturnExchangeRequest {
     private LocalDateTime bankRefundCompletedAt;
     private LocalDateTime replacementCreatedAt;
     private LocalDateTime replacementShippedAt;
+    @Column(length = 1200)
+    private String replacementProofUrl;
     private LocalDateTime replacementDeliveredAt;
     private LocalDateTime completedAt;
 

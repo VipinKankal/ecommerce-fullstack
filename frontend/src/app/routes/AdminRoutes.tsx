@@ -19,6 +19,7 @@ import AdminManualUpiPayments from '../../features/admin/Pages/Dashboard/AdminMa
 import AdminCourierManagement from '../../features/admin/Courier/AdminCourierManagement';
 import AdminReturnRequests from '../../features/admin/returns/AdminReturnRequests';
 import AdminExchangeRequests from '../../features/admin/exchanges/AdminExchangeRequests';
+import AdminAuditLogs from '../../features/admin/Pages/Dashboard/AdminAuditLogs';
 
 const AdminRoutes = () => {
   return (
@@ -34,6 +35,7 @@ const AdminRoutes = () => {
         <Route path="/manual-upi" element={<AdminManualUpiPayments />} />
         <Route path="/return-requests" element={<AdminReturnRequests />} />
         <Route path="/exchange-requests" element={<AdminExchangeRequests />} />
+        <Route path="/audit-logs" element={<AdminAuditLogs />} />
         <Route path="/couriers" element={<AdminCourierManagement />} />
         <Route path="/reports" element={<AdminReports />} />
         <Route path="/account" element={<AdminAccount />} />

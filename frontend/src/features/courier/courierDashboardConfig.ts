@@ -68,10 +68,16 @@ export const reversePickupReadyStatuses = new Set([
 ]);
 
 export const reversePickupCompletedStatuses = new Set([
+  'RETURN_IN_TRANSIT',
+  'REFUND_PENDING',
+  'REFUND_INITIATED',
+  'RETURNED',
+  'EXCHANGE_IN_TRANSIT',
+  'EXCHANGE_RECEIVED',
+  'EXCHANGE_SHIPPED',
   'RETURN_PICKED',
   'OLD_PRODUCT_PICKED',
   'RETURN_RECEIVED',
-  'REFUND_INITIATED',
   'REFUND_COMPLETED',
   'REPLACEMENT_ORDER_CREATED',
   'REPLACEMENT_SHIPPED',

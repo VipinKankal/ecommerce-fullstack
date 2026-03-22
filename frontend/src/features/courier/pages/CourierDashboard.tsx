@@ -17,7 +17,6 @@ import {
   CourierDeliveredSection,
   CourierDeliveriesSection,
   CourierEarningsSection,
-  CourierExchangePickupsSection,
   CourierPetrolSection,
   CourierReversePickupsSection,
 } from 'features/courier/components/CourierDashboardSections';
@@ -37,6 +36,7 @@ const CourierDashboard = () => {
     deliveryForm,
     earnings,
     error,
+    exchangePickupAssignments,
     handleAcceptReversePickup,
     handleCodDepositSubmit,
     handleDeliveryActionChange,
@@ -161,7 +161,15 @@ const CourierDashboard = () => {
             title="Return Pickups"
           />
         )}
-        {activeTab === 'exchangePickups' && <CourierExchangePickupsSection />}
+        {activeTab === 'exchangePickups' && (
+          <CourierReversePickupsSection
+            emptyState="No assigned exchange pickups right now."
+            isReversePickupAccepted={isReversePickupAccepted}
+            onOpenTask={openReverseTask}
+            tasks={exchangePickupAssignments}
+            title="Exchange Pickups"
+          />
+        )}
         {activeTab === 'delivered' && (
           <CourierDeliveredSection
             deliveredAssignments={deliveredAssignments}

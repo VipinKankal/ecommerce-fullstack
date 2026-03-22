@@ -23,10 +23,23 @@ export const API_ROUTES = {
   admin: {
     profile: "/api/admin/profile",
     dashboardSummary: "/api/admin/dashboard/summary",
+    auditLogs: "/api/admin/audit-logs",
     users: "/api/admin/users",
     userStatus: (id: number | string, status: string) => `/api/admin/users/${id}/status/${status}`,
     products: "/api/admin/products",
+    notifyDemand: "/api/admin/notify-demand",
+    inventory: {
+      adjust: (productId: number | string) => `/api/admin/inventory/${productId}`,
+      movements: (productId: number | string) => `/api/admin/products/${productId}/movements`,
+      triggerNotify: (productId: number | string) => `/api/admin/notify-demand/${productId}/trigger`,
+    },
     orders: "/api/admin/orders",
+    orderActions: {
+      confirm: (orderId: number | string) => `/api/admin/orders/${orderId}/confirm`,
+      pack: (orderId: number | string) => `/api/admin/orders/${orderId}/pack`,
+      ship: (orderId: number | string) => `/api/admin/orders/${orderId}/ship`,
+      cancel: (orderId: number | string) => `/api/admin/orders/${orderId}/cancel`,
+    },
     payments: "/api/admin/payments",
     salesReport: "/api/admin/reports/sales",
     updateSellerStatus: (id: number | string, status: string) =>
@@ -36,11 +49,30 @@ export const API_ROUTES = {
       base: "/api/admin/return-exchange",
       review: (requestId: number | string) => `/api/admin/return-exchange/${requestId}/review`,
     },
+    returns: {
+      base: "/api/admin/returns",
+      review: (requestId: number | string) => `/api/admin/returns/${requestId}/review`,
+      pickup: (requestId: number | string) => `/api/admin/returns/${requestId}/pickup`,
+      receive: (requestId: number | string) => `/api/admin/returns/${requestId}/receive`,
+      refundInitiate: (requestId: number | string) => `/api/admin/returns/${requestId}/refund/initiate`,
+      refundComplete: (requestId: number | string) => `/api/admin/returns/${requestId}/refund/complete`,
+    },
     exchanges: {
       base: "/api/admin/exchanges",
       approve: (requestId: number | string) => `/api/admin/exchanges/${requestId}/approve`,
       reject: (requestId: number | string) => `/api/admin/exchanges/${requestId}/reject`,
+      pickup: (requestId: number | string) => `/api/admin/exchanges/${requestId}/pickup`,
+      receive: (requestId: number | string) => `/api/admin/exchanges/${requestId}/receive`,
       replacementOrder: (requestId: number | string) => `/api/admin/exchanges/${requestId}/replacement-order`,
+      replacementDelivered: (requestId: number | string) => `/api/admin/exchanges/${requestId}/replacement-delivered`,
+    },
+    transfers: {
+      base: "/api/admin/transfers",
+      approve: (transferId: number | string) => `/api/admin/transfers/${transferId}/approve`,
+      reject: (transferId: number | string) => `/api/admin/transfers/${transferId}/reject`,
+      plan: (transferId: number | string) => `/api/admin/transfers/${transferId}/plan`,
+      pickup: (transferId: number | string) => `/api/admin/transfers/${transferId}/pickup`,
+      receive: (transferId: number | string) => `/api/admin/transfers/${transferId}/receive`,
     },
     updateSellerStatusAlias: (id: number | string, status: string) =>
       `/api/seller/${id}/status/${status}`,
@@ -154,6 +186,7 @@ export const API_ROUTES = {
       `/api/sellers/products/${productId}/warehouse-transfer`,
     movements: (productId: number | string) =>
       `/api/sellers/products/${productId}/movements`,
+    demand: "/api/sellers/products/demand",
   },
 
   sellerOrders: {
@@ -166,6 +199,11 @@ export const API_ROUTES = {
   sellerAftercare: {
     returns: "/api/seller/aftercare/returns",
     exchanges: "/api/seller/aftercare/exchanges",
+  },
+
+  sellerTransfers: {
+    base: "/api/seller/transfers",
+    cancel: (transferId: number | string) => `/api/seller/transfers/${transferId}/cancel`,
   },
 
   transactions: {

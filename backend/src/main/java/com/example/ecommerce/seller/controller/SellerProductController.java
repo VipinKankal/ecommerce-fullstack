@@ -3,6 +3,8 @@ package com.example.ecommerce.seller.controller;
 import com.example.ecommerce.common.mapper.ResponseMapper;
 import com.example.ecommerce.common.response.ApiResponse;
 import com.example.ecommerce.inventory.service.InventoryService;
+import com.example.ecommerce.inventory.service.RestockNotificationService;
+import com.example.ecommerce.inventory.service.WarehouseTransferService;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.catalog.request.CreateProductRequest;
@@ -28,6 +30,8 @@ public class SellerProductController {
     private final ProductService productService;
     private final SellerService sellerService;
     private final InventoryService inventoryService;
+    private final RestockNotificationService restockNotificationService;
+    private final WarehouseTransferService warehouseTransferService;
 
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getProductsBySellerId(
@@ -99,16 +103,32 @@ public class SellerProductController {
         }
 
         Object rawQuantity = payload == null ? null : payload.get("quantity");
-        int quantity = rawQuantity instanceof Number number
-                ? number.intValue()
-                : Integer.parseInt(String.valueOf(rawQuantity));
+        if (rawQuantity == null) {
+            throw new IllegalArgumentException("Transfer quantity is required");
+        }
+        int quantity;
+        try {
+            quantity = rawQuantity instanceof Number number
+                    ? number.intValue()
+                    : Integer.parseInt(String.valueOf(rawQuantity));
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Invalid transfer quantity");
+        }
+        String sellerNote = payload == null || payload.get("sellerNote") == null
+                ? "Seller requested warehouse transfer"
+                : String.valueOf(payload.get("sellerNote"));
+        String pickupMode = payload == null || payload.get("pickupMode") == null
+                ? "WAREHOUSE_PICKUP"
+                : String.valueOf(payload.get("pickupMode"));
 
-        Product updatedProduct = inventoryService.transferSellerStockToWarehouse(
+        warehouseTransferService.createTransferRequest(
                 product,
+                seller,
                 quantity,
-                "Seller sent stock to warehouse"
+                sellerNote,
+                pickupMode
         );
-        return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
+        return new ResponseEntity<>(ResponseMapper.toProductResponse(product), HttpStatus.OK);
     }
 
     @GetMapping("/{productId}/movements")
@@ -122,5 +142,13 @@ public class SellerProductController {
             throw new Exception("Unauthorized product access");
         }
         return ResponseEntity.ok(inventoryService.getMovementsForProduct(productId));
+    }
+
+    @GetMapping("/demand")
+    public ResponseEntity<Map<String, Object>> getSellerDemandInsights(
+            @RequestHeader("Authorization") String jwt
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        return ResponseEntity.ok(restockNotificationService.getSellerDemandInsights(seller.getId()));
     }
 }

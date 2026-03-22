@@ -25,8 +25,10 @@ public interface OrderService {
     List<Order> usersOrderHistory(Long userId);
     List<Order> sellersOrder(Long sellerId);
     Order updateOrderStatus(Long orderId, OrderStatus status) throws Exception;
+    Order updateOrderStatusByAdmin(Long orderId, OrderStatus status) throws Exception;
     Order updateOrderStatusBySeller(Long orderId, OrderStatus status, Long sellerId) throws Exception;
     Order cancelOrder(Long orderId, User user, String cancelReasonCode, String cancelReasonText) throws Exception;
+    Order cancelOrderByAdmin(Long orderId, String cancelReasonCode, String cancelReasonText) throws Exception;
     OrderItem getOrderItemById(Long id) throws Exception;
 }
 

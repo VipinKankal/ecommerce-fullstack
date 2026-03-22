@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
+  Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -9,6 +11,13 @@ import {
   InputAdornment,
   MenuItem,
   Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from '@mui/material';
@@ -25,6 +34,8 @@ import {
   updateSellerProduct,
 } from 'State/features/seller/products/thunks';
 import { Product } from 'shared/types/product.types';
+import { api } from 'shared/api/Api';
+import { API_ROUTES } from 'shared/api/ApiRoutes';
 import ProductEditDialog from './productsTable/ProductEditDialog';
 import ProductsInventoryTable from './productsTable/ProductsInventoryTable';
 import { ProductEditFormState } from './productsTable/ProductsTable.types';
@@ -35,8 +46,48 @@ type ProductUpdatePayload = Partial<Product> & {
   size?: string;
   sizes?: string;
 };
+type PickupMode = 'SELLER_DROP' | 'WAREHOUSE_PICKUP';
+type SellerDemandProductRow = {
+  productId?: number;
+  subscribedCount?: number;
+  notifiedCount?: number;
+  convertedCount?: number;
+};
+type SellerDemandInsights = {
+  pendingSubscribers?: number;
+  notifiedSubscribers?: number;
+  convertedSubscribers?: number;
+  demandProducts?: SellerDemandProductRow[];
+};
+type SellerMovementRow = {
+  id: number;
+  action?: string;
+  from?: string;
+  to?: string;
+  quantity?: number;
+  movementType?: string;
+  requestType?: string;
+  addedBy?: string;
+  updatedBy?: string;
+  note?: string;
+  createdAt?: string;
+};
+type SellerRecommendationMeta = {
+  recommendedQty: number;
+  headline: string;
+  detail: string;
+  tone: 'success' | 'warning' | 'error' | 'info';
+  variantHighlights: string[];
+};
 
 const LOW_STOCK_THRESHOLD = 5;
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
+};
+const prettify = (value?: string | null) => (value || '-').replaceAll('_', ' ');
 
 const ProductsTable = () => {
   const dispatch = useAppDispatch();
@@ -50,6 +101,20 @@ const ProductsTable = () => {
   const [editProduct, setEditProduct] = useState<Product | null>(null);
   const [transferProduct, setTransferProduct] = useState<Product | null>(null);
   const [transferQuantity, setTransferQuantity] = useState('1');
+  const [transferPickupMode, setTransferPickupMode] =
+    useState<PickupMode>('WAREHOUSE_PICKUP');
+  const [transferSellerNote, setTransferSellerNote] = useState('');
+  const [transferFeedback, setTransferFeedback] = useState<{
+    type: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+  const [demandInsights, setDemandInsights] = useState<SellerDemandInsights | null>(
+    null,
+  );
+  const [movementProduct, setMovementProduct] = useState<Product | null>(null);
+  const [movementRows, setMovementRows] = useState<SellerMovementRow[]>([]);
+  const [movementLoading, setMovementLoading] = useState(false);
+  const [movementError, setMovementError] = useState('');
   const [editForm, setEditForm] = useState<ProductEditFormState>({
     title: '',
     brand: '',
@@ -66,6 +131,32 @@ const ProductsTable = () => {
   useEffect(() => {
     dispatch(fetchSellerProducts());
   }, [dispatch]);
+
+  useEffect(() => {
+    const loadDemandInsights = async () => {
+      try {
+        const response = await api.get(API_ROUTES.sellerProducts.demand);
+        setDemandInsights((response.data || {}) as SellerDemandInsights);
+      } catch {
+        setDemandInsights(null);
+      }
+    };
+
+    loadDemandInsights();
+  }, []);
+
+  const demandByProductId = useMemo(() => {
+    return new Map(
+      (demandInsights?.demandProducts || []).map((item) => [
+        Number(item.productId),
+        {
+          waiting: Number(item.subscribedCount ?? 0),
+          notified: Number(item.notifiedCount ?? 0),
+          converted: Number(item.convertedCount ?? 0),
+        },
+      ]),
+    );
+  }, [demandInsights?.demandProducts]);
 
   const productStats = useMemo(() => {
     const warehouseValues = products.map((product) =>
@@ -92,8 +183,9 @@ const ProductsTable = () => {
       inStock,
       lowStock,
       estimatedValue,
+      waitingUsers: Number(demandInsights?.pendingSubscribers ?? 0),
     };
-  }, [products]);
+  }, [demandInsights?.pendingSubscribers, products]);
 
   const filteredProducts = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -146,6 +238,78 @@ const ProductsTable = () => {
     product.category?.categoryId?.replace(/_/g, ' ') ||
     'N/A';
 
+  const getRecommendationMeta = (product: Product): SellerRecommendationMeta => {
+    const sellerStock = Number(product.sellerStock ?? 0);
+    const warehouseStock = Number(product.warehouseStock ?? product.quantity ?? 0);
+    const demand = demandByProductId.get(Number(product.id)) || {
+      waiting: 0,
+      notified: 0,
+      converted: 0,
+    };
+    const targetWarehouseStock = Math.max(LOW_STOCK_THRESHOLD, demand.waiting);
+    const recommendedQty = Math.max(
+      0,
+      Math.min(sellerStock, targetWarehouseStock - warehouseStock),
+    );
+    const variantHighlights = (product.variants || [])
+      .map((variant) => {
+        const label =
+          variant.size || variant.variantValue || variant.sku || `Variant ${variant.id}`;
+        const variantSellerStock = Number(variant.sellerStock ?? 0);
+        const variantWarehouseStock = Number(variant.warehouseStock ?? 0);
+
+        if (variantWarehouseStock <= 0 && variantSellerStock > 0) {
+          return `${label}: send soon`;
+        }
+        if (variantWarehouseStock <= 0) {
+          return `${label}: empty`;
+        }
+        if (variantWarehouseStock <= LOW_STOCK_THRESHOLD) {
+          return `${label}: ${variantWarehouseStock} left`;
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .slice(0, 2);
+
+    if (sellerStock <= 0) {
+      return {
+        recommendedQty: 0,
+        headline: 'Seller stock unavailable',
+        detail: demand.waiting > 0
+          ? `${demand.waiting} users are waiting but seller stock is empty.`
+          : 'No units available to send right now.',
+        tone: 'error',
+        variantHighlights,
+      };
+    }
+
+    if (recommendedQty > 0) {
+      return {
+        recommendedQty,
+        headline:
+          warehouseStock <= 0 ? 'Send to warehouse now' : 'Top up warehouse stock',
+        detail:
+          demand.waiting > 0
+            ? `${demand.waiting} users are waiting. Recommended transfer ${recommendedQty} units.`
+            : `Threshold top-up recommended: ${recommendedQty} units.`,
+        tone: warehouseStock <= 0 ? 'warning' : 'info',
+        variantHighlights,
+      };
+    }
+
+    return {
+      recommendedQty: 0,
+      headline: 'Warehouse stock healthy',
+      detail:
+        demand.waiting > 0
+          ? `${demand.waiting} users waiting, but warehouse can still cover demand.`
+          : 'No transfer recommendation right now.',
+      tone: 'success',
+      variantHighlights,
+    };
+  };
+
   const openEdit = (row: Product) => {
     setEditProduct(row);
     setEditForm({
@@ -169,11 +333,16 @@ const ProductsTable = () => {
   const openTransfer = (product: Product) => {
     setTransferProduct(product);
     setTransferQuantity('1');
+    setTransferPickupMode('WAREHOUSE_PICKUP');
+    setTransferSellerNote('');
+    setTransferFeedback(null);
   };
 
   const closeTransfer = () => {
     setTransferProduct(null);
     setTransferQuantity('1');
+    setTransferPickupMode('WAREHOUSE_PICKUP');
+    setTransferSellerNote('');
   };
 
   const handleToggleActive = async (product: Product) => {
@@ -186,7 +355,12 @@ const ProductsTable = () => {
           active: product.active === false,
         }),
       ).unwrap();
-      await dispatch(fetchSellerProducts()).unwrap();
+      await Promise.all([
+        dispatch(fetchSellerProducts()).unwrap(),
+        api.get(API_ROUTES.sellerProducts.demand).then((response) => {
+          setDemandInsights((response.data || {}) as SellerDemandInsights);
+        }),
+      ]);
     } catch {
       // Slice error state already captures the backend rejection message.
     } finally {
@@ -240,7 +414,12 @@ const ProductsTable = () => {
           product: updatePayload as ProductUpdatePayload,
         }),
       ).unwrap();
-      await dispatch(fetchSellerProducts()).unwrap();
+      await Promise.all([
+        dispatch(fetchSellerProducts()).unwrap(),
+        api.get(API_ROUTES.sellerProducts.demand).then((response) => {
+          setDemandInsights((response.data || {}) as SellerDemandInsights);
+        }),
+      ]);
       closeEdit();
     } catch {
       // Slice error state already captures the backend rejection message.
@@ -250,7 +429,20 @@ const ProductsTable = () => {
   const handleTransferSubmit = async () => {
     if (!transferProduct?.id) return;
     const quantity = Number(transferQuantity);
-    if (!Number.isFinite(quantity) || quantity <= 0) return;
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setTransferFeedback({
+        type: 'error',
+        message: 'Please enter a valid transfer quantity.',
+      });
+      return;
+    }
+    if (quantity > Number(transferProduct.sellerStock ?? 0)) {
+      setTransferFeedback({
+        type: 'error',
+        message: `Requested quantity is higher than seller stock (${transferProduct.sellerStock ?? 0}).`,
+      });
+      return;
+    }
 
     setTransferringId(transferProduct.id);
     try {
@@ -258,12 +450,57 @@ const ProductsTable = () => {
         transferSellerProductToWarehouse({
           productId: transferProduct.id,
           quantity,
+          pickupMode: transferPickupMode,
+          sellerNote: transferSellerNote.trim() || undefined,
         }),
       ).unwrap();
-      await dispatch(fetchSellerProducts()).unwrap();
+      await Promise.all([
+        dispatch(fetchSellerProducts()).unwrap(),
+        api.get(API_ROUTES.sellerProducts.demand).then((response) => {
+          setDemandInsights((response.data || {}) as SellerDemandInsights);
+        }),
+      ]);
+      setTransferFeedback({
+        type: 'success',
+        message:
+          'Transfer request created successfully. It is now pending admin approval.',
+      });
       closeTransfer();
+    } catch (requestError: unknown) {
+      const fallback = 'Transfer request failed. Please try again.';
+      const message =
+        typeof requestError === 'string'
+          ? requestError
+          : requestError &&
+              typeof requestError === 'object' &&
+              'message' in requestError &&
+              typeof (requestError as { message?: unknown }).message === 'string'
+            ? ((requestError as { message?: string }).message as string)
+            : fallback;
+      setTransferFeedback({
+        type: 'error',
+        message,
+      });
     } finally {
       setTransferringId(null);
+    }
+  };
+
+  const openMovementHistory = async (product: Product) => {
+    if (!product.id) return;
+    setMovementProduct(product);
+    setMovementRows([]);
+    setMovementError('');
+    setMovementLoading(true);
+    try {
+      const response = await api.get(API_ROUTES.sellerProducts.movements(product.id));
+      setMovementRows(
+        Array.isArray(response.data) ? (response.data as SellerMovementRow[]) : [],
+      );
+    } catch {
+      setMovementError('Failed to load stock movement history.');
+    } finally {
+      setMovementLoading(false);
     }
   };
 
@@ -294,6 +531,12 @@ const ProductsTable = () => {
             value: `Rs ${productStats.estimatedValue}`,
             tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
             icon: <WarehouseOutlinedIcon />,
+          },
+          {
+            title: 'Waiting Users',
+            value: productStats.waitingUsers,
+            tone: 'bg-orange-50 text-orange-700 border-orange-100',
+            icon: <WarningAmberRoundedIcon />,
           },
         ].map((stat) => (
           <div
@@ -330,8 +573,8 @@ const ProductsTable = () => {
               Product Inventory
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Seller stock stays with you until you send units to the warehouse.
-              Only warehouse stock is sellable to customers.
+              Seller stock stays with you until warehouse receives an approved
+              transfer request. Only warehouse stock is sellable to customers.
             </Typography>
           </div>
 
@@ -373,10 +616,17 @@ const ProductsTable = () => {
             {error}
           </Alert>
         )}
+        {transferFeedback && (
+          <Alert severity={transferFeedback.type} sx={{ mb: 2 }}>
+            {transferFeedback.message}
+          </Alert>
+        )}
 
         <Alert severity="info" sx={{ mb: 2 }}>
           Sellers can update their own catalog and seller stock. Use Disable to
-          hide a product from customers without removing order history.
+          hide a product from customers without removing order history. Send to
+          Warehouse now creates a transfer request for admin review. Waitlist is
+          read-only and shows how many users are waiting for warehouse stock.
         </Alert>
 
         <ProductsInventoryTable
@@ -386,10 +636,19 @@ const ProductsTable = () => {
           transferringId={transferringId}
           togglingId={togglingId}
           lowStockThreshold={LOW_STOCK_THRESHOLD}
+          getRecommendationMeta={getRecommendationMeta}
+          getDemandMeta={(productId) =>
+            demandByProductId.get(Number(productId)) || {
+              waiting: 0,
+              notified: 0,
+              converted: 0,
+            }
+          }
           getSafeImage={getSafeImage}
           getColorLabel={getColorLabel}
           getCategoryLabel={getCategoryLabel}
           onOpenEdit={openEdit}
+          onOpenMovements={openMovementHistory}
           onOpenTransfer={openTransfer}
           onToggleActive={handleToggleActive}
         />
@@ -403,21 +662,67 @@ const ProductsTable = () => {
         onSave={saveEdit}
       />
 
-      <Dialog open={Boolean(transferProduct)} onClose={closeTransfer} fullWidth maxWidth="xs">
-        <DialogTitle>Send Stock to Warehouse</DialogTitle>
+      <Dialog open={Boolean(transferProduct)} onClose={closeTransfer} fullWidth maxWidth="sm">
+        <DialogTitle>Create Warehouse Transfer Request</DialogTitle>
         <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-            Move seller-owned stock into warehouse stock for customer orders.
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+            Seller transfer request banayega. Stock deduction tabhi hoga jab
+            warehouse receive mark karega.
           </Typography>
-          <TextField
-            fullWidth
-            label="Transfer Quantity"
-            type="number"
-            value={transferQuantity}
-            onChange={(event) => setTransferQuantity(event.target.value)}
-            inputProps={{ min: 1 }}
-            helperText={`Available seller stock: ${transferProduct?.sellerStock ?? 0}`}
-          />
+          <Stack spacing={2}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <TextField
+                fullWidth
+                label="Transfer Quantity"
+                type="number"
+                value={transferQuantity}
+                onChange={(event) => setTransferQuantity(event.target.value)}
+                inputProps={{
+                  min: 1,
+                  max: Number(transferProduct?.sellerStock ?? 0),
+                }}
+              />
+              <TextField
+                select
+                fullWidth
+                label="Pickup Mode"
+                value={transferPickupMode}
+                onChange={(event) =>
+                  setTransferPickupMode(event.target.value as PickupMode)
+                }
+              >
+                <MenuItem value="WAREHOUSE_PICKUP">Warehouse Pickup</MenuItem>
+                <MenuItem value="SELLER_DROP">Seller Drop</MenuItem>
+              </TextField>
+            </div>
+
+            <TextField
+              fullWidth
+              multiline
+              minRows={2}
+              label="Transfer Note (optional)"
+              value={transferSellerNote}
+              onChange={(event) => setTransferSellerNote(event.target.value)}
+              placeholder="Example: pickup address landmark, ready timing, contact person"
+            />
+
+            <Alert severity="info">
+              {transferProduct
+                ? `Available seller stock: ${transferProduct.sellerStock ?? 0}`
+                : 'Choose quantity'}
+            </Alert>
+            {transferPickupMode === 'SELLER_DROP' ? (
+              <Alert severity="success">
+                Seller drop mode: courier assign nahi hoga. Admin approval ke baad
+                seller stock warehouse par drop karega.
+              </Alert>
+            ) : (
+              <Alert severity="warning">
+                Warehouse pickup mode: admin approve ke baad manager logistics plan
+                karega, courier/transport assign karega, phir pickup hoga.
+              </Alert>
+            )}
+          </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={closeTransfer}>Cancel</Button>
@@ -430,8 +735,93 @@ const ProductsTable = () => {
               Number(transferQuantity) <= 0
             }
           >
-            Send
+            Create Request
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(movementProduct)}
+        onClose={() => setMovementProduct(null)}
+        fullWidth
+        maxWidth="lg"
+      >
+        <DialogTitle>Stock Movement History</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <Typography variant="body2" color="text.secondary">
+                  {movementProduct?.title} | Product #{movementProduct?.id}
+                </Typography>
+                {movementProduct && (
+                  <Typography variant="caption" color="text.secondary">
+                    {getRecommendationMeta(movementProduct).detail}
+                  </Typography>
+                )}
+              </div>
+              {movementProduct && (
+                <Chip
+                  size="small"
+                  color={getRecommendationMeta(movementProduct).tone}
+                  label={getRecommendationMeta(movementProduct).headline}
+                />
+              )}
+            </div>
+            {movementError && <Alert severity="error">{movementError}</Alert>}
+            <TableContainer
+              component={Paper}
+              sx={{ borderRadius: '20px', boxShadow: 'none', border: '1px solid #eef2f7' }}
+            >
+              <Table size="small">
+                <TableHead sx={{ bgcolor: '#f8fafc' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>When</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Movement</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Flow</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Qty</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Actors</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Note</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {movementLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        <CircularProgress size={28} />
+                      </TableCell>
+                    </TableRow>
+                  ) : movementRows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                        No stock history found yet.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    movementRows.map((movement) => (
+                      <TableRow key={movement.id} hover>
+                        <TableCell>{formatDateTime(movement.createdAt)}</TableCell>
+                        <TableCell>{prettify(movement.action)}</TableCell>
+                        <TableCell>{prettify(movement.movementType)}</TableCell>
+                        <TableCell>
+                          {movement.from || '-'} to {movement.to || '-'}
+                        </TableCell>
+                        <TableCell>{movement.quantity ?? 0}</TableCell>
+                        <TableCell>
+                          {movement.addedBy || '-'} / {movement.updatedBy || '-'}
+                        </TableCell>
+                        <TableCell>{movement.note || '-'}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setMovementProduct(null)}>Close</Button>
         </DialogActions>
       </Dialog>
     </div>

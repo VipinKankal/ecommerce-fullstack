@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import { api } from 'shared/api/Api';
+import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { mapCourier } from 'features/courier/courierData';
 import { CourierProfile } from 'features/courier/courierTypes';
 
@@ -36,11 +37,19 @@ type RequestItem = {
   pickupScheduledAt?: string;
   courierName?: string;
   courierId?: number | string;
+  qcResult?: string;
+  warehouseProofUrl?: string;
   refund?: { eligibleAfter?: string; status?: string } | null;
   history?: HistoryItem[];
 };
 
-type DialogMode = 'approve' | 'reject' | 'initiateRefund' | 'completeRefund';
+type DialogMode =
+  | 'approve'
+  | 'reject'
+  | 'pickup'
+  | 'receive'
+  | 'initiateRefund'
+  | 'completeRefund';
 
 const prettify = (value?: string | null) => (value || '-').replaceAll('_', ' ');
 const formatDateTime = (value?: string | null) =>
@@ -79,6 +88,22 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+const downloadCsv = (filename: string, rows: string[][]) => {
+  const csv = rows
+    .map((row) =>
+      row.map((cell) => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(','),
+    )
+    .join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 const AdminReturnRequests = () => {
   const [requests, setRequests] = useState<RequestItem[]>([]);
   const [couriers, setCouriers] = useState<CourierProfile[]>([]);
@@ -94,14 +119,18 @@ const AdminReturnRequests = () => {
   const [pickupScheduledAt, setPickupScheduledAt] = useState(
     toDatetimeLocalValue(),
   );
+  const [qcResult, setQcResult] = useState('QC_PASS');
+  const [warehouseProofUrl, setWarehouseProofUrl] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
 
   const loadPage = async () => {
     setLoading(true);
     setError(null);
     try {
       const [requestResponse, courierResponse] = await Promise.allSettled([
-        api.get('/api/admin/returns'),
-        api.get('/api/admin/couriers'),
+        api.get(API_ROUTES.admin.returns.base),
+        api.get(API_ROUTES.adminCouriers.base),
       ]);
 
       if (requestResponse.status === 'fulfilled') {
@@ -146,25 +175,100 @@ const AdminReturnRequests = () => {
     setRejectionReason(request.rejectionReason || '');
     setSelectedCourierId(request.courierId ? String(request.courierId) : '');
     setPickupScheduledAt(toDatetimeLocalValue(request.pickupScheduledAt));
+    setQcResult(request.qcResult || 'QC_PASS');
+    setWarehouseProofUrl(request.warehouseProofUrl || '');
   };
 
   const actions = useMemo(
     () =>
       ({
         RETURN_REQUESTED: ['approve', 'reject'],
+        RETURN_APPROVED: ['pickup'],
+        RETURN_IN_TRANSIT: ['receive'],
         REFUND_PENDING: ['initiateRefund'],
         REFUND_INITIATED: ['completeRefund'],
       }) as Record<string, DialogMode[]>,
     [],
   );
+  const statusOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(requests.map((request) => (request.status || '').trim()).filter(Boolean)),
+      ).sort(),
+    [requests],
+  );
+  const filteredRequests = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    return requests.filter((request) => {
+      const matchesQuery =
+        !query ||
+        [
+          request.productTitle,
+          request.customerName,
+          request.requestNumber,
+          request.returnReason,
+          request.comment,
+          request.adminComment,
+          String(request.orderId ?? ''),
+          String(request.id),
+        ]
+          .filter(Boolean)
+          .some((value) => String(value).toLowerCase().includes(query));
+
+      const matchesStatus =
+        statusFilter === 'ALL' || String(request.status || '') === statusFilter;
+
+      return matchesQuery && matchesStatus;
+    });
+  }, [requests, searchQuery, statusFilter]);
   const dialogTitle =
     mode === 'approve'
       ? 'Approve Request'
       : mode === 'reject'
         ? 'Reject Request'
+        : mode === 'pickup'
+          ? 'Mark Return Pickup'
+          : mode === 'receive'
+            ? 'Receive Return'
         : mode === 'initiateRefund'
           ? 'Initiate Refund'
           : 'Complete Refund';
+
+  const exportReturns = () => {
+    const rows = [
+      [
+        'Request ID',
+        'Request Number',
+        'Order ID',
+        'Product',
+        'Customer',
+        'Status',
+        'Reason',
+        'Courier',
+        'Pickup Scheduled',
+        'QC Result',
+        'Refund Status',
+        'Warehouse Proof',
+      ],
+      ...filteredRequests.map((request) => [
+        String(request.id),
+        request.requestNumber || '',
+        String(request.orderId ?? ''),
+        request.productTitle || '',
+        request.customerName || '',
+        request.status || '',
+        request.returnReason || '',
+        request.courierName || '',
+        request.pickupScheduledAt || '',
+        request.qcResult || '',
+        request.refund?.status || '',
+        request.warehouseProofUrl || '',
+      ]),
+    ];
+
+    downloadCsv('return-requests-export.csv', rows);
+  };
 
   const submit = async () => {
     if (!selected || !mode) return;
@@ -172,7 +276,7 @@ const AdminReturnRequests = () => {
     setError(null);
     try {
       if (mode === 'approve' || mode === 'reject') {
-        await api.patch(`/api/admin/returns/${selected.id}/review`, {
+        await api.patch(API_ROUTES.admin.returns.review(selected.id), {
           approved: mode === 'approve',
           adminComment: adminComment.trim() || undefined,
           rejectionReason:
@@ -183,12 +287,22 @@ const AdminReturnRequests = () => {
               ? new Date(pickupScheduledAt).toISOString()
               : undefined,
         });
+      } else if (mode === 'pickup') {
+        await api.patch(API_ROUTES.admin.returns.pickup(selected.id), {
+          adminComment: adminComment.trim() || undefined,
+        });
+      } else if (mode === 'receive') {
+        await api.patch(API_ROUTES.admin.returns.receive(selected.id), {
+          adminComment: adminComment.trim() || undefined,
+          qcResult: qcResult.trim() || undefined,
+          warehouseProofUrl: warehouseProofUrl.trim() || undefined,
+        });
       } else if (mode === 'initiateRefund') {
-        await api.patch(`/api/admin/returns/${selected.id}/refund/initiate`, {
+        await api.patch(API_ROUTES.admin.returns.refundInitiate(selected.id), {
           adminComment: adminComment.trim() || undefined,
         });
       } else if (mode === 'completeRefund') {
-        await api.patch(`/api/admin/returns/${selected.id}/refund/complete`, {
+        await api.patch(API_ROUTES.admin.returns.refundComplete(selected.id), {
           adminComment: adminComment.trim() || undefined,
         });
       }
@@ -215,9 +329,18 @@ const AdminReturnRequests = () => {
             initiation and completion.
           </Typography>
         </div>
-        <Button variant="outlined" onClick={loadPage} disabled={loading}>
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outlined" onClick={loadPage} disabled={loading}>
+            Refresh
+          </Button>
+          <Button
+            variant="outlined"
+            onClick={exportReturns}
+            disabled={filteredRequests.length === 0}
+          >
+            Export CSV
+          </Button>
+        </div>
       </div>
       {error && <Alert severity="error">{error}</Alert>}
       {success && (
@@ -226,7 +349,29 @@ const AdminReturnRequests = () => {
         </Alert>
       )}
       <Paper className="p-5 rounded-3xl border border-slate-200 shadow-none space-y-4">
-        {requests.map((request) => (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px]">
+          <TextField
+            size="small"
+            placeholder="Search by product, customer, request, order or reason"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          <TextField
+            size="small"
+            select
+            label="Status"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <MenuItem value="ALL">All Statuses</MenuItem>
+            {statusOptions.map((status) => (
+              <MenuItem key={status} value={status}>
+                {prettify(status)}
+              </MenuItem>
+            ))}
+          </TextField>
+        </div>
+        {filteredRequests.map((request) => (
           <div
             key={String(request.id)}
             className="rounded-3xl border border-slate-200 bg-white p-4 flex flex-col gap-4"
@@ -282,6 +427,12 @@ const AdminReturnRequests = () => {
               </div>
               <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 min-h-[84px]">
                 Courier: {request.courierName || 'Not assigned'}
+                <div className="mt-2">
+                  QC: {prettify(request.qcResult)}
+                </div>
+                <div className="mt-2 break-all">
+                  Proof: {request.warehouseProofUrl || 'Not attached'}
+                </div>
               </div>
             </div>
             {!!request.history?.length && (
@@ -320,6 +471,26 @@ const AdminReturnRequests = () => {
                 </Button>
               )}
               {(actions[(request.status || '').toUpperCase()] || []).includes(
+                'pickup',
+              ) && (
+                <Button
+                  variant="contained"
+                  onClick={() => openDialog(request, 'pickup')}
+                >
+                  Mark Pickup
+                </Button>
+              )}
+              {(actions[(request.status || '').toUpperCase()] || []).includes(
+                'receive',
+              ) && (
+                <Button
+                  variant="contained"
+                  onClick={() => openDialog(request, 'receive')}
+                >
+                  Receive + QC
+                </Button>
+              )}
+              {(actions[(request.status || '').toUpperCase()] || []).includes(
                 'reject',
               ) && (
                 <Button
@@ -353,9 +524,9 @@ const AdminReturnRequests = () => {
             </div>
           </div>
         ))}
-        {!requests.length && !loading && (
+        {!filteredRequests.length && !loading && (
           <Typography color="text.secondary">
-            No return requests found.
+            No return requests matched the current filters.
           </Typography>
         )}
       </Paper>
@@ -428,6 +599,28 @@ const AdminReturnRequests = () => {
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
               />
+            )}
+            {mode === 'receive' && (
+              <>
+                <TextField
+                  select
+                  fullWidth
+                  label="QC result"
+                  value={qcResult}
+                  onChange={(e) => setQcResult(e.target.value)}
+                >
+                  <MenuItem value="QC_PASS">QC Pass</MenuItem>
+                  <MenuItem value="QC_FAIL">QC Fail</MenuItem>
+                  <MenuItem value="DAMAGED">Damaged</MenuItem>
+                  <MenuItem value="REFURBISH">Refurbish</MenuItem>
+                </TextField>
+                <TextField
+                  fullWidth
+                  label="Warehouse proof URL"
+                  value={warehouseProofUrl}
+                  onChange={(e) => setWarehouseProofUrl(e.target.value)}
+                />
+              </>
             )}
           </Stack>
         </DialogContent>

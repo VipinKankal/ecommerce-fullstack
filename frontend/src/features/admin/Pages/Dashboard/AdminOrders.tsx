@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import {
   Alert,
+  Button,
   Chip,
   ChipProps,
   CircularProgress,
@@ -15,6 +16,8 @@ import {
 } from '@mui/material';
 import { adminOrdersList } from 'State/backend/MasterApiThunks';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
+import { api } from 'shared/api/Api';
+import { API_ROUTES } from 'shared/api/ApiRoutes';
 
 type AdminOrderRow = {
   id: number;
@@ -31,11 +34,15 @@ type AdminOrderRow = {
   totalItems?: number;
 };
 
+type AdminOrderAction = 'confirm' | 'pack' | 'ship' | 'cancel';
+
 const AdminOrders = () => {
   const dispatch = useAppDispatch();
   const { loading, error, responses } = useAppSelector(
     (state) => state.masterApi,
   );
+  const [actionLoadingId, setActionLoadingId] = React.useState<number | null>(null);
+  const [actionError, setActionError] = React.useState('');
   const orders = Array.isArray(responses.adminOrdersList)
     ? (responses.adminOrdersList as AdminOrderRow[])
     : [];
@@ -49,6 +56,7 @@ const AdminOrders = () => {
       case 'SHIPPED':
       case 'OUT_FOR_DELIVERY':
       case 'CONFIRMED':
+      case 'PACKED':
         return 'info';
       default:
         return 'warning';
@@ -73,6 +81,47 @@ const AdminOrders = () => {
     dispatch(adminOrdersList());
   }, [dispatch]);
 
+  const runOrderAction = async (
+    orderId: number,
+    action: 'confirm' | 'pack' | 'ship' | 'cancel',
+  ) => {
+    setActionLoadingId(orderId);
+    setActionError('');
+    try {
+      if (action === 'cancel') {
+        await api.post(API_ROUTES.admin.orderActions.cancel(orderId), {
+          cancelReasonCode: 'ADMIN_CANCELLED',
+          cancelReasonText: 'Cancelled by warehouse admin before shipment',
+        });
+      } else {
+        await api.post(API_ROUTES.admin.orderActions[action](orderId));
+      }
+      await dispatch(adminOrdersList()).unwrap();
+    } catch (requestError) {
+      setActionError(
+        (requestError as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || 'Failed to update order.',
+      );
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const getAvailableActions = (status?: string): AdminOrderAction[] => {
+    switch ((status || '').toUpperCase()) {
+      case 'INITIATED':
+      case 'PENDING':
+      case 'PLACED':
+        return ['confirm', 'cancel'];
+      case 'CONFIRMED':
+        return ['pack', 'cancel'];
+      case 'PACKED':
+        return ['ship', 'cancel'];
+      default:
+        return [];
+    }
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -84,7 +133,7 @@ const AdminOrders = () => {
         </Typography>
       </div>
 
-      {error && <Alert severity="error">{error}</Alert>}
+      {(error || actionError) && <Alert severity="error">{error || actionError}</Alert>}
 
       <TableContainer
         component={Paper}
@@ -103,23 +152,28 @@ const AdminOrders = () => {
               <TableCell sx={{ fontWeight: 700 }}>Order Status</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Payment Status</TableCell>
               <TableCell sx={{ fontWeight: 700 }}>Amount</TableCell>
+              <TableCell sx={{ fontWeight: 700 }} align="right">
+                Actions
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading && orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
             ) : orders.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                   No orders found.
                 </TableCell>
               </TableRow>
             ) : (
-              orders.map((order) => (
+              orders.map((order) => {
+                const actions = getAvailableActions(order.orderStatus);
+                return (
                 <TableRow key={order.id} hover>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -171,8 +225,53 @@ const AdminOrders = () => {
                       {order.totalItems} items
                     </Typography>
                   </TableCell>
+                  <TableCell align="right">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {actions.includes('confirm') && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => runOrderAction(order.id, 'confirm')}
+                          disabled={actionLoadingId === order.id}
+                        >
+                          Confirm
+                        </Button>
+                      )}
+                      {actions.includes('pack') && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => runOrderAction(order.id, 'pack')}
+                          disabled={actionLoadingId === order.id}
+                        >
+                          Pack
+                        </Button>
+                      )}
+                      {actions.includes('ship') && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => runOrderAction(order.id, 'ship')}
+                          disabled={actionLoadingId === order.id}
+                        >
+                          Ship
+                        </Button>
+                      )}
+                      {actions.includes('cancel') && (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={() => runOrderAction(order.id, 'cancel')}
+                          disabled={actionLoadingId === order.id}
+                        >
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
-              ))
+              )})
             )}
           </TableBody>
         </Table>

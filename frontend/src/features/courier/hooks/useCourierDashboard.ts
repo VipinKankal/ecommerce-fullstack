@@ -113,6 +113,13 @@ export const useCourierDashboard = () => {
       ),
     [visibleReverseAssignments],
   );
+  const exchangePickupAssignments = useMemo(
+    () =>
+      visibleReverseAssignments.filter(
+        (task) => task.reverseType === 'EXCHANGE',
+      ),
+    [visibleReverseAssignments],
+  );
   const activeAssignments = useMemo(
     () =>
       assignments.filter(
@@ -283,6 +290,7 @@ export const useCourierDashboard = () => {
     deliveryForm,
     earnings,
     error,
+    exchangePickupAssignments,
     handleAcceptReversePickup,
     handleCodDepositSubmit,
     handleDeliveryActionChange,

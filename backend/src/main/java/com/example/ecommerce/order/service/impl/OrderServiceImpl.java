@@ -143,6 +143,20 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public Order updateOrderStatusByAdmin(Long orderId, OrderStatus status) throws Exception {
+        Order order = findOrderById(orderId);
+        validateAdminStatusTransition(order.getOrderStatus(), status);
+        order.setOrderStatus(status);
+        if (status == OrderStatus.SHIPPED && order.getShippedAt() == null) {
+            order.setShippedAt(LocalDateTime.now());
+        }
+        if (status == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
+            order.setDeliveredAt(LocalDateTime.now());
+        }
+        return orderRepository.save(order);
+    }
+
+    @Override
     public Order updateOrderStatusBySeller(Long orderId, OrderStatus status, Long sellerId) throws Exception {
         throw new IllegalArgumentException("Seller order cancellation is disabled");
     }
@@ -157,6 +171,43 @@ public class OrderServiceImpl implements OrderService {
         order.setCancelReasonCode(cancelReasonCode);
         order.setCancelReasonText(cancelReasonText);
         order.setCancelledAt(java.time.LocalDateTime.now());
+        return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public Order cancelOrderByAdmin(Long orderId, String cancelReasonCode, String cancelReasonText) throws Exception {
+        Order order = findOrderById(orderId);
+        if (order.getOrderStatus() == OrderStatus.SHIPPED
+                || order.getOrderStatus() == OrderStatus.OUT_FOR_DELIVERY
+                || order.getOrderStatus() == OrderStatus.DELIVERED
+                || order.getOrderStatus() == OrderStatus.CANCELLED) {
+            throw new IllegalArgumentException("Order can be cancelled only before shipment");
+        }
+
+        order.setOrderStatus(OrderStatus.CANCELLED);
+        order.setCancelReasonCode(cancelReasonCode);
+        order.setCancelReasonText(cancelReasonText);
+        order.setCancelledAt(LocalDateTime.now());
+
+        if (order.getOrderItems() != null) {
+            for (OrderItem orderItem : order.getOrderItems()) {
+                if (orderItem.getProduct() != null) {
+                    restoreVariantWarehouseStock(
+                            orderItem.getProduct(),
+                            orderItem.getSize(),
+                            orderItem.getQuantity()
+                    );
+                    inventoryService.restoreWarehouseStockFromCancellation(
+                            orderItem.getProduct(),
+                            orderItem.getQuantity(),
+                            orderItem.getId(),
+                            "Admin cancelled order and stock returned to warehouse"
+                    );
+                }
+            }
+        }
+
         return orderRepository.save(order);
     }
 
@@ -180,6 +231,45 @@ public class OrderServiceImpl implements OrderService {
                     productVariantRepository.save(variant);
                     productRepository.save(product);
                 });
+    }
+
+    private void restoreVariantWarehouseStock(Product product, String size, int quantity) {
+        if (product == null || product.getId() == null || size == null || size.isBlank()) {
+            return;
+        }
+        productVariantRepository.findByProductIdAndSizeIgnoreCase(product.getId(), size.trim())
+                .ifPresent(variant -> {
+                    int available = Math.max(variant.getWarehouseStock() == null ? 0 : variant.getWarehouseStock(), 0);
+                    variant.setWarehouseStock(available + quantity);
+                    productVariantRepository.save(variant);
+                    productRepository.save(product);
+                });
+    }
+
+    private void validateAdminStatusTransition(OrderStatus currentStatus, OrderStatus nextStatus) {
+        if (currentStatus == OrderStatus.CANCELLED
+                || currentStatus == OrderStatus.DELIVERED
+                || currentStatus == OrderStatus.SHIPPED
+                || currentStatus == OrderStatus.OUT_FOR_DELIVERY) {
+            throw new IllegalArgumentException("Order status can no longer be changed from " + currentStatus);
+        }
+
+        if (nextStatus == OrderStatus.CONFIRMED
+                && currentStatus != OrderStatus.INITIATED
+                && currentStatus != OrderStatus.PENDING
+                && currentStatus != OrderStatus.PLACED) {
+            throw new IllegalArgumentException("Only placed orders can be confirmed");
+        }
+
+        if (nextStatus == OrderStatus.PACKED && currentStatus != OrderStatus.CONFIRMED) {
+            throw new IllegalArgumentException("Only confirmed orders can be packed");
+        }
+
+        if (nextStatus == OrderStatus.SHIPPED
+                && currentStatus != OrderStatus.PACKED
+                && currentStatus != OrderStatus.CONFIRMED) {
+            throw new IllegalArgumentException("Only packed orders can be shipped");
+        }
     }
 }
 

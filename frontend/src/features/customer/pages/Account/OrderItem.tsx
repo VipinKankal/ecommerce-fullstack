@@ -23,6 +23,19 @@ const statusColorMap: Record<string, string> = {
   CONFIRMATION_PENDING: '#d97706',
   DELIVERED: '#16a34a',
   CANCELLED: '#ef4444',
+  RETURN_REQUESTED: '#f59e0b',
+  RETURN_APPROVED: '#0ea5e9',
+  RETURN_IN_TRANSIT: '#0284c7',
+  REFUND_PENDING: '#8b5cf6',
+  REFUND_INITIATED: '#7c3aed',
+  REFUND_COMPLETED: '#16a34a',
+  RETURNED: '#16a34a',
+  EXCHANGE_REQUESTED: '#f59e0b',
+  EXCHANGE_APPROVED: '#0ea5e9',
+  EXCHANGE_IN_TRANSIT: '#0284c7',
+  EXCHANGE_RECEIVED: '#6366f1',
+  EXCHANGE_SHIPPED: '#06b6d4',
+  EXCHANGE_COMPLETED: '#16a34a',
 };
 
 const prettyStatus = (value: string) => value.replaceAll('_', ' ');

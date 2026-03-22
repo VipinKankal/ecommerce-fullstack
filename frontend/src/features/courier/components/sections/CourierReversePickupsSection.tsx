@@ -30,8 +30,8 @@ const CourierReversePickupsSection = ({
           {title}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Accept pickup tasks, collect the item, upload proof, and mark the
-          reverse task picked.
+          Accept pickup tasks, collect the item, upload proof, and move the
+          request into transit for warehouse receive.
         </Typography>
       </div>
       <Chip label={`${tasks.length} active`} color="warning" />

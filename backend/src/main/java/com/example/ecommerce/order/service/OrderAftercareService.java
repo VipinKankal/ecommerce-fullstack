@@ -30,6 +30,10 @@ public interface OrderAftercareService {
 
     Map<String, Object> reviewReturnRequest(Long requestId, Map<String, Object> payload) throws Exception;
 
+    Map<String, Object> markReturnPickup(Long requestId, String adminComment) throws Exception;
+
+    Map<String, Object> receiveReturn(Long requestId, Map<String, Object> payload) throws Exception;
+
     Map<String, Object> initiateRefund(Long requestId, String adminComment) throws Exception;
 
     Map<String, Object> completeRefund(Long requestId, String adminComment) throws Exception;
@@ -40,7 +44,13 @@ public interface OrderAftercareService {
 
     Map<String, Object> approveExchange(Long requestId, Map<String, Object> payload) throws Exception;
 
+    Map<String, Object> markExchangePickup(Long requestId, String adminComment) throws Exception;
+
+    Map<String, Object> receiveExchange(Long requestId, Map<String, Object> payload) throws Exception;
+
     Map<String, Object> rejectExchange(Long requestId, String adminComment) throws Exception;
 
-    Map<String, Object> createReplacementOrder(Long requestId, String adminComment) throws Exception;
+    Map<String, Object> createReplacementOrder(Long requestId, Map<String, Object> payload) throws Exception;
+
+    Map<String, Object> completeReplacementDelivery(Long requestId, String adminComment) throws Exception;
 }

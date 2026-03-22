@@ -84,6 +84,21 @@ export type OrderLite = {
 export type CancelReasonOption = { code: string; label: string };
 
 export const cancelAllowed = new Set(['PENDING', 'PLACED', 'CONFIRMED']);
+const customerAftercareStatuses = new Set([
+  'RETURN_REQUESTED',
+  'RETURN_APPROVED',
+  'RETURN_IN_TRANSIT',
+  'REFUND_PENDING',
+  'REFUND_INITIATED',
+  'REFUND_COMPLETED',
+  'RETURNED',
+  'EXCHANGE_REQUESTED',
+  'EXCHANGE_APPROVED',
+  'EXCHANGE_IN_TRANSIT',
+  'EXCHANGE_RECEIVED',
+  'EXCHANGE_SHIPPED',
+  'EXCHANGE_COMPLETED',
+]);
 export const prettyLabel = (value?: string | null) =>
   (value || '').replaceAll('_', ' ');
 
@@ -128,6 +143,7 @@ export const resolveCustomerStatus = (order: OrderLite | null) => {
   const deliveryTaskStatus = (order?.deliveryTaskStatus || '').toUpperCase();
 
   if (rawOrderStatus === 'CANCELLED') return 'CANCELLED';
+  if (customerAftercareStatuses.has(rawOrderStatus)) return rawOrderStatus;
   if (shipmentStatus === 'DELIVERED' || rawOrderStatus === 'DELIVERED') {
     return 'DELIVERED';
   }
@@ -138,7 +154,10 @@ export const resolveCustomerStatus = (order: OrderLite | null) => {
   if (['IN_TRANSIT', 'HANDED_TO_COURIER'].includes(shipmentStatus)) {
     return 'SHIPPED';
   }
-  if ((order?.fulfillmentStatus || '').toUpperCase() === 'FULFILLED') {
+  if (
+    rawOrderStatus === 'PACKED' ||
+    (order?.fulfillmentStatus || '').toUpperCase() === 'FULFILLED'
+  ) {
     return 'PACKED';
   }
   return rawOrderStatus;

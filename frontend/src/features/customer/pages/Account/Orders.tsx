@@ -8,32 +8,9 @@ import OrderItem from './OrderItem';
 import {
   type OrderLite,
   resolveCustomerPaymentMessage,
+  resolveCustomerStatus,
   resolvePaymentTypeLabel,
 } from './orderDetailsTypes';
-
-const deriveDisplayStatus = (order: OrderLite) => {
-  const shipmentStatus = (order.shipmentStatus || '').toUpperCase();
-  const deliveryTaskStatus = (order.deliveryTaskStatus || '').toUpperCase();
-  const orderStatus = (order.orderStatus || 'PENDING').toUpperCase();
-  const fulfillmentStatus = (order.fulfillmentStatus || '').toUpperCase();
-
-  if (orderStatus === 'CANCELLED') return 'CANCELLED';
-  if (shipmentStatus === 'DELIVERED' || orderStatus === 'DELIVERED')
-    return 'DELIVERED';
-  if (deliveryTaskStatus === 'CONFIRMATION_PENDING')
-    return 'CONFIRMATION_PENDING';
-  if (deliveryTaskStatus === 'ARRIVED') return 'ARRIVED_AT_LOCATION';
-  if (
-    shipmentStatus === 'OUT_FOR_DELIVERY' ||
-    deliveryTaskStatus === 'OUT_FOR_DELIVERY'
-  )
-    return 'OUT_FOR_DELIVERY';
-  if (['IN_TRANSIT', 'HANDED_TO_COURIER'].includes(shipmentStatus))
-    return 'SHIPPED';
-  if (fulfillmentStatus === 'FULFILLED') return 'PACKED';
-  if (orderStatus === 'CONFIRMED') return 'CONFIRMED';
-  return orderStatus;
-};
 
 const isInProgressStatus = (status: string) =>
   !['DELIVERED', 'CANCELLED'].includes(status);
@@ -111,7 +88,7 @@ const Orders = () => {
   const filteredOrders = useMemo(() => {
     return orders
       .map((order) => {
-        const displayStatus = deriveDisplayStatus(order);
+        const displayStatus = resolveCustomerStatus(order);
         return {
           ...order,
           displayStatus,

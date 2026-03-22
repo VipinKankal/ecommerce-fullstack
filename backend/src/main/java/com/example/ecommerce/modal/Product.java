@@ -32,6 +32,7 @@ public class Product {
     private int quantity;
     private int sellerStock;
     private int warehouseStock;
+    private int lowStockThreshold = 10;
     private String warrantyType;
     private Integer warrantyDays;
     private String color;

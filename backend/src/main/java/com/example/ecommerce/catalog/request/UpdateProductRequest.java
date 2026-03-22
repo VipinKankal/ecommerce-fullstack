@@ -26,5 +26,6 @@ public class UpdateProductRequest {
     private String size;
     private String warrantyType;
     private Integer warrantyDays;
+    private Integer lowStockThreshold;
     private Boolean active;
 }

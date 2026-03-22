@@ -81,6 +81,7 @@ public class ProductServiceImpl implements ProductService{
         product.setMrpPrice(request.getMrpPrice());
         product.setSize(request.getSize());
         product.setActive(true);
+        product.setLowStockThreshold(10);
         product.setWarrantyType(normalizeWarrantyType(request.getWarrantyType()));
         product.setWarrantyDays(normalizeWarrantyDays(request.getWarrantyType(), request.getWarrantyDays()));
         product.setVariants(buildVariants(request.getVariants(), product));
@@ -161,6 +162,9 @@ public class ProductServiceImpl implements ProductService{
         }
         if (request.getActive() != null) {
             existing.setActive(request.getActive());
+        }
+        if (request.getLowStockThreshold() != null) {
+            existing.setLowStockThreshold(Math.max(request.getLowStockThreshold(), 0));
         }
         if (request.getMrpPrice() != null) {
             existing.setMrpPrice(request.getMrpPrice());
@@ -244,8 +248,9 @@ public class ProductServiceImpl implements ProductService{
                     productVariant.setColor(variant.getColor() == null ? null : variant.getColor().trim());
                     productVariant.setSku(variant.getSku() == null ? null : variant.getSku().trim());
                     productVariant.setPrice(variant.getPrice());
-                    productVariant.setSellerStock(0);
-                    productVariant.setWarehouseStock(Math.max(variant.getQuantity() == null ? 0 : variant.getQuantity(), 0));
+                    int initialSellerStock = Math.max(variant.getQuantity() == null ? 0 : variant.getQuantity(), 0);
+                    productVariant.setSellerStock(initialSellerStock);
+                    productVariant.setWarehouseStock(0);
                     return productVariant;
                 })
                 .toList();

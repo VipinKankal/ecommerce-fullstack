@@ -19,6 +19,7 @@ public class ProductResponse {
     private Integer quantity;
     private Integer sellerStock;
     private Integer warehouseStock;
+    private Integer lowStockThreshold;
     private String warrantyType;
     private Integer warrantyDays;
     private String color;

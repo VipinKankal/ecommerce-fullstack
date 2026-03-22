@@ -57,6 +57,27 @@ describe('orderDetailsTypes', () => {
         fulfillmentStatus: 'FULFILLED',
       }),
     ).toBe('PACKED');
+
+    expect(
+      resolveCustomerStatus({
+        id: 8,
+        orderStatus: 'RETURN_APPROVED',
+      }),
+    ).toBe('RETURN_APPROVED');
+
+    expect(
+      resolveCustomerStatus({
+        id: 9,
+        orderStatus: 'EXCHANGE_IN_TRANSIT',
+      }),
+    ).toBe('EXCHANGE_IN_TRANSIT');
+
+    expect(
+      resolveCustomerStatus({
+        id: 10,
+        orderStatus: 'EXCHANGE_COMPLETED',
+      }),
+    ).toBe('EXCHANGE_COMPLETED');
   });
 
   test('prettyLabel and cancelAllowed stay stable', () => {

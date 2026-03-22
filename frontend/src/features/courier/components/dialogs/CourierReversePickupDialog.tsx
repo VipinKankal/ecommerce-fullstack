@@ -98,7 +98,10 @@ const CourierReversePickupDialog = ({
                     </div>
                     <div>
                       Status:{' '}
-                      {selectedReverseTask.returnStatus || 'PICKUP_SCHEDULED'}
+                      {selectedReverseTask.returnStatus ||
+                        (selectedReverseTask.reverseType === 'EXCHANGE'
+                          ? 'EXCHANGE_PICKUP_SCHEDULED'
+                          : 'RETURN_PICKUP_SCHEDULED')}
                     </div>
                     <div>Pickup Slot: {scheduledLabel}</div>
                     <div>
@@ -173,13 +176,14 @@ const CourierReversePickupDialog = ({
 
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                 Flow: Accept pickup, collect the item from the customer, upload
-                proof, then mark the item picked so the reverse status moves
-                forward.
+                proof, then complete pickup so the request moves into transit for
+                warehouse receive.
               </div>
 
               {picked && (
                 <Alert severity="success">
-                  Pickup already completed for this request.
+                  Pickup already completed and the item is on the way back to
+                  the warehouse.
                 </Alert>
               )}
             </div>
@@ -224,7 +228,7 @@ const CourierReversePickupDialog = ({
             onClick={onSubmit}
             disabled={submittingReversePickup || uploadingReverseProof}
           >
-            {submittingReversePickup ? 'Updating...' : 'Mark Item Picked'}
+            {submittingReversePickup ? 'Updating...' : 'Complete Pickup'}
           </Button>
         )}
     </DialogActions>

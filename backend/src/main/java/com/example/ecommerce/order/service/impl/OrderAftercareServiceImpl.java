@@ -29,7 +29,7 @@ import java.util.Set;
 public class OrderAftercareServiceImpl implements OrderAftercareService {
 
     private static final Set<String> FINAL_RETURN_STATUSES = Set.of("RETURN_REJECTED", "RETURNED");
-    private static final Set<String> FINAL_EXCHANGE_STATUSES = Set.of("EXCHANGE_REJECTED", "EXCHANGE_SHIPPED", "EXCHANGE_COMPLETED");
+    private static final Set<String> FINAL_EXCHANGE_STATUSES = Set.of("EXCHANGE_REJECTED", "EXCHANGE_COMPLETED");
 
     private final OrderItemRepository orderItemRepository;
     private final OrderReturnExchangeRequestRepository requestRepository;
@@ -184,32 +184,67 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             return toReturnResponse(requestRepository.save(request));
         }
 
-        request.setStatus("REFUND_PENDING");
+        request.setStatus("RETURN_APPROVED");
         request.setCourierId(valueAsLong(payload, "courierId"));
         request.setCourierName(request.getCourierId() == null ? null : "Courier #" + request.getCourierId());
         request.setPickupScheduledAt(parseDateTime(payload.get("pickupScheduledAt"), LocalDateTime.now().plusDays(1)));
-        request.setPickupCompletedAt(LocalDateTime.now());
-        request.setReceivedAt(LocalDateTime.now());
+        addHistory(request, "RETURN_APPROVED", "Admin approved return request", "ADMIN");
+        return toReturnResponse(requestRepository.save(request));
+    }
 
-        Product product = requireProduct(request.getProductId());
-        inventoryService.restockWarehouseFromReturn(
-                product,
-                Math.max(request.getQuantityRequested() == null ? 1 : request.getQuantityRequested(), 1),
-                request.getOrderItemId(),
-                request.getId(),
-                "RETURN",
-                "RETURN_REQUESTED",
-                "CUSTOMER",
-                "SYSTEM",
-                "Return accepted and stock added back to warehouse"
+    @Override
+    public Map<String, Object> markReturnPickup(Long requestId, String adminComment) throws Exception {
+        OrderReturnExchangeRequest request = requireRequest(requestId, "RETURN");
+        requireRequestStatus(request, "RETURN_APPROVED", "Return pickup can start only after approval");
+        request.setStatus("RETURN_IN_TRANSIT");
+        request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
+        request.setPickupCompletedAt(LocalDateTime.now());
+        addHistory(request, "RETURN_IN_TRANSIT", "Courier picked return item from customer", "ADMIN");
+        return toReturnResponse(requestRepository.save(request));
+    }
+
+    @Override
+    public Map<String, Object> receiveReturn(Long requestId, Map<String, Object> payload) throws Exception {
+        OrderReturnExchangeRequest request = requireRequest(requestId, "RETURN");
+        requireRequestStatus(request, "RETURN_IN_TRANSIT", "Return can be received only after pickup");
+        String adminComment = valueAsString(payload, "adminComment");
+        String qcResult = firstNonBlank(valueAsString(payload, "qcResult"), "QC_PENDING");
+        String warehouseProofUrl = valueAsString(payload, "warehouseProofUrl");
+        request.setStatus("REFUND_PENDING");
+        request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
+        request.setQcResult(qcResult);
+        request.setWarehouseProofUrl(firstNonBlank(warehouseProofUrl, request.getWarehouseProofUrl()));
+        request.setReceivedAt(LocalDateTime.now());
+        boolean restockAllowed = shouldRestockForQc(qcResult);
+        if (restockAllowed) {
+            Product product = requireProduct(request.getProductId());
+            inventoryService.restockWarehouseFromReturn(
+                    product,
+                    Math.max(request.getQuantityRequested() == null ? 1 : request.getQuantityRequested(), 1),
+                    request.getOrderItemId(),
+                    request.getId(),
+                    "RETURN",
+                    "RETURNED",
+                    "CUSTOMER",
+                    "ADMIN",
+                    "Return received and stock added back to warehouse"
+            );
+        }
+        addHistory(
+                request,
+                "REFUND_PENDING",
+                "Warehouse received return"
+                        + (restockAllowed ? " and stock was updated" : " and stock was held from inventory")
+                        + (qcResult == null ? "" : " | QC: " + qcResult),
+                "ADMIN"
         );
-        addHistory(request, "REFUND_PENDING", "Admin accepted return and warehouse stock was updated", "ADMIN");
         return toReturnResponse(requestRepository.save(request));
     }
 
     @Override
     public Map<String, Object> initiateRefund(Long requestId, String adminComment) throws Exception {
         OrderReturnExchangeRequest request = requireRequest(requestId, "RETURN");
+        requireRequestStatus(request, "REFUND_PENDING", "Refund can be initiated only after warehouse receives the return");
         request.setStatus("REFUND_INITIATED");
         request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
         request.setRefundStatus("INITIATED");
@@ -221,6 +256,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
     @Override
     public Map<String, Object> completeRefund(Long requestId, String adminComment) throws Exception {
         OrderReturnExchangeRequest request = requireRequest(requestId, "RETURN");
+        requireRequestStatus(request, "REFUND_INITIATED", "Refund can be completed only after initiation");
         request.setStatus("RETURNED");
         request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
         request.setRefundStatus("COMPLETED");
@@ -256,15 +292,62 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             throw new IllegalArgumentException("Customer must complete price difference payment before exchange approval");
         }
 
-        request.setStatus("EXCHANGE_PICKUP_COMPLETED");
+        request.setStatus("EXCHANGE_APPROVED");
         request.setAdminComment(valueAsString(payload, "adminComment"));
         request.setApprovedAt(LocalDateTime.now());
         request.setCourierId(valueAsLong(payload, "courierId"));
         request.setCourierName(request.getCourierId() == null ? null : "Courier #" + request.getCourierId());
         request.setPickupScheduledAt(parseDateTime(payload.get("pickupScheduledAt"), LocalDateTime.now().plusDays(1)));
+        addHistory(request, "EXCHANGE_APPROVED", "Admin approved exchange request", "ADMIN");
+        return toExchangeResponse(requestRepository.save(request));
+    }
+
+    @Override
+    public Map<String, Object> markExchangePickup(Long requestId, String adminComment) throws Exception {
+        OrderReturnExchangeRequest request = requireRequest(requestId, "EXCHANGE");
+        requireRequestStatus(request, "EXCHANGE_APPROVED", "Exchange pickup can start only after approval");
+        request.setStatus("EXCHANGE_IN_TRANSIT");
+        request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
         request.setPickupCompletedAt(LocalDateTime.now());
+        addHistory(request, "EXCHANGE_IN_TRANSIT", "Courier picked old item for exchange", "ADMIN");
+        return toExchangeResponse(requestRepository.save(request));
+    }
+
+    @Override
+    public Map<String, Object> receiveExchange(Long requestId, Map<String, Object> payload) throws Exception {
+        OrderReturnExchangeRequest request = requireRequest(requestId, "EXCHANGE");
+        requireRequestStatus(request, "EXCHANGE_IN_TRANSIT", "Exchange item can be received only after pickup");
+        String adminComment = valueAsString(payload, "adminComment");
+        String qcResult = firstNonBlank(valueAsString(payload, "qcResult"), "QC_PENDING");
+        String warehouseProofUrl = valueAsString(payload, "warehouseProofUrl");
+        request.setStatus("EXCHANGE_RECEIVED");
+        request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
+        request.setQcResult(qcResult);
+        request.setWarehouseProofUrl(firstNonBlank(warehouseProofUrl, request.getWarehouseProofUrl()));
         request.setReceivedAt(LocalDateTime.now());
-        addHistory(request, "EXCHANGE_PICKUP_COMPLETED", "Admin approved exchange and marked old item as received", "ADMIN");
+        boolean restockAllowed = shouldRestockForQc(qcResult);
+        if (restockAllowed) {
+            Product returnedProduct = requireProduct(request.getProductId());
+            inventoryService.restockWarehouseFromReturn(
+                    returnedProduct,
+                    Math.max(request.getQuantityRequested() == null ? 1 : request.getQuantityRequested(), 1),
+                    request.getOrderItemId(),
+                    request.getId(),
+                    "EXCHANGE",
+                    "EXCHANGE_RECEIVED",
+                    "CUSTOMER",
+                    "ADMIN",
+                    "Exchange item received and stock added back to warehouse"
+            );
+        }
+        addHistory(
+                request,
+                "EXCHANGE_RECEIVED",
+                "Warehouse received old item for exchange"
+                        + (restockAllowed ? " and stock was updated" : " and stock was held from inventory")
+                        + (qcResult == null ? "" : " | QC: " + qcResult),
+                "ADMIN"
+        );
         return toExchangeResponse(requestRepository.save(request));
     }
 
@@ -278,8 +361,11 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
     }
 
     @Override
-    public Map<String, Object> createReplacementOrder(Long requestId, String adminComment) throws Exception {
+    public Map<String, Object> createReplacementOrder(Long requestId, Map<String, Object> payload) throws Exception {
         OrderReturnExchangeRequest request = requireRequest(requestId, "EXCHANGE");
+        requireRequestStatus(request, "EXCHANGE_RECEIVED", "Replacement can be shipped only after warehouse receives the old item");
+        String adminComment = valueAsString(payload, "adminComment");
+        String replacementProofUrl = valueAsString(payload, "replacementProofUrl");
         Product replacementProduct = requireProduct(
                 request.getRequestedNewProductId() != null ? request.getRequestedNewProductId() : request.getProductId()
         );
@@ -297,7 +383,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         request.setReplacementOrderId(System.currentTimeMillis());
         request.setReplacementCreatedAt(LocalDateTime.now());
         request.setReplacementShippedAt(LocalDateTime.now());
-        request.setCompletedAt(LocalDateTime.now());
+        request.setReplacementProofUrl(firstNonBlank(replacementProofUrl, request.getReplacementProofUrl()));
 
         if (request.getPriceDifference() != null && request.getPriceDifference() < 0) {
             if ("WALLET".equalsIgnoreCase(request.getBalanceMode())) {
@@ -309,7 +395,25 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             }
         }
 
-        addHistory(request, "EXCHANGE_SHIPPED", "Replacement order shipped from warehouse", "ADMIN");
+        addHistory(
+                request,
+                "EXCHANGE_SHIPPED",
+                "Replacement order shipped from warehouse"
+                        + (request.getReplacementProofUrl() == null ? "" : " | Proof attached"),
+                "ADMIN"
+        );
+        return toExchangeResponse(requestRepository.save(request));
+    }
+
+    @Override
+    public Map<String, Object> completeReplacementDelivery(Long requestId, String adminComment) throws Exception {
+        OrderReturnExchangeRequest request = requireRequest(requestId, "EXCHANGE");
+        requireRequestStatus(request, "EXCHANGE_SHIPPED", "Replacement delivery can be completed only after shipment");
+        request.setStatus("EXCHANGE_COMPLETED");
+        request.setAdminComment(firstNonBlank(adminComment, request.getAdminComment()));
+        request.setReplacementDeliveredAt(LocalDateTime.now());
+        request.setCompletedAt(LocalDateTime.now());
+        addHistory(request, "EXCHANGE_COMPLETED", "Replacement delivered to customer", "ADMIN");
         return toExchangeResponse(requestRepository.save(request));
     }
 
@@ -352,6 +456,12 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
                 : !FINAL_EXCHANGE_STATUSES.contains(normalizeType(latest.getStatus()));
         if (active) {
             throw new IllegalArgumentException(requestType + " request already exists for this order item");
+        }
+    }
+
+    private void requireRequestStatus(OrderReturnExchangeRequest request, String expectedStatus, String message) {
+        if (!expectedStatus.equalsIgnoreCase(firstNonBlank(request.getStatus(), ""))) {
+            throw new IllegalArgumentException(message);
         }
     }
 
@@ -432,6 +542,10 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             return second.trim();
         }
         return null;
+    }
+
+    private boolean shouldRestockForQc(String qcResult) {
+        return "QC_PASS".equalsIgnoreCase(firstNonBlank(qcResult, ""));
     }
 
     private String valueAsString(Map<String, Object> payload, String key) {
@@ -542,6 +656,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         replacementOrder.put("status", request.getStatus());
         replacementOrder.put("createdAt", request.getReplacementCreatedAt());
         replacementOrder.put("shippedAt", request.getReplacementShippedAt());
+        replacementOrder.put("proofUrl", request.getReplacementProofUrl());
         replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
         response.put("replacementOrder", replacementOrder);
 
@@ -578,6 +693,8 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         response.put("pickupCompletedAt", request.getPickupCompletedAt());
         response.put("pickedAt", request.getPickupCompletedAt());
         response.put("receivedAt", request.getReceivedAt());
+        response.put("qcResult", request.getQcResult());
+        response.put("warehouseProofUrl", request.getWarehouseProofUrl());
         response.put("refundPendingAt", request.getAdminReviewedAt());
         response.put("refundInitiatedAt", request.getRefundInitiatedAt());
         response.put("refundCompletedAt", request.getRefundCompletedAt());
@@ -623,6 +740,9 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         response.put("oldItemPickedAt", request.getPickupCompletedAt());
         response.put("pickupCompletedAt", request.getPickupCompletedAt());
         response.put("paymentCompletedAt", request.getPaymentCompletedAt());
+        response.put("receivedAt", request.getReceivedAt());
+        response.put("qcResult", request.getQcResult());
+        response.put("warehouseProofUrl", request.getWarehouseProofUrl());
         response.put("walletCreditCompletedAt", request.getWalletCreditCompletedAt());
         response.put("bankRefundInitiatedAt", request.getBankRefundInitiatedAt());
         response.put("bankRefundCompletedAt", request.getBankRefundCompletedAt());
@@ -660,6 +780,8 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         exchangePickup.put("oldItemPickedAt", request.getPickupCompletedAt());
         exchangePickup.put("completedAt", request.getReceivedAt());
         exchangePickup.put("pickupPhoto", request.getProductPhoto());
+        exchangePickup.put("warehouseProofUrl", request.getWarehouseProofUrl());
+        exchangePickup.put("qcResult", request.getQcResult());
         exchangePickup.put("note", request.getAdminComment());
         response.put("exchangePickup", exchangePickup);
 
@@ -670,6 +792,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         replacementOrder.put("status", request.getStatus());
         replacementOrder.put("createdAt", request.getReplacementCreatedAt());
         replacementOrder.put("shippedAt", request.getReplacementShippedAt());
+        replacementOrder.put("proofUrl", request.getReplacementProofUrl());
         replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
         response.put("replacementOrder", replacementOrder);
 

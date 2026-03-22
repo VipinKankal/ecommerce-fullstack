@@ -1,5 +1,7 @@
 package com.example.ecommerce.common.configuration;
 
+import com.example.ecommerce.modal.AuditLogEntry;
+import com.example.ecommerce.repository.AuditLogEntryRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +19,11 @@ import java.io.IOException;
 public class AuditLoggingFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(AuditLoggingFilter.class);
+    private final AuditLogEntryRepository auditLogEntryRepository;
+
+    public AuditLoggingFilter(AuditLogEntryRepository auditLogEntryRepository) {
+        this.auditLogEntryRepository = auditLogEntryRepository;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -41,6 +48,19 @@ public class AuditLoggingFilter extends OncePerRequestFilter {
                 request.getRemoteAddr(),
                 durationMs
         );
+
+        AuditLogEntry entry = new AuditLogEntry();
+        entry.setMethod(request.getMethod());
+        entry.setPath(request.getRequestURI());
+        entry.setStatus(response.getStatus());
+        entry.setActor(actor);
+        entry.setIpAddress(request.getRemoteAddr());
+        entry.setDurationMs(durationMs);
+        try {
+            auditLogEntryRepository.save(entry);
+        } catch (RuntimeException exception) {
+            log.warn("AUDIT_PERSIST_FAILED path={} reason={}", request.getRequestURI(), exception.getMessage());
+        }
     }
 
     private boolean shouldAudit(String uri) {

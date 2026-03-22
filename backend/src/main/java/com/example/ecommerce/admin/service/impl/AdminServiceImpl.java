@@ -2,14 +2,19 @@ package com.example.ecommerce.admin.service.impl;
 
 import com.example.ecommerce.common.domain.AccountStatus;
 import com.example.ecommerce.modal.Order;
+import com.example.ecommerce.modal.OrderReturnExchangeRequest;
 import com.example.ecommerce.modal.Product;
+import com.example.ecommerce.modal.ProductVariant;
 import com.example.ecommerce.modal.Transaction;
 import com.example.ecommerce.modal.User;
+import com.example.ecommerce.modal.WarehouseTransferRequest;
 import com.example.ecommerce.repository.OrderRepository;
+import com.example.ecommerce.repository.OrderReturnExchangeRequestRepository;
 import com.example.ecommerce.repository.ProductRepository;
 import com.example.ecommerce.repository.SellerRepository;
 import com.example.ecommerce.repository.TransactionRepository;
 import com.example.ecommerce.repository.UserRepository;
+import com.example.ecommerce.repository.WarehouseTransferRequestRepository;
 import com.example.ecommerce.admin.response.AdminDashboardSummaryResponse;
 import com.example.ecommerce.admin.response.AdminOrderSummaryResponse;
 import com.example.ecommerce.admin.response.AdminProductSummaryResponse;
@@ -19,10 +24,13 @@ import com.example.ecommerce.admin.response.AdminUserSummaryResponse;
 import com.example.ecommerce.admin.service.AdminService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -34,10 +42,16 @@ public class AdminServiceImpl implements AdminService {
     private final ProductRepository productRepository;
     private final OrderRepository orderRepository;
     private final TransactionRepository transactionRepository;
+    private final OrderReturnExchangeRequestRepository requestRepository;
+    private final WarehouseTransferRequestRepository warehouseTransferRequestRepository;
 
     @Override
     public AdminDashboardSummaryResponse getDashboardSummary() {
         List<Order> orders = orderRepository.findAllByOrderByOrderDateDesc();
+        List<OrderReturnExchangeRequest> requests = requestRepository.findAll();
+        List<WarehouseTransferRequest> transfers = warehouseTransferRequestRepository.findAll();
+        List<Product> products = productRepository.findAllByOrderByCreatedAtDesc();
+        LocalDate today = LocalDate.now();
         AdminDashboardSummaryResponse response = new AdminDashboardSummaryResponse();
         response.setTotalUsers(userRepository.count());
         response.setTotalSellers(sellerRepository.count());
@@ -49,7 +63,52 @@ public class AdminServiceImpl implements AdminService {
         response.setGrossMerchandiseValue(
                 orders.stream().mapToLong(order -> order.getTotalSellingPrice() == null ? 0 : order.getTotalSellingPrice()).sum()
         );
+        response.setTodayInbound(
+                transfers.stream()
+                        .filter(transfer -> transfer.getReceivedAt() != null && transfer.getReceivedAt().toLocalDate().isEqual(today))
+                        .count()
+        );
+        response.setTodayShipped(
+                orders.stream()
+                        .filter(order -> order.getShippedAt() != null && order.getShippedAt().toLocalDate().isEqual(today))
+                        .count()
+                        + requests.stream()
+                        .filter(request -> request.getReplacementShippedAt() != null
+                                && request.getReplacementShippedAt().toLocalDate().isEqual(today))
+                        .count()
+        );
+        response.setPendingReturns(
+                requests.stream()
+                        .filter(request -> "RETURN".equalsIgnoreCase(request.getRequestType()))
+                        .filter(request -> !Set.of("RETURN_REJECTED", "RETURNED").contains(normalize(request.getStatus())))
+                        .count()
+        );
+        response.setPendingExchanges(
+                requests.stream()
+                        .filter(request -> "EXCHANGE".equalsIgnoreCase(request.getRequestType()))
+                        .filter(request -> !Set.of("EXCHANGE_REJECTED", "EXCHANGE_COMPLETED").contains(normalize(request.getStatus())))
+                        .count()
+        );
+        response.setPendingTransfers(
+                transfers.stream()
+                        .filter(transfer -> !Set.of("TRANSFER_COMPLETED", "TRANSFER_REJECTED", "TRANSFER_CANCELLED")
+                                .contains(normalize(transfer.getStatus() == null ? null : transfer.getStatus().name())))
+                        .count()
+        );
+        response.setLowStockAlerts(
+                products.stream()
+                        .filter(product -> {
+                            int warehouseStock = product.getWarehouseStock();
+                            int threshold = product.getLowStockThreshold();
+                            return warehouseStock <= threshold;
+                        })
+                        .count()
+        );
         return response;
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toUpperCase();
     }
 
     @Override
@@ -65,6 +124,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AdminProductSummaryResponse> getProducts() {
         return productRepository.findAllByOrderByCreatedAtDesc().stream().map(this::mapProduct).toList();
     }
@@ -157,10 +217,30 @@ public class AdminServiceImpl implements AdminService {
         response.setQuantity(product.getQuantity());
         response.setSellerStock(product.getSellerStock());
         response.setWarehouseStock(product.getWarehouseStock());
+        response.setLowStockThreshold(product.getLowStockThreshold());
         response.setSellingPrice(product.getSellingPrice());
         response.setMrpPrice(product.getMrpPrice());
         response.setCreatedAt(product.getCreatedAt());
+        response.setVariants(
+                product.getVariants() == null
+                        ? java.util.List.of()
+                        : product.getVariants().stream().map(this::mapVariant).toList()
+        );
         return response;
+    }
+
+    private AdminProductSummaryResponse.VariantSummary mapVariant(ProductVariant variant) {
+        AdminProductSummaryResponse.VariantSummary summary = new AdminProductSummaryResponse.VariantSummary();
+        summary.setId(variant.getId());
+        summary.setVariantType(variant.getVariantType());
+        summary.setVariantValue(variant.getVariantValue());
+        summary.setSize(variant.getSize());
+        summary.setColor(variant.getColor());
+        summary.setSku(variant.getSku());
+        summary.setPrice(variant.getPrice());
+        summary.setSellerStock(variant.getSellerStock());
+        summary.setWarehouseStock(variant.getWarehouseStock());
+        return summary;
     }
 
     private AdminOrderSummaryResponse mapOrder(Order order) {

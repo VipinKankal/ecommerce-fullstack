@@ -50,19 +50,28 @@ export const updateSellerProduct = createAsyncThunk<
 
 export const transferSellerProductToWarehouse = createAsyncThunk<
   Product,
-  { productId: number; quantity: number }
+  {
+    productId: number;
+    quantity: number;
+    pickupMode?: 'SELLER_DROP' | 'WAREHOUSE_PICKUP';
+    sellerNote?: string;
+  }
 >(
   'sellerProduct/transferSellerProductToWarehouse',
-  async ({ productId, quantity }, { rejectWithValue }) => {
+  async ({ productId, quantity, pickupMode, sellerNote }, { rejectWithValue }) => {
     try {
       const response = await api.post(
         API_ROUTES.sellerProducts.transferToWarehouse(productId),
-        { quantity },
+        {
+          quantity,
+          pickupMode,
+          sellerNote,
+        },
       );
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        getErrorMessage(error, 'Warehouse transfer failed'),
+        getErrorMessage(error, 'Transfer request failed'),
       );
     }
   },

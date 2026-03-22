@@ -12,6 +12,12 @@ public class AdminDashboardSummaryResponse {
     private long totalOrders;
     private long totalTransactions;
     private long grossMerchandiseValue;
+    private long todayInbound;
+    private long todayShipped;
+    private long pendingReturns;
+    private long pendingExchanges;
+    private long pendingTransfers;
+    private long lowStockAlerts;
 }
 
 

@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +101,52 @@ public class RestockNotificationServiceImpl implements RestockNotificationServic
     }
 
     @Override
+    public Map<String, Object> triggerManualNotification(Product product, String note) {
+        if (product == null || product.getId() == null) {
+            throw new IllegalArgumentException("Product not found");
+        }
+        if (product.getWarehouseStock() <= 0) {
+            throw new IllegalArgumentException("Warehouse stock must be available before notifying users");
+        }
+
+        List<ProductRestockSubscription> subscriptions =
+                subscriptionRepository.findByProductIdAndStatusOrderByCreatedAtAsc(product.getId(), STATUS_SUBSCRIBED);
+
+        int notified = 0;
+        for (ProductRestockSubscription subscription : subscriptions) {
+            subscription.setStatus(STATUS_NOTIFIED);
+            subscription.setNotifiedAt(LocalDateTime.now());
+            ProductRestockSubscription savedSubscription = subscriptionRepository.save(subscription);
+
+            ProductRestockNotificationLog log = new ProductRestockNotificationLog();
+            log.setSubscription(savedSubscription);
+            log.setProduct(product);
+            log.setUser(savedSubscription.getUser());
+            log.setStatus(STATUS_NOTIFIED);
+            log.setNote(
+                    note == null || note.isBlank()
+                            ? "Manual restock notification triggered by admin"
+                            : note.trim()
+            );
+            log.setCreatedAt(LocalDateTime.now());
+            notificationLogRepository.save(log);
+            notified++;
+        }
+
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("productId", product.getId());
+        response.put("status", STATUS_NOTIFIED);
+        response.put("notifiedCount", notified);
+        response.put(
+                "message",
+                notified == 0
+                        ? "No subscribed users were waiting for this product"
+                        : "Manual notifications sent successfully"
+        );
+        return response;
+    }
+
+    @Override
     public void markSubscriptionConverted(User user, Product product) {
         if (user == null || user.getId() == null || product == null || product.getId() == null) {
             return;
@@ -111,6 +160,124 @@ public class RestockNotificationServiceImpl implements RestockNotificationServic
                         subscriptionRepository.save(subscription);
                     }
                 });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getAdminDemandInsights() {
+        return buildDemandInsights(null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> getSellerDemandInsights(Long sellerId) {
+        return buildDemandInsights(sellerId);
+    }
+
+    private Map<String, Object> buildDemandInsights(Long sellerId) {
+        List<ProductRestockSubscription> subscriptions = subscriptionRepository.findAll();
+        List<ProductRestockNotificationLog> logs = notificationLogRepository.findAll();
+
+        Map<Long, LinkedHashMap<String, Object>> productDemand = new HashMap<>();
+        int subscribedCount = 0;
+        int notifiedCount = 0;
+        int convertedCount = 0;
+
+        for (ProductRestockSubscription subscription : subscriptions) {
+            Product product = subscription.getProduct();
+            if (product == null || product.getId() == null || !belongsToSeller(product, sellerId)) {
+                continue;
+            }
+
+            LinkedHashMap<String, Object> demand = productDemand.computeIfAbsent(
+                    product.getId(),
+                    ignored -> createProductDemandRow(product)
+            );
+
+            String status = (subscription.getStatus() == null ? STATUS_NONE : subscription.getStatus()).toUpperCase();
+            if (STATUS_SUBSCRIBED.equals(status)) {
+                subscribedCount++;
+                demand.put("subscribedCount", ((Number) demand.get("subscribedCount")).intValue() + 1);
+            } else if (STATUS_NOTIFIED.equals(status)) {
+                notifiedCount++;
+                demand.put("notifiedCount", ((Number) demand.get("notifiedCount")).intValue() + 1);
+            } else if (STATUS_CONVERTED.equals(status)) {
+                convertedCount++;
+                demand.put("convertedCount", ((Number) demand.get("convertedCount")).intValue() + 1);
+            }
+
+            LocalDateTime createdAt = subscription.getCreatedAt();
+            LocalDateTime latestSubscribedAt = (LocalDateTime) demand.get("latestSubscribedAt");
+            if (createdAt != null && (latestSubscribedAt == null || createdAt.isAfter(latestSubscribedAt))) {
+                demand.put("latestSubscribedAt", createdAt);
+            }
+
+            LocalDateTime notifiedAt = subscription.getNotifiedAt();
+            LocalDateTime latestNotifiedAt = (LocalDateTime) demand.get("latestNotifiedAt");
+            if (notifiedAt != null && (latestNotifiedAt == null || notifiedAt.isAfter(latestNotifiedAt))) {
+                demand.put("latestNotifiedAt", notifiedAt);
+            }
+        }
+
+        List<Map<String, Object>> topDemandProducts = new ArrayList<>(productDemand.values());
+        topDemandProducts.sort(Comparator
+                .comparingInt((Map<String, Object> row) -> ((Number) row.get("subscribedCount")).intValue())
+                .thenComparingInt(row -> ((Number) row.get("notifiedCount")).intValue())
+                .reversed());
+
+        List<Map<String, Object>> recentNotifications = logs.stream()
+                .filter(log -> belongsToSeller(log.getProduct(), sellerId))
+                .sorted(Comparator.comparing(ProductRestockNotificationLog::getCreatedAt,
+                        Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .limit(8)
+                .map(this::toNotificationRow)
+                .toList();
+
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("pendingSubscribers", subscribedCount);
+        response.put("notifiedSubscribers", notifiedCount);
+        response.put("convertedSubscribers", convertedCount);
+        response.put("demandProducts", topDemandProducts);
+        response.put("recentNotifications", recentNotifications);
+        return response;
+    }
+
+    private boolean belongsToSeller(Product product, Long sellerId) {
+        if (product == null) {
+            return false;
+        }
+        if (sellerId == null) {
+            return true;
+        }
+        return product.getSeller() != null
+                && product.getSeller().getId() != null
+                && product.getSeller().getId().equals(sellerId);
+    }
+
+    private LinkedHashMap<String, Object> createProductDemandRow(Product product) {
+        LinkedHashMap<String, Object> row = new LinkedHashMap<>();
+        row.put("productId", product.getId());
+        row.put("productTitle", product.getTitle());
+        row.put("warehouseStock", product.getWarehouseStock());
+        row.put("sellerStock", product.getSellerStock());
+        row.put("subscribedCount", 0);
+        row.put("notifiedCount", 0);
+        row.put("convertedCount", 0);
+        row.put("latestSubscribedAt", null);
+        row.put("latestNotifiedAt", null);
+        return row;
+    }
+
+    private Map<String, Object> toNotificationRow(ProductRestockNotificationLog log) {
+        LinkedHashMap<String, Object> row = new LinkedHashMap<>();
+        row.put("id", log.getId());
+        row.put("productId", log.getProduct() != null ? log.getProduct().getId() : null);
+        row.put("productTitle", log.getProduct() != null ? log.getProduct().getTitle() : null);
+        row.put("userId", log.getUser() != null ? log.getUser().getId() : null);
+        row.put("status", log.getStatus());
+        row.put("note", log.getNote());
+        row.put("createdAt", log.getCreatedAt());
+        return row;
     }
 
     private Map<String, Object> toResponse(

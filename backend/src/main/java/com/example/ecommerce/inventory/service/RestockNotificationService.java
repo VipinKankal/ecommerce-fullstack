@@ -12,5 +12,11 @@ public interface RestockNotificationService {
 
     void notifySubscribersIfRestocked(Product product);
 
+    Map<String, Object> triggerManualNotification(Product product, String note);
+
     void markSubscriptionConverted(User user, Product product);
+
+    Map<String, Object> getAdminDemandInsights();
+
+    Map<String, Object> getSellerDemandInsights(Long sellerId);
 }

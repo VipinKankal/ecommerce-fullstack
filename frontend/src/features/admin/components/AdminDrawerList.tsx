@@ -39,6 +39,8 @@ import {
   LocalShipping,
   AutorenewOutlined,
   Autorenew,
+  FactCheckOutlined,
+  FactCheck,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch } from 'app/store/Store';
@@ -104,6 +106,12 @@ const menu = [
     path: '/admin/exchange-requests',
     icon: <AutorenewOutlined />,
     activeIcon: <Autorenew />,
+  },
+  {
+    name: 'Audit Logs',
+    path: '/admin/audit-logs',
+    icon: <FactCheckOutlined />,
+    activeIcon: <FactCheck />,
   },
   {
     name: 'Reports',
