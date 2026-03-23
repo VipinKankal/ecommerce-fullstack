@@ -4,6 +4,7 @@ import com.example.ecommerce.catalog.ProductConstraints;
 import com.example.ecommerce.common.response.ApiEnvelope;
 import com.example.ecommerce.common.response.ApiEnvelopeFactory;
 import com.example.ecommerce.common.response.ApiErrorCode;
+import com.example.ecommerce.order.exception.CouponOperationException;
 import com.razorpay.RazorpayException;
 import com.stripe.exception.StripeException;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -156,6 +157,24 @@ public class GlobleException {
             WebRequest request
     ) {
         return buildClassifiedResponse(ex.getMessage(), request);
+    }
+
+    @ExceptionHandler(CouponOperationException.class)
+    public ResponseEntity<ApiEnvelope<Void>> couponOperationExceptionHandler(
+            CouponOperationException ex,
+            WebRequest request
+    ) {
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>(baseDetails(request));
+        details.put("reasonCode", ex.getReasonCode());
+        if (ex.getDetails() != null && !ex.getDetails().isEmpty()) {
+            details.putAll(ex.getDetails());
+        }
+        return buildErrorResponse(
+                ex.getStatus(),
+                ex.getMessage(),
+                ex.getErrorCode(),
+                details
+        );
     }
 
     @ExceptionHandler(RazorpayException.class)

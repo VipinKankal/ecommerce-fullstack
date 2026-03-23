@@ -1,12 +1,17 @@
 package com.example.ecommerce.order.service.impl;
 
+import com.example.ecommerce.common.domain.CouponScopeType;
+import com.example.ecommerce.common.domain.CouponDiscountType;
 import com.example.ecommerce.modal.Cart;
 import com.example.ecommerce.modal.CartItem;
+import com.example.ecommerce.modal.Coupon;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.ProductVariant;
 import com.example.ecommerce.modal.User;
 import com.example.ecommerce.repository.CartItemRepository;
 import com.example.ecommerce.repository.CartRepository;
+import com.example.ecommerce.repository.CouponRepository;
+import com.example.ecommerce.repository.CouponUsageRepository;
 import com.example.ecommerce.repository.ProductVariantRepository;
 import com.example.ecommerce.order.service.CartService;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +26,8 @@ public class CartServiceImpl implements CartService {
     private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final CouponRepository couponRepository;
+    private final CouponUsageRepository couponUsageRepository;
 
     @Override
     public CartItem addItemToCart(User user, Product product, String size, int quantity) {
@@ -87,7 +94,7 @@ public class CartServiceImpl implements CartService {
         }
 
         int totalPrice = 0;
-        int totalDiscountPrice = 0;
+        double subtotalSellingPrice = 0;
         int totalItems = 0;
  
         for (CartItem cartItem : cart.getCartItems()) {
@@ -100,27 +107,128 @@ public class CartServiceImpl implements CartService {
             int selling = cartItem.getSellingPrice() != null ? cartItem.getSellingPrice() : 0;
 
             totalPrice += mrp;
-            totalDiscountPrice += selling;
+            subtotalSellingPrice += selling;
             totalItems += cartItem.getQuantity();
         }
 
+        double couponDiscountAmount = resolveCouponDiscountAmount(user, cart, subtotalSellingPrice);
+        double finalSellingPrice = Math.max(0, subtotalSellingPrice - couponDiscountAmount);
+
         cart.setTotalMrpPrice(totalPrice);
         cart.setTotalItems(totalItems);
-        cart.setTotalSellingPrice(totalDiscountPrice);
-        cart.setDiscount(calculateDiscountPercentage(totalPrice,totalDiscountPrice));
+        cart.setCouponDiscountAmount(couponDiscountAmount);
+        cart.setTotalSellingPrice(roundCurrency(finalSellingPrice));
+        cart.setDiscount((int) Math.round(totalPrice - finalSellingPrice));
         cart.setTotalItems(totalItems);
         return cart;
     }
 
-
-
-    private int calculateDiscountPercentage(int mrpPrice, int sellingPrice) {
-        if (mrpPrice<=0){
+    private double resolveCouponDiscountAmount(User user, Cart cart, double subtotalSellingPrice) {
+        if (cart.getCouponCode() == null || cart.getCouponCode().isBlank() || subtotalSellingPrice <= 0) {
+            cart.setCouponDiscountAmount(0.0);
             return 0;
         }
-        double discount = mrpPrice-sellingPrice;
-        double discountPercentage = (discount / mrpPrice) * 100;
-        return (int)discountPercentage;
+
+        Coupon coupon = couponRepository.findByCodeIgnoreCase(cart.getCouponCode()).orElse(null);
+        if (coupon == null || !coupon.isActive()) {
+            cart.setCouponCode(null);
+            cart.setCouponDiscountAmount(0.0);
+            return 0;
+        }
+
+        if (coupon.getMinimumOrderValue() > subtotalSellingPrice) {
+            cart.setCouponCode(null);
+            cart.setCouponDiscountAmount(0.0);
+            return 0;
+        }
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        boolean afterStart = coupon.getValidityStartDate() == null || !today.isBefore(coupon.getValidityStartDate());
+        boolean beforeEnd = coupon.getValidityEndDate() == null || !today.isAfter(coupon.getValidityEndDate());
+        if (!afterStart || !beforeEnd) {
+            cart.setCouponCode(null);
+            cart.setCouponDiscountAmount(0.0);
+            return 0;
+        }
+
+        if (coupon.getUsageLimit() != null && coupon.getUsedCount() != null && coupon.getUsedCount() >= coupon.getUsageLimit()) {
+            cart.setCouponCode(null);
+            cart.setCouponDiscountAmount(0.0);
+            return 0;
+        }
+
+        int perUserLimit = coupon.getPerUserLimit() == null ? 1 : coupon.getPerUserLimit();
+        if (couponUsageRepository.countByCouponIdAndUserId(coupon.getId(), user.getId()) >= perUserLimit) {
+            cart.setCouponCode(null);
+            cart.setCouponDiscountAmount(0.0);
+            return 0;
+        }
+
+        double applicableSubtotal = calculateApplicableSubtotal(coupon, cart);
+        if (applicableSubtotal <= 0) {
+            cart.setCouponCode(null);
+            cart.setCouponDiscountAmount(0.0);
+            return 0;
+        }
+
+        double discountAmount = calculateCouponDiscount(coupon, applicableSubtotal);
+        cart.setCouponDiscountAmount(discountAmount);
+        cart.setCouponCode(coupon.getCode());
+        return discountAmount;
+    }
+
+    private double calculateApplicableSubtotal(Coupon coupon, Cart cart) {
+        if (cart.getCartItems() == null) {
+            return 0;
+        }
+        return cart.getCartItems().stream()
+                .filter(item -> isItemApplicable(coupon, item))
+                .map(CartItem::getSellingPrice)
+                .filter(value -> value != null)
+                .mapToDouble(Integer::doubleValue)
+                .sum();
+    }
+
+    private boolean isItemApplicable(Coupon coupon, CartItem item) {
+        if (coupon == null || item == null || item.getProduct() == null) {
+            return false;
+        }
+        CouponScopeType scopeType = coupon.getScopeType() == null ? CouponScopeType.GLOBAL : coupon.getScopeType();
+        Long scopeId = coupon.getScopeId();
+        if (scopeType == CouponScopeType.GLOBAL || scopeId == null) {
+            return true;
+        }
+        return switch (scopeType) {
+            case SELLER -> item.getProduct().getSeller() != null && scopeId.equals(item.getProduct().getSeller().getId());
+            case CATEGORY -> item.getProduct().getCategory() != null && scopeId.equals(item.getProduct().getCategory().getId());
+            case PRODUCT -> item.getProduct().getId() != null && scopeId.equals(item.getProduct().getId());
+            case GLOBAL -> true;
+        };
+    }
+
+    private double calculateCouponDiscount(Coupon coupon, double subtotalSellingPrice) {
+        double discountAmount;
+        CouponDiscountType discountType = coupon.getDiscountType() == null
+                ? CouponDiscountType.PERCENT
+                : coupon.getDiscountType();
+
+        if (discountType == CouponDiscountType.FLAT) {
+            discountAmount = coupon.getDiscountValue();
+        } else {
+            double discountValue = coupon.getDiscountValue() > 0 ? coupon.getDiscountValue() : coupon.getDiscountPercentage();
+            discountAmount = (subtotalSellingPrice * discountValue) / 100.0;
+        }
+
+        if (coupon.getMaxDiscount() != null && coupon.getMaxDiscount() > 0) {
+            discountAmount = Math.min(discountAmount, coupon.getMaxDiscount());
+        }
+
+        discountAmount = Math.min(discountAmount, subtotalSellingPrice);
+        return roundCurrency(discountAmount);
+    }
+
+    private double roundCurrency(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 }
 

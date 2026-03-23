@@ -2,9 +2,11 @@ package com.example.ecommerce.order.controller;
 
 import com.example.ecommerce.common.domain.PaymentOrderStatus;
 import com.example.ecommerce.common.domain.PaymentProvider;
+import com.example.ecommerce.common.domain.CouponReservationState;
 import com.example.ecommerce.modal.*;
 import com.example.ecommerce.common.response.ApiResponse;
 import com.example.ecommerce.order.response.CheckoutPaymentStatusResponse;
+import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.PaymentService;
 import com.example.ecommerce.order.service.TransactionService;
 import com.example.ecommerce.seller.service.SellerReportService;
@@ -30,6 +32,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final UserService userService;
+    private final CouponService couponService;
     private final SellerService sellerService;
     private final SellerReportService sellerReportService;
     private final TransactionService transactionService;
@@ -40,7 +43,7 @@ public class PaymentController {
     public ResponseEntity<CheckoutPaymentStatusResponse> getPaymentSuccessHandler(
             @PathVariable String paymentId,
             @RequestParam String paymentLinkId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         PaymentOrder paymentOrder = paymentService.getPaymentOrderByPaymentId(paymentLinkId);
@@ -68,7 +71,7 @@ public class PaymentController {
     @Transactional
     public ResponseEntity<CheckoutPaymentStatusResponse> getCheckoutPaymentStatus(
             @PathVariable Long paymentOrderId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         PaymentOrder paymentOrder = paymentService.getPaymentOrderById(paymentOrderId);
@@ -119,6 +122,13 @@ public class PaymentController {
     }
 
     private void applySuccessfulPaymentSideEffects(PaymentOrder paymentOrder) throws Exception {
+        Order primaryOrder = resolvePrimaryOrder(paymentOrder.getOrders());
+        if (primaryOrder != null && primaryOrder.getUser() != null) {
+            couponService.markCouponUsedIfPresent(primaryOrder.getUser(), paymentOrder.getOrders());
+        }
+        if (paymentOrder.getCouponReservationState() == CouponReservationState.RESERVED) {
+            paymentOrder.setCouponReservationState(CouponReservationState.CONSUMED);
+        }
         for (Order order : paymentOrder.getOrders()) {
             transactionService.createTransaction(order);
             Seller seller = sellerService.getSellerById(order.getSellerId());
@@ -232,3 +242,4 @@ public class PaymentController {
         return null;
     }
 }
+

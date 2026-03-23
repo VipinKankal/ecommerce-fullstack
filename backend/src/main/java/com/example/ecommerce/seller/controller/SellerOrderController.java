@@ -26,7 +26,7 @@ public class SellerOrderController {
 
     @GetMapping
     public ResponseEntity<List<SellerOrderResponse>> getAllOrdersHandler(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         List<Order> orders = orderService.sellersOrder(seller.getId());
@@ -35,7 +35,7 @@ public class SellerOrderController {
 
     @PatchMapping("/{orderId}/status/{orderStatus}")
     public ResponseEntity<SellerOrderResponse> updateOrderHandler(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @PathVariable Long orderId,
             @PathVariable OrderStatus orderStatus
     ) throws Exception {
@@ -44,6 +44,7 @@ public class SellerOrderController {
         return new ResponseEntity<>(ResponseMapper.toSellerOrderResponse(order), HttpStatus.ACCEPTED);
     }
 }
+
 
 
 

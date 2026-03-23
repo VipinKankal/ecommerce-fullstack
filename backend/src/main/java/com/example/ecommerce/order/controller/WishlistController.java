@@ -30,7 +30,7 @@ public class WishlistController {
     @GetMapping
     @Transactional(readOnly = true)
     public ResponseEntity<WishlistResponse> getWishlistByUserId(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Wishlist wishlist = wishlistService.getWishlistByUserId(user);
@@ -41,7 +41,7 @@ public class WishlistController {
     @Transactional
     public ResponseEntity<WishlistResponse> addProductToWishlist(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Product product = productService.findProductById(productId);
         User user = userService.findUserByJwtToken(jwt);
@@ -53,7 +53,7 @@ public class WishlistController {
     @Transactional
     public ResponseEntity<WishlistResponse> removeProductFromWishlist(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Product product = productService.findProductById(productId);
         User user = userService.findUserByJwtToken(jwt);
@@ -90,6 +90,7 @@ public class WishlistController {
         return response;
     }
 }
+
 
 
 

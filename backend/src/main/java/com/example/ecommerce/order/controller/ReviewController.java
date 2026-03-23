@@ -30,7 +30,7 @@ public class ReviewController {
     public ResponseEntity<Review> createReview(
             @Valid @RequestBody CreateReviewRequest request,
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
 
         User user = userService.findUserByJwtToken(jwt);
@@ -50,7 +50,7 @@ public class ReviewController {
     public ResponseEntity<Review> updateReview(
             @PathVariable Long reviewId,
             @Valid @RequestBody CreateReviewRequest request,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
 
         User user = userService.findUserByJwtToken(jwt);
@@ -67,7 +67,7 @@ public class ReviewController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<ApiResponse> deleteReview(
             @PathVariable Long reviewId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
 
         User user = userService.findUserByJwtToken(jwt);
@@ -78,6 +78,7 @@ public class ReviewController {
         return ResponseEntity.ok(response);
     }
 }
+
 
 
 

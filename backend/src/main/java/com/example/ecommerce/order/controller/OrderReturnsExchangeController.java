@@ -23,7 +23,7 @@ public class OrderReturnsExchangeController {
     @GetMapping("/returns")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getReturnRequests(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         if (user == null) {
@@ -35,7 +35,7 @@ public class OrderReturnsExchangeController {
     @GetMapping("/return-exchange")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getReturnExchangeRequests(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         if (user == null) {
@@ -48,7 +48,7 @@ public class OrderReturnsExchangeController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<Map<String, Object>> createReturnRequest(
             @PathVariable Long orderItemId,
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -59,7 +59,7 @@ public class OrderReturnsExchangeController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<Map<String, Object>> createReturnExchangeRequest(
             @PathVariable Long orderItemId,
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -69,7 +69,7 @@ public class OrderReturnsExchangeController {
     @GetMapping("/exchanges")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<List<Map<String, Object>>> getExchangeRequests(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         if (user == null) {
@@ -82,7 +82,7 @@ public class OrderReturnsExchangeController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<Map<String, Object>> createExchangeRequest(
             @PathVariable Long orderItemId,
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -93,7 +93,7 @@ public class OrderReturnsExchangeController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<Map<String, Object>> submitDifferencePayment(
             @PathVariable Long requestId,
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -107,7 +107,7 @@ public class OrderReturnsExchangeController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<Map<String, Object>> selectBalanceMode(
             @PathVariable Long requestId,
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -121,10 +121,11 @@ public class OrderReturnsExchangeController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<Map<String, Object>> submitBankDetails(
             @PathVariable Long requestId,
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @RequestBody(required = false) Map<String, Object> payload
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         return ResponseEntity.ok(orderAftercareService.submitBankDetails(user, requestId, payload));
     }
 }
+

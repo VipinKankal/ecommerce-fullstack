@@ -1,5 +1,6 @@
 import { PayloadAction, createSlice } from '@reduxjs/toolkit';
 import type { UnknownAction } from 'redux';
+import { getThunkErrorMessage } from './masterApi/shared';
 
 interface MasterApiState {
   loading: boolean;
@@ -59,10 +60,7 @@ const masterApiSlice = createSlice({
       .addMatcher(isMasterRejected, (state, action: MasterApiAction) => {
         state.loading = false;
         state.lastAction = getActionKey(action.type);
-        state.error =
-          typeof action.payload === 'string'
-            ? action.payload
-            : 'Request failed';
+        state.error = getThunkErrorMessage(action.payload, 'Request failed');
       });
   },
 });

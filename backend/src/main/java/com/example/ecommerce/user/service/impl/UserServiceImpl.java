@@ -1,5 +1,6 @@
 package com.example.ecommerce.user.service.impl;
 
+import com.example.ecommerce.common.configuration.AuthenticatedPrincipalService;
 import com.example.ecommerce.common.configuration.JwtProvider;
 import com.example.ecommerce.common.domain.AccountStatus;
 import com.example.ecommerce.common.exceptions.UserNotFoundException;
@@ -17,10 +18,13 @@ public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
+    private final AuthenticatedPrincipalService authenticatedPrincipalService;
 
     @Override
     public User findUserByJwtToken(String jwt) throws Exception {
-        String email = jwtProvider.getEmailFromToken(jwt);
+        String email = (jwt != null && !jwt.isBlank())
+                ? jwtProvider.getEmailFromToken(jwt)
+                : authenticatedPrincipalService.currentEmail();
         return this.findUserByEmail(email);
     }
 
@@ -49,9 +53,3 @@ public class UserServiceImpl implements UserService {
         return userRepository.save(user);
     }
 }
-
-
-
-
-
-

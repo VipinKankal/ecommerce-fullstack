@@ -17,6 +17,7 @@ import com.example.ecommerce.seller.response.SellerResponse;
 import com.example.ecommerce.user.response.UserProfileResponse;
 import com.example.ecommerce.admin.service.AdminService;
 import com.example.ecommerce.inventory.service.RestockNotificationService;
+import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.OrderService;
 import com.example.ecommerce.seller.service.SellerService;
 import com.example.ecommerce.user.service.UserService;
@@ -50,12 +51,13 @@ public class AdminController {
     private final UserService userService;
     private final AdminService adminService;
     private final OrderService orderService;
+    private final CouponService couponService;
     private final RestockNotificationService restockNotificationService;
     private final AuditLogEntryRepository auditLogEntryRepository;
 
     @GetMapping("/profile")
     public ResponseEntity<UserProfileResponse> getAdminProfile(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         if (user.getRole() != UserRole.ROLE_ADMIN) {
@@ -166,8 +168,20 @@ public class AdminController {
         String cancelReasonText = payload == null || payload.get("cancelReasonText") == null
                 ? "Cancelled by warehouse admin before shipment"
                 : String.valueOf(payload.get("cancelReasonText"));
+        com.example.ecommerce.modal.Order order = orderService.cancelOrderByAdmin(id, cancelReasonCode, cancelReasonText);
+        couponService.releaseCouponReservation(
+                order.getCouponCode(),
+                order.getUser() == null ? null : order.getUser().getId(),
+                "ORDER_CANCELLED_BY_ADMIN",
+                "Reservation released due to admin cancellation"
+        );
+        couponService.restoreCouponUsageForCancelledOrders(
+                order.getUser(),
+                java.util.List.of(order),
+                "Order cancelled by admin before shipment"
+        );
         return ResponseEntity.ok(
-                toOrderActionResponse(orderService.cancelOrderByAdmin(id, cancelReasonCode, cancelReasonText))
+                toOrderActionResponse(order)
         );
     }
 
@@ -244,6 +258,7 @@ public class AdminController {
         return value == null ? null : value.trim().toLowerCase();
     }
 }
+
 
 
 

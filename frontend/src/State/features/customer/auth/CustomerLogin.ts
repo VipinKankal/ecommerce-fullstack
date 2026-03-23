@@ -70,7 +70,7 @@ export const signinCustomer = createAsyncThunk(
         loginRequest,
       );
       if (response.data?.jwt) {
-        setAuthToken(response.data.jwt, 'customer');
+        setAuthToken(response.data.jwt, 'customer', { persistToken: false });
       } else if (globalThis.sessionStorage !== undefined) {
         globalThis.sessionStorage.setItem('auth_role', 'customer');
         globalThis.sessionStorage.removeItem('auth_jwt');
@@ -100,11 +100,9 @@ export const register = createAsyncThunk(
 
 export const getUserProfile = createAsyncThunk<UserProfile, string | void>(
   'auth/getUserProfile',
-  async (jwt, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get(API_ROUTES.user.profile, {
-        headers: jwt ? { Authorization: `Bearer ${jwt}` } : undefined,
-      });
+      const response = await api.get(API_ROUTES.user.profile);
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(readErrorMessage(error, 'Profile load failed'));
@@ -194,7 +192,7 @@ export const verifyEmailChangeOtp = createAsyncThunk(
         payload,
       );
       if (response.data?.jwt) {
-        setAuthToken(response.data.jwt, 'customer');
+        setAuthToken(response.data.jwt, 'customer', { persistToken: false });
       }
       return response.data;
     } catch (error: unknown) {
@@ -230,3 +228,6 @@ export const logout = createAsyncThunk(
     return 'Logout successful';
   },
 );
+
+
+

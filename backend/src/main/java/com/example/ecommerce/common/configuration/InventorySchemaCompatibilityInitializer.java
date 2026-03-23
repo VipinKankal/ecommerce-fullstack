@@ -18,6 +18,7 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
     public void run(ApplicationArguments args) {
         ensureLegacyStatusColumnsCompatible();
         ensureCheckoutPaymentColumns();
+        ensureCouponColumns();
         ensureProductInventoryColumns();
         ensureProductVariantTable();
         ensureProductWarehouseOpsColumns();
@@ -114,6 +115,11 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         ensureColumn("payment_order", "payment_type", "VARCHAR(64) NULL");
         ensureColumn("payment_order", "provider", "VARCHAR(64) NULL");
         ensureColumn("payment_order", "merchant_transaction_id", "VARCHAR(128) NULL");
+        ensureColumn("payment_order", "checkout_request_id", "VARCHAR(128) NULL");
+        ensureColumn("payment_order", "retry_count", "INT NOT NULL DEFAULT 0");
+        ensureColumn("payment_order", "last_retry_at", "DATETIME(6) NULL");
+        ensureColumn("payment_order", "coupon_reservation_state", "VARCHAR(32) NULL");
+        ensureUniqueIndex("payment_order", "uk_payment_order_user_checkout", "user_id, checkout_request_id");
 
         jdbcTemplate.execute(
                 "UPDATE payment_order " +
@@ -150,6 +156,172 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "WHERE merchant_transaction_id IS NULL " +
                         "AND payment_link_id IS NOT NULL " +
                         "AND payment_link_id <> ''"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE payment_order " +
+                        "SET coupon_reservation_state = 'NONE' " +
+                        "WHERE coupon_reservation_state IS NULL " +
+                        "OR TRIM(CAST(coupon_reservation_state AS CHAR)) = ''"
+        );
+    }
+
+    private void ensureCouponColumns() {
+        ensureColumn("coupon", "discount_type", "VARCHAR(32) NULL");
+        ensureColumn("coupon", "discount_value", "DOUBLE NULL");
+        ensureColumn("coupon", "max_discount", "DOUBLE NULL");
+        ensureColumn("coupon", "usage_limit", "INT NULL");
+        ensureColumn("coupon", "per_user_limit", "INT NULL");
+        ensureColumn("coupon", "used_count", "INT NOT NULL DEFAULT 0");
+        ensureColumn("coupon", "reserved_count", "INT NOT NULL DEFAULT 0");
+        ensureColumn("coupon", "scope_type", "VARCHAR(32) NULL");
+        ensureColumn("coupon", "scope_id", "BIGINT NULL");
+        ensureColumn("coupon", "first_order_only", "BOOLEAN NOT NULL DEFAULT FALSE");
+        ensureColumn("coupon", "user_eligibility_type", "VARCHAR(64) NULL");
+        ensureColumn("coupon", "inactive_days_threshold", "INT NULL");
+        ensureColumn("coupon", "is_active", "BOOLEAN NOT NULL DEFAULT TRUE");
+        ensureColumn("cart", "coupon_discount_amount", "DOUBLE NULL");
+        ensureColumn("orders", "coupon_code", "VARCHAR(255) NULL");
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET discount_type = 'PERCENT' " +
+                        "WHERE discount_type IS NULL " +
+                        "OR " + emptyEnumAsTextCondition("discount_type")
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET discount_value = CASE " +
+                        "WHEN discount_value IS NULL OR discount_value = 0 THEN discount_percentage " +
+                        "ELSE discount_value END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET per_user_limit = CASE " +
+                        "WHEN per_user_limit IS NULL OR per_user_limit < 1 THEN 1 " +
+                        "ELSE per_user_limit END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET used_count = CASE " +
+                        "WHEN used_count IS NULL OR used_count < 0 THEN 0 " +
+                        "ELSE used_count END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET reserved_count = CASE " +
+                        "WHEN reserved_count IS NULL OR reserved_count < 0 THEN 0 " +
+                        "ELSE reserved_count END"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET scope_type = 'GLOBAL' " +
+                        "WHERE scope_type IS NULL OR " + emptyEnumAsTextCondition("scope_type")
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET first_order_only = FALSE " +
+                        "WHERE first_order_only IS NULL"
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET user_eligibility_type = CASE " +
+                        "WHEN first_order_only = TRUE THEN 'NEW_USERS_ONLY' " +
+                        "ELSE 'ALL_USERS' END " +
+                        "WHERE user_eligibility_type IS NULL OR " + emptyEnumAsTextCondition("user_eligibility_type")
+        );
+
+        jdbcTemplate.execute(
+                "UPDATE coupon " +
+                        "SET inactive_days_threshold = CASE " +
+                        "WHEN user_eligibility_type = 'INACTIVE_USERS_ONLY' " +
+                        "AND (inactive_days_threshold IS NULL OR inactive_days_threshold < 1) THEN 30 " +
+                        "WHEN user_eligibility_type <> 'INACTIVE_USERS_ONLY' THEN NULL " +
+                        "ELSE inactive_days_threshold END"
+        );
+
+        ensureCouponUsageTable();
+        ensureCouponUserMapTable();
+        ensureCouponEventLogTable();
+    }
+
+    private void ensureCouponUsageTable() {
+        if (tableExists("coupon_usage")) {
+            ensureColumn("coupon_usage", "order_id", "BIGINT NULL");
+            ensureColumn("coupon_usage", "coupon_code", "VARCHAR(255) NULL");
+            ensureColumn("coupon_usage", "discount_amount", "DOUBLE NULL");
+            ensureColumn("coupon_usage", "used_at", "TIMESTAMP NULL");
+            return;
+        }
+
+        jdbcTemplate.execute(
+                "CREATE TABLE coupon_usage (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "coupon_id BIGINT NULL," +
+                        "user_id BIGINT NULL," +
+                        "order_id BIGINT NULL," +
+                        "coupon_code VARCHAR(255) NULL," +
+                        "discount_amount DOUBLE NULL," +
+                        "used_at TIMESTAMP NULL," +
+                        "PRIMARY KEY (id)" +
+                        ")"
+        );
+    }
+
+    private void ensureCouponUserMapTable() {
+        if (tableExists("coupon_user_map")) {
+            ensureColumn("coupon_user_map", "coupon_id", "BIGINT NOT NULL");
+            ensureColumn("coupon_user_map", "user_id", "BIGINT NOT NULL");
+            ensureColumn("coupon_user_map", "created_at", "DATETIME(6) NOT NULL");
+            return;
+        }
+
+        jdbcTemplate.execute(
+                "CREATE TABLE coupon_user_map (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "coupon_id BIGINT NOT NULL," +
+                        "user_id BIGINT NOT NULL," +
+                        "created_at DATETIME(6) NOT NULL," +
+                        "PRIMARY KEY (id)," +
+                        "UNIQUE KEY uk_coupon_user_map_coupon_user (coupon_id, user_id)" +
+                        ")"
+        );
+    }
+
+    private void ensureCouponEventLogTable() {
+        if (tableExists("coupon_event_log")) {
+            ensureColumn("coupon_event_log", "coupon_id", "BIGINT NULL");
+            ensureColumn("coupon_event_log", "coupon_code", "VARCHAR(255) NULL");
+            ensureColumn("coupon_event_log", "user_id", "BIGINT NULL");
+            ensureColumn("coupon_event_log", "event_type", "VARCHAR(64) NOT NULL");
+            ensureColumn("coupon_event_log", "reason_code", "VARCHAR(128) NULL");
+            ensureColumn("coupon_event_log", "note", "VARCHAR(1200) NULL");
+            ensureColumn("coupon_event_log", "created_at", "DATETIME(6) NOT NULL");
+            return;
+        }
+
+        jdbcTemplate.execute(
+                "CREATE TABLE coupon_event_log (" +
+                        "id BIGINT NOT NULL AUTO_INCREMENT," +
+                        "coupon_id BIGINT NULL," +
+                        "coupon_code VARCHAR(255) NULL," +
+                        "user_id BIGINT NULL," +
+                        "event_type VARCHAR(64) NOT NULL," +
+                        "reason_code VARCHAR(128) NULL," +
+                        "note VARCHAR(1200) NULL," +
+                        "created_at DATETIME(6) NOT NULL," +
+                        "PRIMARY KEY (id)," +
+                        "INDEX idx_coupon_event_log_created_at (created_at)," +
+                        "INDEX idx_coupon_event_log_coupon_id (coupon_id)," +
+                        "INDEX idx_coupon_event_log_user_id (user_id)" +
+                        ")"
         );
     }
 
@@ -199,10 +371,10 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
     }
 
     private void ensureProductActivationColumn() {
-        ensureColumn("product", "is_active", "BIT NOT NULL DEFAULT b'1'");
+        ensureColumn("product", "is_active", "BOOLEAN NOT NULL DEFAULT TRUE");
         jdbcTemplate.execute(
                 "UPDATE product " +
-                        "SET is_active = b'1' " +
+                        "SET is_active = TRUE " +
                         "WHERE is_active IS NULL"
         );
     }
@@ -277,7 +449,7 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "converted_at DATETIME(6) NULL," +
                         "PRIMARY KEY (id)," +
                         "CONSTRAINT fk_restock_subscription_product FOREIGN KEY (product_id) REFERENCES product (id)," +
-                        "CONSTRAINT fk_restock_subscription_user FOREIGN KEY (user_id) REFERENCES user (id)" +
+                        "CONSTRAINT fk_restock_subscription_user FOREIGN KEY (user_id) REFERENCES " + userTableReference() + " (id)" +
                         ")"
         );
 
@@ -293,7 +465,7 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
                         "PRIMARY KEY (id)," +
                         "CONSTRAINT fk_restock_log_subscription FOREIGN KEY (subscription_id) REFERENCES product_restock_subscriptions (id)," +
                         "CONSTRAINT fk_restock_log_product FOREIGN KEY (product_id) REFERENCES product (id)," +
-                        "CONSTRAINT fk_restock_log_user FOREIGN KEY (user_id) REFERENCES user (id)" +
+                        "CONSTRAINT fk_restock_log_user FOREIGN KEY (user_id) REFERENCES " + userTableReference() + " (id)" +
                         ")"
         );
     }
@@ -457,10 +629,19 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
     private boolean columnExists(String tableName, String columnName) {
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM information_schema.columns " +
-                        "WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?",
+                        "WHERE LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?)",
                 Integer.class,
                 tableName,
                 columnName
+        );
+        return count != null && count > 0;
+    }
+
+    private boolean tableExists(String tableName) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE LOWER(table_name) = LOWER(?)",
+                Integer.class,
+                tableName
         );
         return count != null && count > 0;
     }
@@ -480,5 +661,47 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
             );
             log.info("Added missing column {}.{}", tableName, columnName);
         }
+    }
+
+    private void ensureUniqueIndex(String tableName, String indexName, String columnsSql) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.statistics " +
+                        "WHERE LOWER(table_name) = LOWER(?) AND LOWER(index_name) = LOWER(?)",
+                Integer.class,
+                tableName,
+                indexName
+        );
+        if (count != null && count > 0) {
+            return;
+        }
+        try {
+            jdbcTemplate.execute(
+                    "CREATE UNIQUE INDEX " + indexName +
+                            " ON " + tableName + " (" + columnsSql + ")"
+            );
+            log.info("Added unique index {} on {}({})", indexName, tableName, columnsSql);
+        } catch (Exception ex) {
+            log.warn("Could not create unique index {} on {}({}): {}", indexName, tableName, columnsSql, ex.getMessage());
+        }
+    }
+
+    private String userTableReference() {
+        String databaseProductName = jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<String>) connection ->
+                connection.getMetaData().getDatabaseProductName()
+        );
+        return databaseProductName != null && databaseProductName.toLowerCase().contains("h2")
+                ? "\"user\""
+                : "user";
+    }
+
+    private String emptyEnumAsTextCondition(String columnName) {
+        return "TRIM(CAST(" + columnName + " AS CHAR)) = ''";
+    }
+
+    private boolean isH2Database() {
+        String databaseProductName = jdbcTemplate.execute((org.springframework.jdbc.core.ConnectionCallback<String>) connection ->
+                connection.getMetaData().getDatabaseProductName()
+        );
+        return databaseProductName != null && databaseProductName.toLowerCase().contains("h2");
     }
 }

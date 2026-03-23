@@ -31,6 +31,7 @@ public class Cart {
     private int totalMrpPrice;
     private int discount;
     private String couponCode;
+    private Double couponDiscountAmount = 0.0;
 
 
 }

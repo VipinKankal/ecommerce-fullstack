@@ -52,24 +52,11 @@ export interface SellerOrder {
   orderItems?: SellerOrderItem[];
 }
 
-const buildAuthHeaders = () => {
-  const token =
-    globalThis.sessionStorage !== undefined
-      ? globalThis.sessionStorage.getItem('auth_jwt')
-      : null;
-  if (!token) return undefined;
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
-
 export const fetchSellerOrders = createAsyncThunk<SellerOrder[], void>(
   'sellerOrder/fetchSellerOrders',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get(API_ROUTES.sellerOrders.base, {
-        headers: buildAuthHeaders(),
-      });
+      const response = await api.get(API_ROUTES.sellerOrders.base);
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(getErrorMessage(error, 'Failed to fetch orders'));
@@ -87,7 +74,6 @@ export const updateSellerOrderStatus = createAsyncThunk<
       const response = await api.patch(
         API_ROUTES.sellerOrders.updateStatus(orderId, orderStatus),
         null,
-        { headers: buildAuthHeaders() },
       );
       return response.data;
     } catch (error: unknown) {

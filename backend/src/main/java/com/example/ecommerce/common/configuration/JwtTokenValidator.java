@@ -20,10 +20,16 @@ import java.util.List;
 public class JwtTokenValidator extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
     private final ApiResponseWriter apiResponseWriter;
+    private final AuthCookieService authCookieService;
 
-    public JwtTokenValidator(JwtProvider jwtProvider, ApiResponseWriter apiResponseWriter) {
+    public JwtTokenValidator(
+            JwtProvider jwtProvider,
+            ApiResponseWriter apiResponseWriter,
+            AuthCookieService authCookieService
+    ) {
         this.jwtProvider = jwtProvider;
         this.apiResponseWriter = apiResponseWriter;
+        this.authCookieService = authCookieService;
     }
 
     @Override
@@ -32,10 +38,11 @@ public class JwtTokenValidator extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-        String jwt = request.getHeader("Authorization");
+        String authorizationHeader = request.getHeader("Authorization");
+        String rawToken = null;
 
-        if (jwt != null) {
-            if (!jwt.startsWith("Bearer ")) {
+        if (authorizationHeader != null && !authorizationHeader.isBlank()) {
+            if (!authorizationHeader.startsWith("Bearer ")) {
                 SecurityContextHolder.clearContext();
                 apiResponseWriter.writeError(
                         response,
@@ -46,9 +53,14 @@ public class JwtTokenValidator extends OncePerRequestFilter {
                 );
                 return;
             }
+            rawToken = authorizationHeader.substring(7);
+        } else {
+            rawToken = authCookieService.resolveToken(request);
+        }
 
+        if (rawToken != null && !rawToken.isBlank()) {
             try {
-                Claims claims = jwtProvider.parseToken(jwt.substring(7));
+                Claims claims = jwtProvider.parseToken(rawToken);
                 String email = String.valueOf(claims.get("email"));
                 String authorities = String.valueOf(claims.get("authorities"));
 
@@ -73,7 +85,3 @@ public class JwtTokenValidator extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
-
-
-
-

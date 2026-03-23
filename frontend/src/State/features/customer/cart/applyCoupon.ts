@@ -3,29 +3,31 @@ import { Cart } from 'shared/types/cart.types';
 import { api } from 'shared/api/Api';
 import { CouponState } from 'shared/types/coupon.types';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
-import { getErrorMessage } from 'State/backend/masterApi/shared';
+import {
+  getApiError,
+  getThunkErrorMessage,
+  type ApiRequestError,
+} from 'State/backend/masterApi/shared';
 
 export const applyCoupon = createAsyncThunk<
   Cart,
   {
     apply: boolean;
     code: string;
-    orderValue: number;
   },
-  { rejectValue: string }
+  { rejectValue: ApiRequestError }
 >(
   'cart/applyCoupon',
-  async ({ apply, code, orderValue }, { rejectWithValue }) => {
+  async ({ apply, code }, { rejectWithValue }) => {
     try {
       const response = await api.post(API_ROUTES.coupons.apply, {
         apply,
         code,
-        orderValue,
       });
 
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(getErrorMessage(error, 'Failed to apply coupon'));
+      return rejectWithValue(getApiError(error, 'Failed to apply coupon'));
     }
   },
 );
@@ -61,7 +63,7 @@ const couponSlice = createSlice({
       })
       .addCase(applyCoupon.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload || 'Something went wrong';
+        state.error = getThunkErrorMessage(action.payload, 'Something went wrong');
         state.couponApplied = false;
       });
   },

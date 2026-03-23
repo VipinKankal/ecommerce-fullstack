@@ -49,27 +49,55 @@ public class OrderServiceImpl implements OrderService {
             PaymentProvider provider
     ) {
         Address address = addressRepository.save(shippingAddress);
-        // brand 1 == 4 shirts
-        // brand 2 == 3 pants
-        // brand 3 == 1 watch
-
         Map<Long, List<CartItem>> itemsByBrand = cart.getCartItems().stream()
                 .collect(Collectors.groupingBy(item -> item.getProduct().getSeller().getId()));
         Set<Order> orders = new HashSet<>();
-        for (Map.Entry<Long,List<CartItem>>entry:itemsByBrand.entrySet()){
-            Long sellerId=entry.getKey();
-            List<CartItem> items=entry.getValue();
-            int totalOrderPrice = items.stream().mapToInt(
-                    CartItem::getSellingPrice
-            ).sum();
-            int totalItem = items.stream().mapToInt(
-                    CartItem::getQuantity
-            ).sum();
+        List<Map.Entry<Long, List<CartItem>>> sellerEntries = new ArrayList<>(itemsByBrand.entrySet());
+        int subtotalBeforeCoupon = cart.getCartItems().stream()
+                .map(CartItem::getSellingPrice)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+        int remainingCouponDiscount = (int) Math.round(
+                cart.getCouponDiscountAmount() == null ? 0.0 : cart.getCouponDiscountAmount()
+        );
+
+        for (int index = 0; index < sellerEntries.size(); index++) {
+            Map.Entry<Long, List<CartItem>> entry = sellerEntries.get(index);
+            Long sellerId = entry.getKey();
+            List<CartItem> items = entry.getValue();
+            int sellerSubtotal = items.stream()
+                    .map(CartItem::getSellingPrice)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+            int totalOrderMrp = items.stream()
+                    .map(CartItem::getMrpPrice)
+                    .filter(Objects::nonNull)
+                    .mapToInt(Integer::intValue)
+                    .sum();
+            int totalItem = items.stream().mapToInt(CartItem::getQuantity).sum();
+            int sellerCouponDiscount;
+            if (index == sellerEntries.size() - 1) {
+                sellerCouponDiscount = remainingCouponDiscount;
+            } else if (subtotalBeforeCoupon <= 0 || remainingCouponDiscount <= 0) {
+                sellerCouponDiscount = 0;
+            } else {
+                sellerCouponDiscount = (int) Math.round(
+                        (double) sellerSubtotal * (cart.getCouponDiscountAmount() == null ? 0.0 : cart.getCouponDiscountAmount())
+                                / subtotalBeforeCoupon
+                );
+                sellerCouponDiscount = Math.min(sellerCouponDiscount, remainingCouponDiscount);
+            }
+            remainingCouponDiscount -= sellerCouponDiscount;
+
             Order createOrder = new Order();
             createOrder.setUser(user);
             createOrder.setSellerId(sellerId);
-            createOrder.setTotalMrpPrice(totalOrderPrice);
-            createOrder.setTotalSellingPrice(totalOrderPrice);
+            createOrder.setTotalMrpPrice(totalOrderMrp);
+            createOrder.setTotalSellingPrice(Math.max(0, sellerSubtotal - sellerCouponDiscount));
+            createOrder.setDiscount(sellerCouponDiscount);
+            createOrder.setCouponCode(cart.getCouponCode());
             createOrder.setTotalItems(totalItem);
             createOrder.setShippingAddress(address);
             createOrder.setOrderStatus(orderStatus);
@@ -82,7 +110,7 @@ public class OrderServiceImpl implements OrderService {
             orders.add(savedOrder);
 
             List<OrderItem> orderItems = new ArrayList<>();
-            for(CartItem item:items){
+            for (CartItem item : items) {
                 OrderItem orderItem = new OrderItem();
                 orderItem.setOrder(savedOrder);
                 orderItem.setMrpPrice(item.getMrpPrice());

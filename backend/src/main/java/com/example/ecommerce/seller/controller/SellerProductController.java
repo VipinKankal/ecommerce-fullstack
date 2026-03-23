@@ -35,7 +35,7 @@ public class SellerProductController {
 
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getProductsBySellerId(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         List<Product> products = productService.getProductBySellerId(seller.getId());
@@ -45,7 +45,7 @@ public class SellerProductController {
     @PostMapping
     public ResponseEntity<ProductResponse> createProduct(
             @Valid @RequestBody CreateProductRequest request,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         Product product = productService.createProduct(request, seller);
@@ -55,7 +55,7 @@ public class SellerProductController {
     @DeleteMapping("/{productId}")
     public ResponseEntity<ApiResponse> deleteProduct(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         productService.deleteProduct(productId, seller.getId());
@@ -68,7 +68,7 @@ public class SellerProductController {
     public ResponseEntity<ProductResponse> updateProduct(
             @PathVariable Long productId,
             @Valid @RequestBody UpdateProductRequest incoming,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         Product updatedProduct = productService.updateProduct(productId, incoming, seller.getId());
@@ -79,7 +79,7 @@ public class SellerProductController {
     public ResponseEntity<ProductResponse> updateProductActiveState(
             @PathVariable Long productId,
             @RequestBody Map<String, Object> payload,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         Object rawActive = payload == null ? null : payload.get("active");
@@ -94,7 +94,7 @@ public class SellerProductController {
     public ResponseEntity<ProductResponse> transferStockToWarehouse(
             @PathVariable Long productId,
             @RequestBody(required = false) Map<String, Object> payload,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         Product product = productService.findProductById(productId);
@@ -134,7 +134,7 @@ public class SellerProductController {
     @GetMapping("/{productId}/movements")
     public ResponseEntity<List<Map<String, Object>>> getProductMovements(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         Product product = productService.findProductById(productId);
@@ -146,9 +146,10 @@ public class SellerProductController {
 
     @GetMapping("/demand")
     public ResponseEntity<Map<String, Object>> getSellerDemandInsights(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         return ResponseEntity.ok(restockNotificationService.getSellerDemandInsights(seller.getId()));
     }
 }
+

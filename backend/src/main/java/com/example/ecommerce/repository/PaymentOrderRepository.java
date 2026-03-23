@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PaymentOrderRepository extends JpaRepository<PaymentOrder, Long> {
  PaymentOrder findByPaymentLinkId(String paymentId);
  PaymentOrder findByMerchantTransactionId(String merchantTransactionId);
+ PaymentOrder findTopByUserIdAndCheckoutRequestIdOrderByIdDesc(Long userId, String checkoutRequestId);
 }
 
 

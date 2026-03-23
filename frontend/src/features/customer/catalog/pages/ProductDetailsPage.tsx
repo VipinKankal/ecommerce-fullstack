@@ -35,7 +35,6 @@ const ProductDetailsPage = () => {
     productImages,
     quantity,
     selectedProduct,
-    selectedVariant,
     selectedSize,
     setActiveImage,
     setSelectedSize,

@@ -80,9 +80,15 @@ export const API_ROUTES = {
 
   coupons: {
     apply: "/api/coupons/apply",
+    recommendation: "/api/coupons/recommendation",
     adminCreate: "/api/coupons/admin/create",
+    adminUpdate: (id: number | string) => `/api/coupons/admin/${id}`,
+    adminDisable: (id: number | string) => `/api/coupons/admin/${id}/disable`,
+    adminMapUsers: (id: number | string) => `/api/coupons/admin/${id}/users`,
     adminDelete: (id: number | string) => `/api/coupons/admin/create/${id}`,
     adminAll: "/api/coupons/admin/all",
+    adminMetrics: "/api/coupons/admin/metrics",
+    adminMonitoring: "/api/coupons/admin/monitoring",
   },
 
   cart: {

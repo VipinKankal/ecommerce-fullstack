@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 import type { AppDispatch } from 'app/store/Store';
 import {
@@ -8,6 +8,7 @@ import {
 import { deleteItem, fetchUserCart } from 'State/features/customer/cart/slice';
 import { applyCoupon } from 'State/features/customer/cart/applyCoupon';
 import { createCheckoutOrder } from 'State/backend/MasterApiThunks';
+import { getApiError } from 'State/backend/masterApi/shared';
 import { toggleWishlistProduct } from 'State/features/customer/wishlist/slice';
 import { Address } from 'shared/types/user.types';
 import { PaymentOption, ShippingAddressForm } from '../types/checkoutTypes';
@@ -22,12 +23,51 @@ type CartItem = {
 
 type CartShape = {
   cartItems?: CartItem[];
+  couponCode?: string | null;
+  couponDiscountAmount?: number | null;
 };
 
 const readErrorMessage = (error: unknown, fallback: string) =>
   typeof error === 'string'
     ? error
     : (error as { message?: string })?.message || fallback;
+
+const couponReasonMessages: Record<string, string> = {
+  COUPON_NOT_FOUND: 'This coupon could not be found.',
+  COUPON_INACTIVE: 'This coupon is no longer active.',
+  COUPON_EXPIRED: 'This coupon has expired.',
+  COUPON_CODE_REQUIRED: 'Please enter a coupon code.',
+  MIN_ORDER_NOT_MET: 'Your bag no longer meets this coupon minimum order.',
+  PER_USER_LIMIT_REACHED: 'You have already used this coupon the maximum number of times.',
+  USAGE_LIMIT_REACHED: 'This coupon has reached its usage limit.',
+  FIRST_ORDER_ONLY: 'This coupon is only valid on your first order.',
+  USER_NOT_ELIGIBLE: 'This coupon is not available for your account.',
+  USER_INACTIVE: 'Only active users can use this coupon.',
+  CART_EMPTY: 'Add items to your bag before applying a coupon.',
+  NOT_APPLICABLE_TO_CART: 'This coupon does not apply to the items in your bag.',
+  COUPON_NOT_APPLIED: 'No coupon is currently applied to your bag.',
+};
+
+const couponReasonCodes = new Set(Object.keys(couponReasonMessages));
+
+const resolveCouponError = (error: unknown, fallback: string) => {
+  const apiError = getApiError(error, fallback);
+  const reasonCode = apiError.reasonCode;
+
+  if (reasonCode && couponReasonCodes.has(reasonCode)) {
+    return {
+      message: couponReasonMessages[reasonCode] || apiError.message,
+      reasonCode,
+      isCouponIssue: true,
+    };
+  }
+
+  return {
+    message: apiError.message || fallback,
+    reasonCode,
+    isCouponIssue: false,
+  };
+};
 
 interface Params {
   cart?: CartShape | null;
@@ -36,9 +76,6 @@ interface Params {
   goToStep: (step: 'BAG' | 'ADDRESS' | 'PAYMENT') => void;
   handleSelectSavedAddress: (address: Address) => void;
   navigate: NavigateFunction;
-  pricing: {
-    selectedPriceSelling: number;
-  };
   useManualAddress: boolean;
   setUseManualAddress: (value: boolean) => void;
   addressForm: ShippingAddressForm;
@@ -52,7 +89,6 @@ export const useCheckoutSubmit = ({
   goToStep,
   handleSelectSavedAddress,
   navigate,
-  pricing,
   useManualAddress,
   setUseManualAddress,
   addressForm,
@@ -63,6 +99,9 @@ export const useCheckoutSubmit = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
+  const checkoutRequestIdRef = useRef(
+    globalThis.crypto?.randomUUID?.() || `checkout-${Date.now()}`,
+  );
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) {
@@ -75,12 +114,33 @@ export const useCheckoutSubmit = ({
         applyCoupon({
           apply: true,
           code: couponCode.trim(),
-          orderValue: pricing.selectedPriceSelling,
         }),
       ).unwrap();
       await dispatch(fetchUserCart());
     } catch (error: unknown) {
-      setSubmitError(readErrorMessage(error, 'Failed to apply coupon.'));
+      setSubmitError(resolveCouponError(error, 'Failed to apply coupon.').message);
+    }
+  };
+
+  const handleRemoveCoupon = async () => {
+    const currentCouponCode = (cart?.couponCode || couponCode).trim();
+    if (!currentCouponCode) {
+      setSubmitError('No coupon is currently applied to your bag.');
+      return;
+    }
+
+    setSubmitError(null);
+    try {
+      await dispatch(
+        applyCoupon({
+          apply: false,
+          code: currentCouponCode,
+        }),
+      ).unwrap();
+      await dispatch(fetchUserCart());
+      setCouponCode('');
+    } catch (error: unknown) {
+      setSubmitError(resolveCouponError(error, 'Failed to remove coupon.').message);
     }
   };
 
@@ -205,6 +265,7 @@ export const useCheckoutSubmit = ({
         createCheckoutOrder({
           shippingAddress: shippingDetails,
           paymentMethod,
+          checkoutRequestId: checkoutRequestIdRef.current,
         }),
       ).unwrap();
       await dispatch(getUserProfile()).unwrap();
@@ -229,7 +290,19 @@ export const useCheckoutSubmit = ({
 
       navigate('/account/orders');
     } catch (error: unknown) {
-      setSubmitError(readErrorMessage(error, 'Failed to create payment order'));
+      const resolvedError = resolveCouponError(
+        error,
+        'Failed to create payment order',
+      );
+      if (resolvedError.isCouponIssue) {
+        await dispatch(fetchUserCart());
+        goToStep('BAG');
+        setSubmitError(
+          `${resolvedError.message} Go back to your bag and update the coupon before placing the order again.`,
+        );
+      } else {
+        setSubmitError(readErrorMessage(error, 'Failed to create payment order'));
+      }
     } finally {
       setSubmitting(false);
     }
@@ -260,6 +333,7 @@ export const useCheckoutSubmit = ({
     handleApplyCoupon,
     handleBagContinue,
     handleMoveSelectedToWishlist,
+    handleRemoveCoupon,
     handlePlaceOrder,
     handleRemoveSelected,
     handleSaveAddress,

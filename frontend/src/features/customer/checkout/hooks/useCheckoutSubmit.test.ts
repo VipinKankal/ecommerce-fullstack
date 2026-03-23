@@ -12,7 +12,6 @@ const createParams = (
   goToStep: jest.fn(),
   handleSelectSavedAddress: jest.fn(),
   navigate: jest.fn(),
-  pricing: { selectedPriceSelling: 0 },
   useManualAddress: false,
   setUseManualAddress: jest.fn(),
   addressForm: {
@@ -56,5 +55,64 @@ describe('useCheckoutSubmit', () => {
 
     expect(params.goToStep).toHaveBeenCalledWith('ADDRESS');
     expect(result.current.submitError).toBe('Address is required');
+  });
+
+  test('maps coupon apply failures to user-friendly messages', async () => {
+    const dispatch = jest.fn().mockReturnValue({
+      unwrap: jest
+        .fn()
+        .mockRejectedValue({ message: 'Coupon not valid', reasonCode: 'COUPON_EXPIRED' }),
+    });
+    const params = createParams({ dispatch });
+    const { result } = renderHook(() => useCheckoutSubmit(params));
+
+    await act(async () => {
+      result.current.setCouponCode('SAVE10');
+    });
+
+    await act(async () => {
+      await result.current.handleApplyCoupon();
+    });
+
+    expect(result.current.submitError).toBe('This coupon has expired.');
+  });
+
+  test('returns checkout to BAG step when coupon revalidation fails during order placement', async () => {
+    const dispatch = jest
+      .fn()
+      .mockReturnValueOnce({
+        unwrap: jest
+          .fn()
+          .mockRejectedValue({ message: 'Coupon usage limit reached', reasonCode: 'USAGE_LIMIT_REACHED' }),
+      })
+      .mockReturnValueOnce({
+        unwrap: jest.fn().mockResolvedValue({}),
+      });
+
+    const params = createParams({
+      cart: { cartItems: [{ id: 1 }] },
+      cartItems: [{ id: 1 }],
+      dispatch,
+      addressForm: {
+        name: 'Vipin',
+        mobileNumber: '9999999999',
+        address: 'Street 1',
+        locality: 'Area',
+        street: 'Street 1',
+        city: 'Jaipur',
+        state: 'Rajasthan',
+        pinCode: '302001',
+      },
+    });
+    const { result } = renderHook(() => useCheckoutSubmit(params));
+
+    await act(async () => {
+      await result.current.handlePlaceOrder();
+    });
+
+    expect(params.goToStep).toHaveBeenCalledWith('BAG');
+    expect(result.current.submitError).toBe(
+      'This coupon has reached its usage limit. Go back to your bag and update the coupon before placing the order again.',
+    );
   });
 });

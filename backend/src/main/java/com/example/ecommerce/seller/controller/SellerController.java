@@ -1,6 +1,7 @@
 package com.example.ecommerce.seller.controller;
 
 import com.example.ecommerce.auth.request.RequestEmailChangeOtpRequest;
+import com.example.ecommerce.common.configuration.AuthCookieService;
 import com.example.ecommerce.auth.request.VerifyEmailChangeOtpRequest;
 import com.example.ecommerce.common.configuration.JwtProvider;
 import com.example.ecommerce.common.domain.AccountStatus;
@@ -24,6 +25,7 @@ import com.example.ecommerce.seller.service.SellerReportService;
 import com.example.ecommerce.seller.service.SellerService;
 import com.example.ecommerce.common.utils.OtpUtil;
 import jakarta.mail.MessagingException;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,6 +53,7 @@ public class SellerController {
     private final SellerReportService sellerReportService;
     private final SellerRepository sellerRepository;
     private final JwtProvider jwtProvider;
+    private final AuthCookieService authCookieService;
 
     @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
@@ -109,7 +112,7 @@ public class SellerController {
     @GetMapping("/profile")
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<SellerResponse> getSellerProfile(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         return new ResponseEntity<>(ResponseMapper.toSellerResponse(seller), HttpStatus.OK);
@@ -134,7 +137,7 @@ public class SellerController {
     @PatchMapping
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<SellerResponse> updateSeller(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @Valid @RequestBody SellerUpdateRequest request
     ) throws Exception {
         Seller profile = sellerService.getSellerProfile(jwt);
@@ -145,7 +148,7 @@ public class SellerController {
     @PostMapping("/email/change/request-otp")
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<ApiResponse> requestSellerEmailChangeOtp(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @Valid @RequestBody RequestEmailChangeOtpRequest request
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
@@ -185,8 +188,9 @@ public class SellerController {
     @PostMapping("/email/change/verify")
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<AuthResponse> verifySellerEmailChangeOtp(
-            @RequestHeader("Authorization") String jwt,
-            @Valid @RequestBody VerifyEmailChangeOtpRequest request
+            @RequestHeader(value = "Authorization", required = false) String jwt,
+            @Valid @RequestBody VerifyEmailChangeOtpRequest request,
+            HttpServletResponse httpResponse
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         String normalizedNewEmail = normalizeEmail(request.getNewEmail());
@@ -226,6 +230,7 @@ public class SellerController {
                 Collections.singletonList(new SimpleGrantedAuthority(seller.getRole().name()))
         );
         String refreshedJwt = jwtProvider.generateToken(authentication);
+        authCookieService.writeAuthCookie(httpResponse, refreshedJwt);
 
         AuthResponse response = new AuthResponse();
         response.setJwt(refreshedJwt);
@@ -255,7 +260,7 @@ public class SellerController {
     @GetMapping("/report")
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<SellerReport> getSellerReport(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         SellerReport report = sellerReportService.getSellerReport(seller);
@@ -270,6 +275,10 @@ public class SellerController {
         return otp == null ? null : otp.trim();
     }
 }
+
+
+
+
 
 
 

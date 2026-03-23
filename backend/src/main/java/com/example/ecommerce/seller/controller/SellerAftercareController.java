@@ -25,7 +25,7 @@ public class SellerAftercareController {
 
     @GetMapping("/returns")
     public ResponseEntity<List<Map<String, Object>>> getSellerReturns(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         return ResponseEntity.ok(orderAftercareService.getSellerReturnRequests(seller.getId()));
@@ -33,9 +33,10 @@ public class SellerAftercareController {
 
     @GetMapping("/exchanges")
     public ResponseEntity<List<Map<String, Object>>> getSellerExchanges(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         return ResponseEntity.ok(orderAftercareService.getSellerExchangeRequests(seller.getId()));
     }
 }
+

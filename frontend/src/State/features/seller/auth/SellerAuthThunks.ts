@@ -101,7 +101,7 @@ export const signinSeller = createAsyncThunk(
         otp: loginRequest.otp,
       });
       if (response.data?.jwt) {
-        setAuthToken(response.data.jwt, 'seller');
+        setAuthToken(response.data.jwt, 'seller', { persistToken: false });
       } else if (globalThis.sessionStorage !== undefined) {
         globalThis.sessionStorage.setItem('auth_role', 'seller');
         globalThis.sessionStorage.removeItem('auth_jwt');
@@ -197,11 +197,9 @@ export const verifySellerEmail = createAsyncThunk(
 export const fetchSellerProfile = createAsyncThunk<
   SellerProfile,
   string | void
->('seller/fetchProfile', async (jwt, { rejectWithValue }) => {
+>('seller/fetchProfile', async (_, { rejectWithValue }) => {
   try {
-    const response = await api.get(API_ROUTES.sellers.profile, {
-      headers: jwt ? { Authorization: `Bearer ${jwt}` } : undefined,
-    });
+    const response = await api.get(API_ROUTES.sellers.profile);
     return response.data;
   } catch (error: unknown) {
     return rejectWithValue(readErrorMessage(error, 'Failed to load profile'));
@@ -247,7 +245,7 @@ export const verifySellerEmailChangeOtp = createAsyncThunk(
         payload,
       );
       if (response.data?.jwt) {
-        setAuthToken(response.data.jwt, 'seller');
+        setAuthToken(response.data.jwt, 'seller', { persistToken: false });
       }
       return response.data;
     } catch (error: unknown) {
@@ -274,3 +272,6 @@ export const logout = createAsyncThunk<
     return rejectWithValue('Failed to logout properly');
   }
 });
+
+
+

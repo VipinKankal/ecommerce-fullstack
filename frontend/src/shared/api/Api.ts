@@ -38,6 +38,12 @@ type ApiEnvelope<T = unknown> = {
   timestamp: string;
 };
 
+type AuthRole = 'seller' | 'customer' | 'admin' | 'courier';
+
+type SetAuthTokenOptions = {
+  persistToken?: boolean;
+};
+
 const isApiEnvelope = (value: unknown): value is ApiEnvelope => {
   if (typeof value !== 'object' || value === null) return false;
 
@@ -74,9 +80,12 @@ export const getAuthRole = () => {
 
 export const setAuthToken = (
   token?: string | null,
-  role?: 'seller' | 'customer' | 'admin' | 'courier' | null,
+  role?: AuthRole | null,
+  options: SetAuthTokenOptions = {},
 ) => {
-  if (token) {
+  const persistToken = options.persistToken ?? true;
+
+  if (token && persistToken) {
     api.defaults.headers.common.Authorization = `Bearer ${token}`;
     if (globalThis.sessionStorage !== undefined) {
       globalThis.sessionStorage.setItem('auth_jwt', token);
@@ -90,13 +99,18 @@ export const setAuthToken = (
   delete api.defaults.headers.common.Authorization;
   if (globalThis.sessionStorage !== undefined) {
     globalThis.sessionStorage.removeItem('auth_jwt');
-    globalThis.sessionStorage.removeItem('auth_role');
+    if (role) {
+      globalThis.sessionStorage.setItem('auth_role', role);
+    } else {
+      globalThis.sessionStorage.removeItem('auth_role');
+    }
   }
 };
 
 if (globalThis.sessionStorage !== undefined) {
   const existingToken = globalThis.sessionStorage.getItem('auth_jwt');
+  const existingRole = getAuthRole() as AuthRole | null;
   if (existingToken) {
-    setAuthToken(existingToken);
+    setAuthToken(existingToken, existingRole);
   }
 }

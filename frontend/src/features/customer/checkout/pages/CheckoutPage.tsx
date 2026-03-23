@@ -2,12 +2,18 @@ import React, { useEffect, useMemo } from 'react';
 import { Alert } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
+import { getUserProfile } from 'State/features/customer/auth/thunks';
+import { getAuthRole } from 'shared/api/Api';
 import {
   deleteItem,
   fetchUserCart,
   updateItem,
 } from 'State/features/customer/cart/slice';
-import { orderSummary, productsList } from 'State/backend/MasterApiThunks';
+import {
+  couponRecommendation,
+  orderSummary,
+  productsList,
+} from 'State/backend/MasterApiThunks';
 import CheckoutActionBar from '../components/CheckoutActionBar';
 import CheckoutAddressStep from '../components/CheckoutAddressStep';
 import CheckoutBagStep from '../components/CheckoutBagStep';
@@ -102,23 +108,56 @@ const CheckoutPage = () => {
   } = useCheckoutAddress({ customer });
 
   useEffect(() => {
-    const token =
-      globalThis.sessionStorage !== undefined
-        ? globalThis.sessionStorage.getItem('auth_jwt')
-        : null;
-    if (!customer && !token) {
-      navigate('/login');
-      return;
-    }
-    if (customer) {
-      dispatch(fetchUserCart());
-    }
+    let active = true;
+
+    const ensureCustomerSession = async () => {
+      if (customer) {
+        dispatch(fetchUserCart());
+        return;
+      }
+
+      const authRole = getAuthRole();
+      if (authRole && authRole !== 'customer') {
+        navigate('/login');
+        return;
+      }
+
+      try {
+        await dispatch(getUserProfile()).unwrap();
+      } catch {
+        if (active) {
+          navigate('/login');
+        }
+      }
+    };
+
+    ensureCustomerSession();
+
+    return () => {
+      active = false;
+    };
   }, [customer, dispatch, navigate]);
 
   const currentSummary = useMemo(
     () => toOrderSummary(masterApi.responses.orderSummary),
     [masterApi.responses.orderSummary],
   );
+  const recommendation = useMemo(() => {
+    const payload = masterApi.responses.couponRecommendation;
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+    const record = payload as Record<string, unknown>;
+    return {
+      recommended: record.recommended === true,
+      couponCode:
+        typeof record.couponCode === 'string' ? record.couponCode : null,
+      estimatedDiscount:
+        typeof record.estimatedDiscount === 'number'
+          ? record.estimatedDiscount
+          : null,
+    };
+  }, [masterApi.responses.couponRecommendation]);
 
   const {
     allSelected,
@@ -191,6 +230,7 @@ const CheckoutPage = () => {
     handleApplyCoupon,
     handleBagContinue,
     handleMoveSelectedToWishlist,
+    handleRemoveCoupon,
     handlePlaceOrder,
     handleRemoveSelected,
     handleSaveAddress,
@@ -207,7 +247,6 @@ const CheckoutPage = () => {
     goToStep,
     handleSelectSavedAddress,
     navigate,
-    pricing,
     useManualAddress,
     setUseManualAddress,
     addressForm,
@@ -223,6 +262,13 @@ const CheckoutPage = () => {
       }),
     );
   }, [dispatch, featuredCategoryId, cartItems]);
+
+  useEffect(() => {
+    if (currentStep !== 'BAG' || !cartItems.length || cart?.couponCode) {
+      return;
+    }
+    dispatch(couponRecommendation());
+  }, [currentStep, cart?.couponCode, cartItems.length, dispatch]);
 
   const fetchSummary = useMemo(
     () => async (shippingDetails: ShippingAddressForm) => {
@@ -331,8 +377,16 @@ const CheckoutPage = () => {
               {currentStep === 'BAG' && (
                 <CouponSection
                   couponCode={couponCode}
+                  appliedCouponCode={cart?.couponCode}
+                  couponDiscountAmount={cart?.couponDiscountAmount}
+                  recommendedCouponCode={
+                    recommendation?.recommended ? recommendation.couponCode : null
+                  }
+                  recommendedDiscount={recommendation?.estimatedDiscount}
+                  onUseRecommended={setCouponCode}
                   onCouponCodeChange={setCouponCode}
                   onApplyCoupon={handleApplyCoupon}
+                  onRemoveCoupon={handleRemoveCoupon}
                 />
               )}
 
@@ -370,3 +424,5 @@ const CheckoutPage = () => {
 };
 
 export default CheckoutPage;
+
+

@@ -14,4 +14,6 @@ public class CheckoutOrderRequest {
 
     @NotBlank(message = "paymentMethod is required")
     private String paymentMethod;
+
+    private String checkoutRequestId;
 }

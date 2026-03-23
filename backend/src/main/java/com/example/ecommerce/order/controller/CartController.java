@@ -31,7 +31,7 @@ public class CartController {
 
     @GetMapping
     public ResponseEntity<Cart> findUserCartHandler(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Cart cart = cartService.findUserCart(user);
@@ -41,7 +41,7 @@ public class CartController {
     @PutMapping("/add")
     public ResponseEntity<Cart> addItemToCart(
             @Valid @RequestBody AddItemRequest request,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws ProductException, Exception {
 
         User user = userService.findUserByJwtToken(jwt);
@@ -60,7 +60,7 @@ public class CartController {
 
     @DeleteMapping("/item/{cartItemId}")
     public ResponseEntity<Cart> deleteCartItemHandler(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @PathVariable Long cartItemId
     ) throws Exception {
 
@@ -73,7 +73,7 @@ public class CartController {
 
     @PutMapping("/item/{cartItemId}")
     public ResponseEntity<Cart> updateCartItem(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @PathVariable Long cartItemId,
             @Valid @RequestBody UpdateCartItemRequest request
     ) throws Exception {
@@ -89,6 +89,7 @@ public class CartController {
         return ResponseEntity.ok(cart);
     }
 }
+
 
 
 

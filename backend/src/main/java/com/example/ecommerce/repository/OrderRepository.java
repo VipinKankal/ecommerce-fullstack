@@ -42,4 +42,8 @@ public interface OrderRepository extends JpaRepository<Order , Long> {
             "orderItems.product.images"
     })
     java.util.Optional<Order> findDetailedByIdAndSellerId(Long id, Long sellerId);
+
+    long countByUserId(Long userId);
+
+    java.util.Optional<Order> findTopByUserIdOrderByOrderDateDesc(Long userId);
 }

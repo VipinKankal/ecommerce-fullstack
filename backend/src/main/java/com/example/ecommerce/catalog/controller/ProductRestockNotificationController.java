@@ -25,7 +25,7 @@ public class ProductRestockNotificationController {
     @GetMapping("/{productId}/notify-me/status")
     public ResponseEntity<Map<String, Object>> getNotifyStatus(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Product product = productService.findActiveProductById(productId);
@@ -35,10 +35,11 @@ public class ProductRestockNotificationController {
     @PostMapping("/{productId}/notify-me")
     public ResponseEntity<Map<String, Object>> subscribeForRestock(
             @PathVariable Long productId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Product product = productService.findActiveProductById(productId);
         return ResponseEntity.ok(restockNotificationService.subscribe(user, product));
     }
 }
+

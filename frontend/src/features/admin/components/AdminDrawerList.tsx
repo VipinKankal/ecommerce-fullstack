@@ -13,8 +13,6 @@ import {
   CategoryOutlined,
   ElectricBolt,
   ElectricBoltOutlined,
-  LocalOffer,
-  LocalOfferOutlined,
   GridView,
   GridViewOutlined,
   AccountBoxOutlined,
@@ -130,12 +128,6 @@ const menu = [
     path: '/admin/coupon',
     icon: <ConfirmationNumberOutlined />,
     activeIcon: <ConfirmationNumber />,
-  },
-  {
-    name: 'Add Coupon',
-    path: '/admin/add-new-coupon-from',
-    icon: <LocalOfferOutlined />,
-    activeIcon: <LocalOffer />,
   },
   {
     name: 'Home Grid',

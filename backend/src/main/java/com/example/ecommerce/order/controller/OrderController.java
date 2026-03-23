@@ -1,9 +1,11 @@
 package com.example.ecommerce.order.controller;
 
 import com.example.ecommerce.common.domain.PaymentMethod;
+import com.example.ecommerce.common.domain.PaymentOrderStatus;
 import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
 import com.example.ecommerce.common.domain.PaymentType;
+import com.example.ecommerce.common.domain.CouponReservationState;
 import com.example.ecommerce.common.domain.UserRole;
 import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.*;
@@ -18,6 +20,7 @@ import com.example.ecommerce.order.response.OrderShippingAddressResponse;
 import com.example.ecommerce.order.response.PaymentLinkResponse;
 import com.example.ecommerce.order.response.PhonePePaymentSession;
 import com.example.ecommerce.order.service.CartService;
+import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.OrderService;
 import com.example.ecommerce.order.service.PaymentService;
 import com.example.ecommerce.seller.service.SellerReportService;
@@ -34,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -57,6 +61,7 @@ public class OrderController {
     private final OrderService orderService;
     private final UserService userService;
     private final CartService cartService;
+    private final CouponService couponService;
     private final SellerService sellerService;
     private final SellerReportService sellerReportService;
     private final PaymentService paymentService;
@@ -68,13 +73,13 @@ public class OrderController {
     public ResponseEntity<PaymentLinkResponse> createPaymentLink(
             @RequestBody Address shippingAddress,
             @RequestParam String paymentMethod,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         PaymentMethod resolvedPaymentMethod = resolveCheckoutPaymentMethod(paymentMethod == null ? "" : paymentMethod.trim().toUpperCase());
         PaymentLinkResponse response = resolvedPaymentMethod == PaymentMethod.COD
                 ? createCashOnDeliveryResponse(user, shippingAddress)
-                : createOnlinePaymentResponse(user, shippingAddress, resolvedPaymentMethod);
+                : createOnlinePaymentResponse(user, shippingAddress, resolvedPaymentMethod, null);
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
@@ -82,7 +87,7 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<PaymentLinkResponse> createCheckoutOrder(
             @Valid @RequestBody CheckoutOrderRequest request,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         String normalizedPaymentMethod = request.getPaymentMethod() == null
@@ -93,11 +98,23 @@ public class OrderController {
             return new ResponseEntity<>(createCashOnDeliveryResponse(user, request.getShippingAddress()), HttpStatus.OK);
         }
 
+        String checkoutRequestId = normalizeCheckoutRequestId(request.getCheckoutRequestId());
+        if (checkoutRequestId != null) {
+            PaymentOrder previousAttempt = paymentOrderRepository.findTopByUserIdAndCheckoutRequestIdOrderByIdDesc(
+                    user.getId(),
+                    checkoutRequestId
+            );
+            if (previousAttempt != null && previousAttempt.getStatus() != PaymentOrderStatus.SUCCESS) {
+                return new ResponseEntity<>(retryExistingPaymentOrder(user, previousAttempt), HttpStatus.OK);
+            }
+        }
+
         return new ResponseEntity<>(
                 createOnlinePaymentResponse(
                         user,
                         request.getShippingAddress(),
-                        resolveCheckoutPaymentMethod(normalizedPaymentMethod)
+                        resolveCheckoutPaymentMethod(normalizedPaymentMethod),
+                        checkoutRequestId
                 ),
                 HttpStatus.OK
         );
@@ -106,7 +123,7 @@ public class OrderController {
     @PostMapping("/summary")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<CheckoutOrderSummaryResponse> getCheckoutSummary(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Cart cart = requireCart(user);
@@ -139,7 +156,7 @@ public class OrderController {
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     @Transactional(readOnly = true)
     public ResponseEntity<List<OrderHistoryResponse>> usersOrderHistory(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         List<Order> orders = orderService.usersOrderHistory(user.getId());
@@ -152,7 +169,7 @@ public class OrderController {
     @Transactional(readOnly = true)
     public ResponseEntity<OrderHistoryResponse> getOrderById(
             @PathVariable Long orderId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Order order = orderService.findOrderById(orderId);
@@ -169,7 +186,7 @@ public class OrderController {
     @Transactional(readOnly = true)
     public ResponseEntity<OrderHistoryItemResponse> getOrderItemById(
             @PathVariable Long orderItemId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         OrderItem orderItem = orderService.getOrderItemById(orderItemId);
@@ -194,7 +211,7 @@ public class OrderController {
     public ResponseEntity<OrderHistoryResponse> cancelOrder(
             @PathVariable Long orderId,
             @Valid @RequestBody CancelOrderRequest request,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Order order = orderService.cancelOrder(
@@ -202,6 +219,17 @@ public class OrderController {
                 user,
                 request.getCancelReasonCode(),
                 request.getCancelReasonText()
+        );
+        couponService.releaseCouponReservation(
+                order.getCouponCode(),
+                user.getId(),
+                "ORDER_CANCELLED",
+                "Reservation released due to customer cancellation"
+        );
+        couponService.restoreCouponUsageForCancelledOrders(
+                user,
+                List.of(order),
+                "Order cancelled by customer before shipment"
         );
 
         if (order.getOrderItems() != null) {
@@ -302,81 +330,106 @@ public class OrderController {
     private PaymentLinkResponse createOnlinePaymentResponse(
             User user,
             Address shippingAddress,
-            PaymentMethod paymentMethod
+            PaymentMethod paymentMethod,
+            String checkoutRequestId
     ) throws Exception {
         Cart cart = requireCart(user);
-        if (paymentMethod == PaymentMethod.UPI) {
-            paymentService.assertPhonePeConfigured();
+        couponService.validateAppliedCoupon(user, cart);
+        String reservedCouponCode = couponService.reserveCouponForCheckout(user, cart, checkoutRequestId);
+        try {
+            if (paymentMethod == PaymentMethod.UPI) {
+                paymentService.assertPhonePeConfigured();
+                Set<Order> orders = orderService.createOrder(
+                        user,
+                        shippingAddress,
+                        cart,
+                        com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                        PaymentStatus.PENDING,
+                        PaymentMethod.UPI,
+                        PaymentType.UPI,
+                        PaymentProvider.PHONEPE
+                );
+                PaymentOrder paymentOrder = paymentService.createOrder(
+                        user,
+                        orders,
+                        PaymentMethod.UPI,
+                        PaymentType.UPI,
+                        PaymentProvider.PHONEPE
+                );
+                paymentOrder.setCheckoutRequestId(checkoutRequestId);
+                paymentOrder.setCouponReservationState(
+                        reservedCouponCode == null ? CouponReservationState.NONE : CouponReservationState.RESERVED
+                );
+                paymentOrderRepository.save(paymentOrder);
+                PhonePePaymentSession session = paymentService.createPhonePePaymentSession(user, paymentOrder);
+                return buildPaymentResponse(
+                        orders,
+                        paymentOrder.getId(),
+                        PaymentMethod.UPI,
+                        PaymentType.UPI,
+                        PaymentProvider.PHONEPE,
+                        PaymentStatus.PENDING,
+                        com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                        session.getRedirectUrl(),
+                        session.getMerchantTransactionId()
+                );
+            }
+
             Set<Order> orders = orderService.createOrder(
                     user,
                     shippingAddress,
                     cart,
                     com.example.ecommerce.common.domain.OrderStatus.INITIATED,
                     PaymentStatus.PENDING,
-                    PaymentMethod.UPI,
-                    PaymentType.UPI,
-                    PaymentProvider.PHONEPE
+                    PaymentMethod.CARD,
+                    PaymentType.CARD,
+                    PaymentProvider.STRIPE
             );
             PaymentOrder paymentOrder = paymentService.createOrder(
                     user,
                     orders,
-                    PaymentMethod.UPI,
-                    PaymentType.UPI,
-                    PaymentProvider.PHONEPE
+                    PaymentMethod.CARD,
+                    PaymentType.CARD,
+                    PaymentProvider.STRIPE
             );
-            PhonePePaymentSession session = paymentService.createPhonePePaymentSession(user, paymentOrder);
+            paymentOrder.setCheckoutRequestId(checkoutRequestId);
+            paymentOrder.setCouponReservationState(
+                    reservedCouponCode == null ? CouponReservationState.NONE : CouponReservationState.RESERVED
+            );
+            String paymentUrl = paymentService.createStripePaymentLink(
+                    user,
+                    paymentOrder.getAmount(),
+                    paymentOrder.getId()
+            );
+            paymentOrder.setPaymentLinkId(String.valueOf(paymentOrder.getId()));
+            paymentOrderRepository.save(paymentOrder);
             return buildPaymentResponse(
                     orders,
                     paymentOrder.getId(),
-                    PaymentMethod.UPI,
-                    PaymentType.UPI,
-                    PaymentProvider.PHONEPE,
+                    PaymentMethod.CARD,
+                    PaymentType.CARD,
+                    PaymentProvider.STRIPE,
                     PaymentStatus.PENDING,
                     com.example.ecommerce.common.domain.OrderStatus.INITIATED,
-                    session.getRedirectUrl(),
-                    session.getMerchantTransactionId()
+                    paymentUrl,
+                    String.valueOf(paymentOrder.getId())
             );
+        } catch (Exception ex) {
+            if (reservedCouponCode != null) {
+                couponService.releaseCouponReservation(
+                        reservedCouponCode,
+                        user.getId(),
+                        "CHECKOUT_CREATE_FAILED",
+                        "Reservation released due to checkout failure"
+                );
+            }
+            throw ex;
         }
-
-        Set<Order> orders = orderService.createOrder(
-                user,
-                shippingAddress,
-                cart,
-                com.example.ecommerce.common.domain.OrderStatus.INITIATED,
-                PaymentStatus.PENDING,
-                PaymentMethod.CARD,
-                PaymentType.CARD,
-                PaymentProvider.STRIPE
-        );
-        PaymentOrder paymentOrder = paymentService.createOrder(
-                user,
-                orders,
-                PaymentMethod.CARD,
-                PaymentType.CARD,
-                PaymentProvider.STRIPE
-        );
-        String paymentUrl = paymentService.createStripePaymentLink(
-                user,
-                paymentOrder.getAmount(),
-                paymentOrder.getId()
-        );
-        paymentOrder.setPaymentLinkId(String.valueOf(paymentOrder.getId()));
-        paymentOrderRepository.save(paymentOrder);
-        return buildPaymentResponse(
-                orders,
-                paymentOrder.getId(),
-                PaymentMethod.CARD,
-                PaymentType.CARD,
-                PaymentProvider.STRIPE,
-                PaymentStatus.PENDING,
-                com.example.ecommerce.common.domain.OrderStatus.INITIATED,
-                paymentUrl,
-                String.valueOf(paymentOrder.getId())
-        );
     }
 
     private PaymentLinkResponse createCashOnDeliveryResponse(User user, Address shippingAddress) throws Exception {
         Cart cart = requireCart(user);
+        couponService.validateAppliedCoupon(user, cart);
         Set<Order> orders = orderService.createOrder(
                 user,
                 shippingAddress,
@@ -387,6 +440,7 @@ public class OrderController {
                 PaymentType.CASH,
                 null
         );
+        couponService.markCouponUsedIfPresent(user, orders);
         return buildPaymentResponse(
                 orders,
                 null,
@@ -397,6 +451,85 @@ public class OrderController {
                 com.example.ecommerce.common.domain.OrderStatus.PLACED,
                 null,
                 null
+        );
+    }
+
+    private String normalizeCheckoutRequestId(String rawCheckoutRequestId) {
+        if (rawCheckoutRequestId == null || rawCheckoutRequestId.isBlank()) {
+            return null;
+        }
+        String trimmed = rawCheckoutRequestId.trim();
+        return trimmed.length() > 120 ? trimmed.substring(0, 120) : trimmed;
+    }
+
+    private PaymentLinkResponse retryExistingPaymentOrder(User user, PaymentOrder paymentOrder) throws Exception {
+        if (paymentOrder.getStatus() == PaymentOrderStatus.SUCCESS) {
+            throw new IllegalArgumentException("Payment already completed for this checkout request");
+        }
+        if (paymentOrder.getUser() == null || !paymentOrder.getUser().getId().equals(user.getId())) {
+            throw new AccessDeniedException("Unauthorized payment retry access");
+        }
+        Set<Order> orders = paymentOrder.getOrders();
+        if (orders == null || orders.isEmpty()) {
+            throw new IllegalArgumentException("Cannot retry payment without order context");
+        }
+        if (paymentOrder.getCouponReservationState() == CouponReservationState.RELEASED) {
+            couponService.reserveCouponForOrders(
+                    user,
+                    orders,
+                    "PAYMENT_RETRY:" + paymentOrder.getId()
+            );
+            paymentOrder.setCouponReservationState(CouponReservationState.RESERVED);
+        }
+
+        PaymentMethod paymentMethod;
+        PaymentType paymentType;
+        PaymentProvider provider;
+        String paymentUrl;
+        String paymentReference;
+
+        if (paymentOrder.getProvider() == PaymentProvider.PHONEPE || paymentOrder.getPaymentMethod() == PaymentMethod.UPI) {
+            paymentService.assertPhonePeConfigured();
+            PhonePePaymentSession session = paymentService.createPhonePePaymentSession(user, paymentOrder);
+            paymentMethod = PaymentMethod.UPI;
+            paymentType = PaymentType.UPI;
+            provider = PaymentProvider.PHONEPE;
+            paymentUrl = session.getRedirectUrl();
+            paymentReference = session.getMerchantTransactionId();
+        } else {
+            paymentMethod = PaymentMethod.CARD;
+            paymentType = PaymentType.CARD;
+            provider = PaymentProvider.STRIPE;
+            paymentUrl = paymentService.createStripePaymentLink(
+                    user,
+                    paymentOrder.getAmount(),
+                    paymentOrder.getId()
+            );
+            paymentOrder.setPaymentLinkId(String.valueOf(paymentOrder.getId()));
+            paymentReference = String.valueOf(paymentOrder.getId());
+        }
+
+        paymentOrder.setStatus(PaymentOrderStatus.PENDING);
+        paymentOrder.setPaymentMethod(paymentMethod);
+        paymentOrder.setPaymentType(paymentType);
+        paymentOrder.setProvider(provider);
+        paymentOrder.setRetryCount((paymentOrder.getRetryCount() == null ? 0 : paymentOrder.getRetryCount()) + 1);
+        paymentOrder.setLastRetryAt(LocalDateTime.now());
+        if (paymentOrder.getCouponReservationState() == null) {
+            paymentOrder.setCouponReservationState(CouponReservationState.NONE);
+        }
+        paymentOrderRepository.save(paymentOrder);
+
+        return buildPaymentResponse(
+                orders,
+                paymentOrder.getId(),
+                paymentMethod,
+                paymentType,
+                provider,
+                PaymentStatus.PENDING,
+                com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                paymentUrl,
+                paymentReference
         );
     }
 
@@ -437,3 +570,4 @@ public class OrderController {
         return response;
     }
 }
+

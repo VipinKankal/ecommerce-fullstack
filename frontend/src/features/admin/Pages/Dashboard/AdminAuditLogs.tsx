@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
@@ -61,7 +61,7 @@ const AdminAuditLogs = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const loadLogs = async () => {
+  const loadLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -83,11 +83,11 @@ const AdminAuditLogs = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [actorQuery, dateFrom, dateTo, methodFilter, searchQuery, statusFilter]);
 
   useEffect(() => {
     loadLogs();
-  }, []);
+  }, [loadLogs]);
 
   const methodOptions = useMemo(
     () =>

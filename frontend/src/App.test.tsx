@@ -19,6 +19,6 @@ test('renders shopper brand', () => {
     </Provider>,
   );
 
-  const brandElement = screen.getByText(/shopper/i);
+  const brandElement = screen.getByRole('button', { name: /shopper/i });
   expect(brandElement).toBeInTheDocument();
 });

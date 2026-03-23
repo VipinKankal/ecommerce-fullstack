@@ -6,10 +6,12 @@ import com.example.ecommerce.common.domain.PaymentOrderStatus;
 import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
 import com.example.ecommerce.common.domain.PaymentType;
+import com.example.ecommerce.common.domain.CouponReservationState;
 import com.example.ecommerce.modal.Order;
 import com.example.ecommerce.modal.PaymentOrder;
 import com.example.ecommerce.modal.User;
 import com.example.ecommerce.order.response.PhonePePaymentSession;
+import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.PaymentService;
 import com.example.ecommerce.repository.OrderRepository;
 import com.example.ecommerce.repository.PaymentOrderRepository;
@@ -49,6 +51,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final PaymentOrderRepository paymentOrderRepository;
     private final OrderRepository orderRepository;
+    private final CouponService couponService;
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Value("${payment.razorpay.api-key}")
@@ -159,6 +162,7 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             paymentOrder.setStatus(PaymentOrderStatus.FAILED);
+            releaseReservationOnFailure(paymentOrder);
             paymentOrderRepository.save(paymentOrder);
             return false;
         }
@@ -257,6 +261,7 @@ public class PaymentServiceImpl implements PaymentService {
             }
         } else if ("FAILED".equals(status)) {
             paymentOrder.setStatus(PaymentOrderStatus.FAILED);
+            releaseReservationOnFailure(paymentOrder);
             for (Order order : paymentOrder.getOrders()) {
                 order.setPaymentStatus(PaymentStatus.FAILED);
                 orderRepository.save(order);
@@ -524,6 +529,28 @@ public class PaymentServiceImpl implements PaymentService {
             }
         }
         return null;
+    }
+
+    private void releaseReservationOnFailure(PaymentOrder paymentOrder) {
+        if (paymentOrder == null) {
+            return;
+        }
+        if (paymentOrder.getCouponReservationState() != CouponReservationState.RESERVED) {
+            return;
+        }
+        Order primaryOrder = paymentOrder.getOrders() == null
+                ? null
+                : paymentOrder.getOrders().stream()
+                .min(java.util.Comparator.comparing(Order::getId, java.util.Comparator.nullsLast(Long::compareTo)))
+                .orElse(null);
+        String couponCode = primaryOrder == null ? null : primaryOrder.getCouponCode();
+        couponService.releaseCouponReservation(
+                couponCode,
+                paymentOrder.getUser() == null ? null : paymentOrder.getUser().getId(),
+                "PAYMENT_FAILED",
+                "Coupon reservation released after payment failure"
+        );
+        paymentOrder.setCouponReservationState(CouponReservationState.RELEASED);
     }
 }
 

@@ -24,7 +24,7 @@ public class TransactionController {
     @GetMapping("/seller")
     @PreAuthorize("hasRole('SELLER')")
     public ResponseEntity<List<AdminTransactionSummaryResponse>> getTransactionBySeller(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         List<AdminTransactionSummaryResponse> transactions = transactionService.getTransactionBySellerId(seller);
@@ -38,6 +38,7 @@ public class TransactionController {
         return ResponseEntity.ok(transactions);
     }
 }
+
 
 
 

@@ -57,6 +57,7 @@ public class Order {
     private double totalMrpPrice;
     private Integer totalSellingPrice;
     private double discount;
+    private String couponCode;
 
     @Convert(converter = OrderStatusConverter.class)
     private OrderStatus orderStatus;

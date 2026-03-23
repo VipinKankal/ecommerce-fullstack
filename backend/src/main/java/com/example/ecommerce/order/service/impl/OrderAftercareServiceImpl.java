@@ -1,13 +1,16 @@
 package com.example.ecommerce.order.service.impl;
 
 import com.example.ecommerce.inventory.service.InventoryService;
+import com.example.ecommerce.modal.Order;
 import com.example.ecommerce.modal.OrderItem;
 import com.example.ecommerce.modal.OrderReturnExchangeRequest;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.RequestHistoryEntry;
 import com.example.ecommerce.modal.User;
 import com.example.ecommerce.order.service.OrderAftercareService;
+import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.repository.OrderItemRepository;
+import com.example.ecommerce.repository.OrderRepository;
 import com.example.ecommerce.repository.OrderReturnExchangeRequestRepository;
 import com.example.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +36,10 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
 
     private final OrderItemRepository orderItemRepository;
     private final OrderReturnExchangeRequestRepository requestRepository;
+    private final OrderRepository orderRepository;
     private final ProductRepository productRepository;
     private final InventoryService inventoryService;
+    private final CouponService couponService;
 
     @Override
     @Transactional(readOnly = true)
@@ -263,7 +268,9 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         request.setRefundCompletedAt(LocalDateTime.now());
         request.setCompletedAt(LocalDateTime.now());
         addHistory(request, "RETURNED", "Refund completed and return flow closed", "ADMIN");
-        return toReturnResponse(requestRepository.save(request));
+        OrderReturnExchangeRequest savedRequest = requestRepository.save(request);
+        restoreCouponForFullyReturnedOrder(savedRequest);
+        return toReturnResponse(savedRequest);
     }
 
     @Override
@@ -498,6 +505,47 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             throw new Exception("Product not found");
         }
         return productRepository.findById(productId).orElseThrow(() -> new Exception("Product not found"));
+    }
+
+    private void restoreCouponForFullyReturnedOrder(OrderReturnExchangeRequest request) {
+        if (request == null || request.getOrderId() == null) {
+            return;
+        }
+        Order order = orderRepository.findById(request.getOrderId()).orElse(null);
+        if (order == null || order.getCouponCode() == null || order.getCouponCode().isBlank()) {
+            return;
+        }
+        if (order.getOrderItems() == null || order.getOrderItems().isEmpty()) {
+            return;
+        }
+
+        List<OrderReturnExchangeRequest> returnRequests = requestRepository
+                .findByOrderIdAndRequestTypeOrderByRequestedAtDesc(order.getId(), "RETURN");
+        if (returnRequests.isEmpty()) {
+            return;
+        }
+
+        LinkedHashMap<Long, String> latestStatusByItem = new LinkedHashMap<>();
+        for (OrderReturnExchangeRequest row : returnRequests) {
+            if (row.getOrderItemId() == null || latestStatusByItem.containsKey(row.getOrderItemId())) {
+                continue;
+            }
+            latestStatusByItem.put(row.getOrderItemId(), normalizeType(row.getStatus()));
+        }
+
+        boolean allItemsReturned = order.getOrderItems().stream()
+                .map(OrderItem::getId)
+                .allMatch(itemId -> "RETURNED".equals(latestStatusByItem.get(itemId)));
+
+        if (!allItemsReturned) {
+            return;
+        }
+
+        couponService.restoreCouponUsageForCancelledOrders(
+                order.getUser(),
+                List.of(order),
+                "Coupon restored after full order return and completed refund"
+        );
     }
 
     private void applyBankDetails(OrderReturnExchangeRequest request, Map<String, Object> payload) {

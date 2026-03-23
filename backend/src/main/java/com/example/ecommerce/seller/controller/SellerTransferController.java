@@ -27,7 +27,7 @@ public class SellerTransferController {
 
     @GetMapping
     public ResponseEntity<List<WarehouseTransferResponse>> getTransfers(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         return ResponseEntity.ok(warehouseTransferService.getSellerTransfers(seller.getId()));
@@ -36,9 +36,10 @@ public class SellerTransferController {
     @PostMapping("/{transferId}/cancel")
     public ResponseEntity<WarehouseTransferResponse> cancelTransfer(
             @PathVariable Long transferId,
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
         return ResponseEntity.ok(warehouseTransferService.cancelTransfer(transferId, seller.getId()));
     }
 }
+

@@ -3,7 +3,10 @@ import { Cart } from 'shared/types/cart.types';
 import { api } from 'shared/api/Api';
 import { applyCoupon } from './applyCoupon';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
-import { getErrorMessage } from 'State/backend/masterApi/shared';
+import {
+  getErrorMessage,
+  getThunkErrorMessage,
+} from 'State/backend/masterApi/shared';
 
 interface CartState {
   cart: Cart | null;
@@ -149,6 +152,14 @@ const cartSlice = createSlice({
       .addCase(applyCoupon.pending, (state) => {
         state.loading = true;
         state.error = null;
+      })
+      .addCase(applyCoupon.fulfilled, (state, action) => {
+        state.loading = false;
+        state.cart = action.payload;
+      })
+      .addCase(applyCoupon.rejected, (state, action) => {
+        state.loading = false;
+        state.error = getThunkErrorMessage(action.payload, 'Failed to apply coupon');
       });
   },
 });

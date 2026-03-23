@@ -1,5 +1,6 @@
 package com.example.ecommerce.seller.service.impl;
 
+import com.example.ecommerce.common.configuration.AuthenticatedPrincipalService;
 import com.example.ecommerce.common.configuration.JwtProvider;
 import com.example.ecommerce.common.domain.AccountStatus;
 import com.example.ecommerce.common.domain.UserRole;
@@ -11,16 +12,15 @@ import com.example.ecommerce.modal.KycDetails;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.modal.StoreDetails;
 import com.example.ecommerce.modal.VerificationCode;
-import com.example.ecommerce.repository.AddressRepository;
 import com.example.ecommerce.repository.SellerRepository;
 import com.example.ecommerce.repository.VerificationCodeRepository;
 import com.example.ecommerce.seller.request.SellerSignupRequest;
 import com.example.ecommerce.seller.request.SellerUpdateRequest;
 import com.example.ecommerce.seller.service.SellerService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -36,10 +36,13 @@ public class SellerServiceImpl implements SellerService {
     private final PasswordEncoder passwordEncoder;
     private final VerificationCodeRepository verificationCodeRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final AuthenticatedPrincipalService authenticatedPrincipalService;
 
     @Override
     public Seller getSellerProfile(String jwt) throws Exception {
-        String email = jwtProvider.getEmailFromToken(jwt);
+        String email = (jwt != null && !jwt.isBlank())
+                ? jwtProvider.getEmailFromToken(jwt)
+                : authenticatedPrincipalService.currentEmail();
         return this.getSellerByEmail(email);
     }
 
@@ -60,8 +63,6 @@ public class SellerServiceImpl implements SellerService {
         newSeller.setPickupAddress(request.getPickupAddress() == null ? new Address() : request.getPickupAddress());
         newSeller.setGSTIN(request.getGSTIN());
         newSeller.setRole(UserRole.ROLE_SELLER);
-        // Legacy databases may have stricter CHECK constraints on account_status.
-        // Use ACTIVE at signup time to avoid insert failures on older schemas.
         newSeller.setAccountStatus(AccountStatus.ACTIVE);
         newSeller.setMobileNumber(request.getMobileNumber());
         newSeller.setDateOfBirth(request.getDateOfBirth());
@@ -100,7 +101,6 @@ public class SellerServiceImpl implements SellerService {
                     try {
                         jdbcTemplate.execute("ALTER TABLE seller DROP CONSTRAINT `" + constraint + "`");
                     } catch (Exception ignoredToo) {
-                        // Best effort: keep signup moving even if the schema is already compatible.
                     }
                 }
             }
@@ -129,7 +129,6 @@ public class SellerServiceImpl implements SellerService {
                     END
                     """);
         } catch (Exception ignored) {
-            // Best effort only. The actual insert still proceeds and will reveal real issues if any remain.
         }
     }
 
@@ -282,11 +281,3 @@ public class SellerServiceImpl implements SellerService {
         return sellerRepository.save(seller);
     }
 }
-
-
-
-
-
-
-
-

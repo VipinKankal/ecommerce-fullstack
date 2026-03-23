@@ -1,5 +1,6 @@
 package com.example.ecommerce.user.controller;
 
+import com.example.ecommerce.common.configuration.AuthCookieService;
 import com.example.ecommerce.common.configuration.JwtProvider;
 import com.example.ecommerce.common.domain.AccountStatus;
 import com.example.ecommerce.modal.Address;
@@ -17,6 +18,7 @@ import com.example.ecommerce.user.response.UserAddressResponse;
 import com.example.ecommerce.user.response.UserProfileResponse;
 import com.example.ecommerce.auth.service.EmailService;
 import com.example.ecommerce.user.service.UserService;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -40,11 +42,12 @@ public class UserController {
     private final EmailService emailService;
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
+    private final AuthCookieService authCookieService;
 
     @GetMapping("/auth/users/profile")
     @Transactional(readOnly = true)
     public ResponseEntity<UserProfileResponse> getUserProfileHandler(
-            @RequestHeader("Authorization") String jwt) throws Exception {
+            @RequestHeader(value = "Authorization", required = false) String jwt) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         return ResponseEntity.ok(toUserProfileResponse(user));
     }
@@ -52,7 +55,7 @@ public class UserController {
     @PutMapping("/auth/users/profile")
     @Transactional
     public ResponseEntity<UserProfileResponse> updateUserProfileHandler(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @Valid @RequestBody UpdateUserProfileRequest request
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -65,7 +68,7 @@ public class UserController {
     @PutMapping("/auth/users/account/deactivate")
     @Transactional
     public ResponseEntity<ApiResponse> deactivateAccountHandler(
-            @RequestHeader("Authorization") String jwt
+            @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         user.setAccountStatus(AccountStatus.DEACTIVATED);
@@ -79,7 +82,7 @@ public class UserController {
     @PostMapping("/auth/users/addresses")
     @Transactional
     public ResponseEntity<UserProfileResponse> addAddressHandler(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @Valid @RequestBody UserAddressRequest request
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -92,7 +95,7 @@ public class UserController {
     @PutMapping("/auth/users/addresses/{addressId}")
     @Transactional
     public ResponseEntity<UserProfileResponse> updateAddressHandler(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @PathVariable Long addressId,
             @Valid @RequestBody UserAddressRequest request
     ) throws Exception {
@@ -119,7 +122,7 @@ public class UserController {
     @DeleteMapping("/auth/users/addresses/{addressId}")
     @Transactional
     public ResponseEntity<UserProfileResponse> deleteAddressHandler(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @PathVariable Long addressId
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -138,7 +141,7 @@ public class UserController {
     @PostMapping("/auth/users/email/change/request-otp")
     @Transactional
     public ResponseEntity<ApiResponse> requestEmailChangeOtp(
-            @RequestHeader("Authorization") String jwt,
+            @RequestHeader(value = "Authorization", required = false) String jwt,
             @Valid @RequestBody RequestEmailChangeOtpRequest request
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
@@ -178,8 +181,9 @@ public class UserController {
     @PostMapping("/auth/users/email/change/verify")
     @Transactional
     public ResponseEntity<AuthResponse> verifyEmailChangeOtp(
-            @RequestHeader("Authorization") String jwt,
-            @Valid @RequestBody VerifyEmailChangeOtpRequest request
+            @RequestHeader(value = "Authorization", required = false) String jwt,
+            @Valid @RequestBody VerifyEmailChangeOtpRequest request,
+            HttpServletResponse httpResponse
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         String normalizedNewEmail = normalizeEmail(request.getNewEmail());
@@ -219,6 +223,7 @@ public class UserController {
                 Collections.singletonList(new SimpleGrantedAuthority(user.getRole().name()))
         );
         String refreshedJwt = jwtProvider.generateToken(authentication);
+        authCookieService.writeAuthCookie(httpResponse, refreshedJwt);
 
         AuthResponse response = new AuthResponse();
         response.setJwt(refreshedJwt);
@@ -277,6 +282,11 @@ public class UserController {
         return otp == null ? null : otp.trim();
     }
 }
+
+
+
+
+
 
 
 

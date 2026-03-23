@@ -1,7 +1,8 @@
-﻿import React, { useEffect, useState } from 'react';
-import { Button, Divider, TextField } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Alert, Button, Divider, TextField } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
+import { applyCoupon } from 'State/features/customer/cart/applyCoupon';
 import { deleteItem, fetchUserCart } from 'State/features/customer/cart/slice';
 import { CartItem } from 'shared/types/cart.types';
 
@@ -21,7 +22,24 @@ const Cart = () => {
   const totalMrp = cart?.totalMrpPrice ?? 0;
   const totalSelling = cart?.totalSellingPrice ?? 0;
   const discount = totalMrp - totalSelling;
+  const couponDiscountAmount = cart?.couponDiscountAmount ?? 0;
   const itemCount = cartItems.length;
+
+  const handleCouponAction = async () => {
+    const targetCode = (cart?.couponCode || couponCode).trim();
+    if (!targetCode) return;
+
+    await dispatch(
+      applyCoupon({
+        apply: !cart?.couponCode,
+        code: targetCode,
+      }),
+    );
+    await dispatch(fetchUserCart());
+    if (!cart?.couponCode) {
+      setCouponCode('');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -70,20 +88,14 @@ const Cart = () => {
                 Available Offers
               </p>
               <p className="text-sm text-gray-600 mt-2">
-                7.5% Assured Cashback* on a minimum spend of ?100. T&C
+                Apply a coupon at checkout to unlock your best eligible price.
               </p>
-              <button
-                type="button"
-                className="text-xs font-semibold text-rose-500 mt-2"
-              >
-                Show More
-              </button>
             </div>
 
             <div className="flex items-center justify-between border-b pb-3 text-sm font-semibold">
               <div className="flex items-center gap-2">
                 <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-rose-500 text-white text-xs">
-                  ?
+                  {itemCount}
                 </span>
                 <span>
                   {itemCount}/{itemCount} ITEMS SELECTED
@@ -98,10 +110,7 @@ const Cart = () => {
             {cartItems.length === 0 && (
               <div className="text-center py-20 border-2 border-dashed rounded-3xl">
                 <p className="text-gray-400 font-bold">Your bag is empty.</p>
-                <Button
-                  onClick={() => navigate('/')}
-                  sx={{ mt: 2, fontWeight: 'bold' }}
-                >
+                <Button onClick={() => navigate('/')} sx={{ mt: 2, fontWeight: 'bold' }}>
                   Start Shopping
                 </Button>
               </div>
@@ -133,7 +142,7 @@ const Cart = () => {
                           dispatch(deleteItem({ cartItemId: item.id }))
                         }
                       >
-                        ?
+                        x
                       </button>
                     </div>
                     <div className="h-24 w-20 rounded-md overflow-hidden border bg-gray-50">
@@ -160,10 +169,10 @@ const Cart = () => {
                         </span>
                       </div>
                       <div className="mt-2 text-sm font-semibold text-gray-900">
-                        ?{sellingPrice}
+                        Rs {sellingPrice}
                         {mrpPrice > sellingPrice && (
                           <span className="text-xs text-gray-400 line-through ml-2">
-                            ?{mrpPrice}
+                            Rs {mrpPrice}
                           </span>
                         )}
                         {offPercent > 0 && (
@@ -177,14 +186,6 @@ const Cart = () => {
                 );
               })}
             </div>
-
-            <div className="rounded-lg border border-gray-200 px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <span className="text-gray-600">?</span>
-                <span>Add More From Wishlist</span>
-              </div>
-              <span className="text-gray-400">�</span>
-            </div>
           </div>
 
           <div className="lg:col-span-4">
@@ -193,48 +194,32 @@ const Cart = () => {
                 <p className="text-xs font-semibold text-gray-600 uppercase">
                   Coupons
                 </p>
+                {cartState.error && <Alert severity="error">{cartState.error}</Alert>}
+                {cart?.couponCode && (
+                  <Alert severity="success">
+                    Applied coupon <strong>{cart.couponCode}</strong> saving Rs{' '}
+                    {couponDiscountAmount}
+                  </Alert>
+                )}
                 <div className="flex gap-2">
                   <TextField
                     size="small"
-                    placeholder="Apply Coupons"
-                    value={couponCode}
+                    placeholder="Apply Coupon"
+                    value={cart?.couponCode || couponCode}
                     onChange={(e) => setCouponCode(e.target.value)}
                     fullWidth
+                    disabled={Boolean(cart?.couponCode)}
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
                   />
-                  <Button variant="outlined" size="small">
-                    Apply
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={cartState.loading}
+                    onClick={handleCouponAction}
+                  >
+                    {cart?.couponCode ? 'Remove' : 'Apply'}
                   </Button>
                 </div>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 p-4 space-y-3">
-                <p className="text-xs font-semibold text-gray-600 uppercase">
-                  Support Social Work
-                </p>
-                <div className="flex items-center gap-2">
-                  <input type="checkbox" className="h-4 w-4" />
-                  <p className="text-sm text-gray-800">
-                    Donate and make a difference
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {[10, 20, 50, 100].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      className="px-3 py-1 rounded-full border text-sm"
-                    >
-                      ?{amt}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="text-xs font-semibold text-rose-500"
-                >
-                  Know More
-                </button>
               </div>
 
               <div className="rounded-lg border border-gray-200 p-4 space-y-3">
@@ -244,21 +229,25 @@ const Cart = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Total MRP</span>
-                    <span>?{totalMrp}</span>
+                    <span>Rs {totalMrp}</span>
                   </div>
                   <div className="flex justify-between text-emerald-600">
                     <span>Discount on MRP</span>
-                    <span>-?{discount}</span>
+                    <span>-Rs {discount}</span>
+                  </div>
+                  <div className="flex justify-between text-emerald-600">
+                    <span>Coupon Discount</span>
+                    <span>-Rs {couponDiscountAmount}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Platform Fee</span>
-                    <span>?0</span>
+                    <span>Rs 0</span>
                   </div>
                 </div>
                 <Divider />
                 <div className="flex justify-between font-semibold">
                   <span>Total Amount</span>
-                  <span>?{totalSelling}</span>
+                  <span>Rs {totalSelling}</span>
                 </div>
               </div>
 
