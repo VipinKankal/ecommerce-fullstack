@@ -88,6 +88,7 @@ public class AppConfiguration {
                 )
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokenRepository)
+                        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
                         .ignoringRequestMatchers(
                                 "/api/auth/signup",
                                 "/api/auth/signin",
@@ -100,7 +101,8 @@ public class AppConfiguration {
                                 "/sellers/verifyEmail/**"
                         )
                 )
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .logout(logout -> logout.disable());
         return http.build();
     }
 
@@ -151,3 +153,4 @@ public class AppConfiguration {
         return new RestTemplate();
     }
 }
+

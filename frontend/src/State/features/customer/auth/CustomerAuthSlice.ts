@@ -56,6 +56,7 @@ const customerAuthSlice = createSlice({
     resetOtp: (state) => {
       state.otpSent = false;
     },
+    resetCustomerAuthState: () => initialState,
   },
   extraReducers: (builder) => {
     builder
@@ -161,5 +162,6 @@ const customerAuthSlice = createSlice({
   },
 });
 
-export const { clearError, resetOtp } = customerAuthSlice.actions;
+export const { clearError, resetOtp, resetCustomerAuthState } =
+  customerAuthSlice.actions;
 export default customerAuthSlice.reducer;

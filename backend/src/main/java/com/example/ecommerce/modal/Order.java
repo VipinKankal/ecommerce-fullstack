@@ -51,6 +51,9 @@ public class Order {
     @ManyToOne
     private Address shippingAddress;
 
+    @OneToOne(mappedBy = "order", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private OrderTaxSnapshot orderTaxSnapshot;
+
     @Embedded
     private PaymentDetails paymentDetails = new PaymentDetails();
 

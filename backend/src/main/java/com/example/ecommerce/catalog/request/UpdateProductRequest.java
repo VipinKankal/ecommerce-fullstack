@@ -24,6 +24,14 @@ public class UpdateProductRequest {
     private String color;
     private List<String> images;
     private String size;
+    private String hsnCode;
+    private String pricingMode;
+    private String taxClass;
+    private String taxRuleVersion;
+    private Double taxPercentage;
+    private Double costPrice;
+    private Double platformCommission;
+    private String currency;
     private String warrantyType;
     private Integer warrantyDays;
     private Integer lowStockThreshold;

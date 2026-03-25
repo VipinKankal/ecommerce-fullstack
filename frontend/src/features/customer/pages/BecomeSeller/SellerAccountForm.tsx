@@ -68,7 +68,12 @@ const validationSchemas = [
   }),
   Yup.object({
     gstin: Yup.string()
-      .length(15, 'GSTIN must be 15 chars')
+      .trim()
+      .uppercase('GSTIN must be uppercase')
+      .matches(
+        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/,
+        'Invalid GSTIN format',
+      )
       .required('Required'),
     businessDetails: Yup.object({
       businessName: Yup.string().required('Required'),
@@ -182,7 +187,7 @@ const SellerAccountForm = ({ onRegisterSuccess }: SellerAccountFormProps) => {
         email: values.email,
         password: values.password,
         dateOfBirth: values.dateOfBirth || null,
-        GSTIN: values.gstin,
+        GSTIN: values.gstin.trim().toUpperCase(),
         pickupAddress: {
           name: values.pickupAddress.name,
           mobileNumber: values.pickupAddress.mobile || values.mobile,
@@ -197,7 +202,7 @@ const SellerAccountForm = ({ onRegisterSuccess }: SellerAccountFormProps) => {
         businessDetails: {
           businessName: values.businessDetails.businessName,
           businessType: values.businessDetails.businessType,
-          gstNumber: values.gstin,
+          gstNumber: values.gstin.trim().toUpperCase(),
           panNumber: values.businessDetails.panNumber,
         },
         bankDetails: {

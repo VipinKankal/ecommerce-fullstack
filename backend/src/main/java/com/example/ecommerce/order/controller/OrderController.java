@@ -7,6 +7,7 @@ import com.example.ecommerce.common.domain.PaymentStatus;
 import com.example.ecommerce.common.domain.PaymentType;
 import com.example.ecommerce.common.domain.CouponReservationState;
 import com.example.ecommerce.common.domain.UserRole;
+import com.example.ecommerce.common.mapper.ResponseMapper;
 import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.*;
 import com.example.ecommerce.order.request.CheckoutOrderRequest;
@@ -270,6 +271,7 @@ public class OrderController {
         response.setCancelReasonCode(order.getCancelReasonCode());
         response.setCancelReasonText(order.getCancelReasonText());
         response.setShippingAddress(toShippingAddressResponse(order.getShippingAddress()));
+        response.setOrderTaxSnapshot(ResponseMapper.toOrderTaxSnapshotResponse(order.getOrderTaxSnapshot()));
 
         List<OrderHistoryItemResponse> items = order.getOrderItems().stream()
                 .map(this::toOrderItemResponse)

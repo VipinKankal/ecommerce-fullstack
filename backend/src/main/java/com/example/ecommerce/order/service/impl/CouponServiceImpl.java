@@ -798,9 +798,21 @@ public class CouponServiceImpl implements CouponService {
         response.setFirstOrderOnly(coupon.isFirstOrderOnly());
         response.setUserEligibilityType(coupon.getUserEligibilityType());
         response.setInactiveDaysThreshold(coupon.getInactiveDaysThreshold());
-        response.setMappedUserCount(couponUserMapRepository.countByCouponId(coupon.getId()));
+        response.setMappedUserCount(resolveMappedUserCount(coupon.getId()));
         response.setActive(coupon.isActive());
         return response;
+    }
+
+    private long resolveMappedUserCount(Long couponId) {
+        if (couponId == null) {
+            return 0;
+        }
+        try {
+            return couponUserMapRepository.countByCouponId(couponId);
+        } catch (Exception ex) {
+            log.warn("Unable to resolve mapped user count for coupon {}", couponId, ex);
+            return 0;
+        }
     }
 
     private String normalizeCode(String code) {

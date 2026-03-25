@@ -21,7 +21,16 @@ public class TransactionServiceImpl implements TransactionService {
 
     @Override
     public Transaction createTransaction(Order order) {
-        Seller seller = sellerRepository.findById(order.getSellerId()).get();
+        if (order == null || order.getId() == null) {
+            throw new IllegalArgumentException("Order is required to create a transaction");
+        }
+        return transactionRepository.findByOrderId(order.getId()).orElseGet(() -> createNewTransaction(order));
+    }
+
+    private Transaction createNewTransaction(Order order) {
+        Seller seller = order.getSellerId() == null
+                ? null
+                : sellerRepository.findById(order.getSellerId()).orElse(null);
         Transaction transaction = new Transaction();
         transaction.setSeller(seller);
         transaction.setCustomer(order.getUser());

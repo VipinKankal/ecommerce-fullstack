@@ -80,6 +80,14 @@ public class ProductServiceImpl implements ProductService{
         product.setImages(request.getImages());
         product.setMrpPrice(request.getMrpPrice());
         product.setSize(request.getSize());
+        product.setHsnCode(normalizeNullable(request.getHsnCode()));
+        product.setPricingMode(normalizePricingMode(request.getPricingMode()));
+        product.setTaxClass(normalizeTaxClass(request.getTaxClass()));
+        product.setTaxRuleVersion(normalizeTaxRuleVersion(request.getTaxRuleVersion()));
+        product.setTaxPercentage(normalizeCurrencyValue(request.getTaxPercentage(), 0.0));
+        product.setCostPrice(normalizeCurrencyValue(request.getCostPrice(), 0.0));
+        product.setPlatformCommission(normalizeCurrencyValue(request.getPlatformCommission(), 0.0));
+        product.setCurrencyCode(normalizeCurrency(request.getCurrency()));
         product.setActive(true);
         product.setLowStockThreshold(10);
         product.setWarrantyType(normalizeWarrantyType(request.getWarrantyType()));
@@ -148,6 +156,30 @@ public class ProductServiceImpl implements ProductService{
         }
         if (request.getSize() != null) {
             existing.setSize(request.getSize());
+        }
+        if (request.getHsnCode() != null) {
+            existing.setHsnCode(normalizeNullable(request.getHsnCode()));
+        }
+        if (request.getPricingMode() != null) {
+            existing.setPricingMode(normalizePricingMode(request.getPricingMode()));
+        }
+        if (request.getTaxClass() != null) {
+            existing.setTaxClass(normalizeTaxClass(request.getTaxClass()));
+        }
+        if (request.getTaxRuleVersion() != null) {
+            existing.setTaxRuleVersion(normalizeTaxRuleVersion(request.getTaxRuleVersion()));
+        }
+        if (request.getTaxPercentage() != null) {
+            existing.setTaxPercentage(normalizeCurrencyValue(request.getTaxPercentage(), 0.0));
+        }
+        if (request.getCostPrice() != null) {
+            existing.setCostPrice(normalizeCurrencyValue(request.getCostPrice(), 0.0));
+        }
+        if (request.getPlatformCommission() != null) {
+            existing.setPlatformCommission(normalizeCurrencyValue(request.getPlatformCommission(), 0.0));
+        }
+        if (request.getCurrency() != null) {
+            existing.setCurrencyCode(normalizeCurrency(request.getCurrency()));
         }
         if (request.getWarrantyType() != null) {
             existing.setWarrantyType(normalizeWarrantyType(request.getWarrantyType()));
@@ -227,6 +259,50 @@ public class ProductServiceImpl implements ProductService{
             return 0;
         }
         return Math.max(warrantyDays, 0);
+    }
+
+    private String normalizePricingMode(String pricingMode) {
+        if (pricingMode == null || pricingMode.isBlank()) {
+            return "INCLUSIVE";
+        }
+        String normalized = pricingMode.trim().toUpperCase();
+        return List.of("INCLUSIVE", "EXCLUSIVE").contains(normalized) ? normalized : "INCLUSIVE";
+    }
+
+    private String normalizeTaxClass(String taxClass) {
+        if (taxClass == null || taxClass.isBlank()) {
+            return "APPAREL_STANDARD";
+        }
+        return taxClass.trim().toUpperCase();
+    }
+
+    private String normalizeTaxRuleVersion(String taxRuleVersion) {
+        if (taxRuleVersion == null || taxRuleVersion.isBlank()) {
+            return "AUTO_ACTIVE";
+        }
+        return taxRuleVersion.trim().toUpperCase();
+    }
+
+    private String normalizeCurrency(String currency) {
+        if (currency == null || currency.isBlank()) {
+            return "INR";
+        }
+        return currency.trim().toUpperCase();
+    }
+
+    private Double normalizeCurrencyValue(Number value, double fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        return Math.max(value.doubleValue(), 0.0);
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isBlank() ? null : trimmed.toUpperCase();
     }
 
     private List<ProductVariant> buildVariants(

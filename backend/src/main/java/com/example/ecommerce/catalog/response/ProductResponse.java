@@ -23,6 +23,14 @@ public class ProductResponse {
     private String warrantyType;
     private Integer warrantyDays;
     private String color;
+    private String hsnCode;
+    private String pricingMode;
+    private String taxClass;
+    private String taxRuleVersion;
+    private Double taxPercentage;
+    private Double costPrice;
+    private Double platformCommission;
+    private String currency;
     private List<String> images = new ArrayList<>();
     private Integer numRatings;
     private CategorySummary category;

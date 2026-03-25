@@ -8,6 +8,7 @@ import com.example.ecommerce.common.domain.PaymentType;
 import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.inventory.service.RestockNotificationService;
 import com.example.ecommerce.modal.*;
+import com.example.ecommerce.order.service.OrderTaxSnapshotService;
 import com.example.ecommerce.repository.AddressRepository;
 import com.example.ecommerce.repository.CartRepository;
 import com.example.ecommerce.repository.OrderItemRepository;
@@ -35,6 +36,7 @@ public class OrderServiceImpl implements OrderService {
     private final RestockNotificationService restockNotificationService;
     private final ProductVariantRepository productVariantRepository;
     private final ProductRepository productRepository;
+    private final OrderTaxSnapshotService orderTaxSnapshotService;
 
     @Override
     @Transactional
@@ -130,6 +132,8 @@ public class OrderServiceImpl implements OrderService {
                 restockNotificationService.markSubscriptionConverted(user, item.getProduct());
                 orderItems.add(savedOrderItem);
             }
+
+            orderTaxSnapshotService.freezeSnapshot(savedOrder, orderItems, sellerCouponDiscount);
         }
 
         // Once order is created, clear purchased items from cart.

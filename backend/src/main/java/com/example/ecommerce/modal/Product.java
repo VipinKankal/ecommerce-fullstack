@@ -36,6 +36,14 @@ public class Product {
     private String warrantyType;
     private Integer warrantyDays;
     private String color;
+    private String hsnCode;
+    private String pricingMode;
+    private String taxClass;
+    private String taxRuleVersion;
+    private Double taxPercentage;
+    private Double costPrice;
+    private Double platformCommission;
+    private String currencyCode;
 
     @ElementCollection
     private List<String> images = new ArrayList<>();

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import {
@@ -13,10 +13,18 @@ import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import { adminSignin, getAdminProfile } from 'State/features/admin/auth/thunks';
 import { clearAdminAuthError } from 'State/features/admin/auth/slice';
+import {
+  consumePostLoginRedirect,
+  getDefaultLandingPath,
+  getPendingAuthNotice,
+} from 'shared/auth/session';
 
 const AdminLoginForm = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [sessionNotice, setSessionNotice] = useState<string | null>(() =>
+    getPendingAuthNotice(),
+  );
   const { loading, error } = useAppSelector((state) => state.adminAuth);
 
   const formik = useFormik({
@@ -31,8 +39,11 @@ const AdminLoginForm = () => {
     onSubmit: async (values) => {
       const result = await dispatch(adminSignin(values));
       if (adminSignin.fulfilled.match(result)) {
-        await dispatch(getAdminProfile());
-        navigate('/admin/dashboard');
+        await dispatch(getAdminProfile()).unwrap();
+        const { redirectPath } = consumePostLoginRedirect(
+          getDefaultLandingPath('admin'),
+        );
+        navigate(redirectPath);
       }
     },
   });
@@ -42,6 +53,16 @@ const AdminLoginForm = () => {
       <Typography variant="h5" fontWeight="900" textAlign="center" mb={3}>
         Admin Login
       </Typography>
+
+      {sessionNotice && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setSessionNotice(null)}
+        >
+          {sessionNotice}
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>

@@ -5,6 +5,7 @@ import com.example.ecommerce.common.domain.PaymentMethod;
 import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
 import com.example.ecommerce.common.domain.PaymentType;
+import com.example.ecommerce.order.response.OrderTaxSnapshotResponse;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -33,6 +34,7 @@ public class SellerOrderResponse {
     private LocalDateTime deliveredAt;
     private CustomerSummary user;
     private AddressSummary shippingAddress;
+    private OrderTaxSnapshotResponse orderTaxSnapshot;
     private List<OrderItemSummary> orderItems = new ArrayList<>();
 
     @Data

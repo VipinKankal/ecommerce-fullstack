@@ -8,9 +8,8 @@ import com.example.ecommerce.common.response.ApiResponse;
 import com.example.ecommerce.order.response.CheckoutPaymentStatusResponse;
 import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.PaymentService;
+import com.example.ecommerce.order.service.SettlementLedgerService;
 import com.example.ecommerce.order.service.TransactionService;
-import com.example.ecommerce.seller.service.SellerReportService;
-import com.example.ecommerce.seller.service.SellerService;
 import com.example.ecommerce.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
@@ -33,9 +32,8 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final UserService userService;
     private final CouponService couponService;
-    private final SellerService sellerService;
-    private final SellerReportService sellerReportService;
     private final TransactionService transactionService;
+    private final SettlementLedgerService settlementLedgerService;
 
     @GetMapping("/{paymentId}")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
@@ -131,13 +129,8 @@ public class PaymentController {
         }
         for (Order order : paymentOrder.getOrders()) {
             transactionService.createTransaction(order);
-            Seller seller = sellerService.getSellerById(order.getSellerId());
-            SellerReport report = sellerReportService.getSellerReport(seller);
-            report.setTotalOrders(report.getTotalOrders() + 1);
-            report.setTotalEarnings(report.getTotalEarnings() + order.getTotalSellingPrice());
-            report.setTotalSales(report.getTotalSales() + order.getOrderItems().size());
-            sellerReportService.updateSellerReport(report);
         }
+        settlementLedgerService.recordSuccessfulPayment(paymentOrder);
     }
 
     private CheckoutPaymentStatusResponse buildCheckoutPaymentStatusResponse(

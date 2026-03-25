@@ -10,6 +10,7 @@ import {
   fetchWishlist,
   toggleWishlistProduct,
 } from 'State/features/customer/wishlist/slice';
+import { redirectToLogin } from 'shared/auth/redirectToLogin';
 
 export const useProductDetails = () => {
   const [quantity, setQuantity] = useState(1);
@@ -99,7 +100,11 @@ export const useProductDetails = () => {
     if (!selectedProduct) return;
 
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to add items to your cart.',
+      );
       return;
     }
 
@@ -113,7 +118,17 @@ export const useProductDetails = () => {
       ).unwrap();
 
       alert('Product added to cart successfully!');
-    } catch {
+    } catch (error) {
+      const message =
+        typeof error === 'string' ? error : 'Failed to add product to cart.';
+      if (/login|auth|unauth|session/i.test(message)) {
+        redirectToLogin(
+          navigate,
+          'customer',
+          'Please log in again to continue with your cart.',
+        );
+        return;
+      }
       alert('Failed to add product to cart.');
     }
   };
@@ -121,7 +136,11 @@ export const useProductDetails = () => {
   const handleBuyNow = async () => {
     if (!selectedProduct) return;
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to continue to checkout.',
+      );
       return;
     }
 
@@ -134,7 +153,17 @@ export const useProductDetails = () => {
         }),
       ).unwrap();
       navigate('/checkout/cart');
-    } catch {
+    } catch (error) {
+      const message =
+        typeof error === 'string' ? error : 'Failed to process Buy Now.';
+      if (/login|auth|unauth|session/i.test(message)) {
+        redirectToLogin(
+          navigate,
+          'customer',
+          'Please log in again to continue to checkout.',
+        );
+        return;
+      }
       alert('Failed to process Buy Now.');
     }
   };
@@ -142,7 +171,11 @@ export const useProductDetails = () => {
   const handleToggleWishlist = async () => {
     if (!selectedProduct?.id) return;
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to save products to your wishlist.',
+      );
       return;
     }
     try {
@@ -156,13 +189,19 @@ export const useProductDetails = () => {
     if (!selectedProduct?.id) return;
 
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to save stock alerts for this product.',
+      );
       return;
     }
 
     setNotifyLoading(true);
     try {
-      const response = await api.post(API_ROUTES.products.notifyMe(selectedProduct.id));
+      const response = await api.post(
+        API_ROUTES.products.notifyMe(selectedProduct.id),
+      );
       setNotifyStatus(String(response.data?.status || 'SUBSCRIBED'));
       setNotifyMessage(
         String(
@@ -171,8 +210,8 @@ export const useProductDetails = () => {
       );
     } catch (error) {
       setNotifyMessage(
-        (error as { response?: { data?: { message?: string } } })?.response?.data
-          ?.message || 'Failed to save notification request.',
+        (error as { response?: { data?: { message?: string } } })?.response
+          ?.data?.message || 'Failed to save notification request.',
       );
     } finally {
       setNotifyLoading(false);

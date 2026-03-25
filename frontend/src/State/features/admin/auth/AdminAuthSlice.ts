@@ -44,6 +44,7 @@ const adminAuthSlice = createSlice({
       state.error = null;
       state.message = null;
     },
+    resetAdminAuthState: () => initialState,
   },
   extraReducers: (builder) => {
     builder
@@ -106,5 +107,6 @@ const adminAuthSlice = createSlice({
   },
 });
 
-export const { clearAdminAuthError } = adminAuthSlice.actions;
+export const { clearAdminAuthError, resetAdminAuthState } =
+  adminAuthSlice.actions;
 export default adminAuthSlice.reducer;

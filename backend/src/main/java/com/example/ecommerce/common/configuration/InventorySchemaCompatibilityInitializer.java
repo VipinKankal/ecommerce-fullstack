@@ -664,13 +664,23 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
     }
 
     private void ensureUniqueIndex(String tableName, String indexName, String columnsSql) {
-        Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM information_schema.statistics " +
-                        "WHERE LOWER(table_name) = LOWER(?) AND LOWER(index_name) = LOWER(?)",
-                Integer.class,
-                tableName,
-                indexName
-        );
+        Integer count = null;
+        try {
+            count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM information_schema.statistics " +
+                            "WHERE LOWER(table_name) = LOWER(?) AND LOWER(index_name) = LOWER(?)",
+                    Integer.class,
+                    tableName,
+                    indexName
+            );
+        } catch (Exception ex) {
+            log.debug(
+                    "Skipping index existence lookup for {} on {} because metadata query failed: {}",
+                    indexName,
+                    tableName,
+                    ex.getMessage()
+            );
+        }
         if (count != null && count > 0) {
             return;
         }
@@ -705,3 +715,4 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         return databaseProductName != null && databaseProductName.toLowerCase().contains("h2");
     }
 }
+

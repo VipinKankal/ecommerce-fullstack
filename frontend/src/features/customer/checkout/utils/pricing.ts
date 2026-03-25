@@ -5,6 +5,11 @@ export interface OrderSummaryPriceBreakdown {
   totalMRP?: number;
   totalSellingPrice?: number;
   totalDiscount?: number;
+  taxableAmount?: number;
+  cgst?: number;
+  sgst?: number;
+  igst?: number;
+  totalTax?: number;
 }
 
 export interface OrderSummaryResponse {

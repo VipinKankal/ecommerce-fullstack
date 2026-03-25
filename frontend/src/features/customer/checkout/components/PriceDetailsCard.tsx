@@ -7,6 +7,11 @@ interface Props {
   selectedDiscount: number;
   platformFee: number;
   totalAmount: number;
+  taxableAmount?: number | null;
+  cgst?: number | null;
+  sgst?: number | null;
+  igst?: number | null;
+  totalTax?: number | null;
 }
 
 const PriceDetailsCard = ({
@@ -15,6 +20,11 @@ const PriceDetailsCard = ({
   selectedDiscount,
   platformFee,
   totalAmount,
+  taxableAmount,
+  cgst,
+  sgst,
+  igst,
+  totalTax,
 }: Props) => {
   return (
     <div className="space-y-3 rounded-lg border border-gray-200 p-4">
@@ -35,6 +45,44 @@ const PriceDetailsCard = ({
           <span>Rs {platformFee}</span>
         </div>
       </div>
+      {(taxableAmount != null ||
+        cgst != null ||
+        sgst != null ||
+        igst != null ||
+        totalTax != null) && (
+        <div className="space-y-2 text-sm rounded-md border border-blue-100 bg-blue-50/40 p-3">
+          {taxableAmount != null && (
+            <div className="flex justify-between">
+              <span>Taxable Amount</span>
+              <span>Rs {taxableAmount}</span>
+            </div>
+          )}
+          {cgst != null && (
+            <div className="flex justify-between">
+              <span>CGST</span>
+              <span>Rs {cgst}</span>
+            </div>
+          )}
+          {sgst != null && (
+            <div className="flex justify-between">
+              <span>SGST</span>
+              <span>Rs {sgst}</span>
+            </div>
+          )}
+          {igst != null && (
+            <div className="flex justify-between">
+              <span>IGST</span>
+              <span>Rs {igst}</span>
+            </div>
+          )}
+          {totalTax != null && (
+            <div className="flex justify-between font-semibold">
+              <span>Total Tax</span>
+              <span>Rs {totalTax}</span>
+            </div>
+          )}
+        </div>
+      )}
       <Divider />
       <div className="flex justify-between font-semibold">
         <span>Total Amount</span>

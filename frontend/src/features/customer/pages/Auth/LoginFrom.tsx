@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFormik } from 'formik';
 import {
   TextField,
@@ -18,10 +18,18 @@ import {
 } from 'State/features/customer/auth/thunks';
 import { clearError } from 'State/features/customer/auth/slice';
 import { useNavigate } from 'react-router-dom';
+import {
+  consumePostLoginRedirect,
+  getDefaultLandingPath,
+  getPendingAuthNotice,
+} from 'shared/auth/session';
 
 const LoginForm = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [sessionNotice, setSessionNotice] = useState<string | null>(() =>
+    getPendingAuthNotice(),
+  );
 
   const { loading, error, otpSent } = useAppSelector(
     (state) => state.customerAuth,
@@ -32,9 +40,11 @@ const LoginForm = () => {
     onSubmit: async (values) => {
       const result = await dispatch(signinCustomer(values));
       if (signinCustomer.fulfilled.match(result)) {
-        const jwt = (result.payload as { jwt?: string })?.jwt;
-        await dispatch(getUserProfile(jwt));
-        navigate('/');
+        await dispatch(getUserProfile()).unwrap();
+        const { redirectPath } = consumePostLoginRedirect(
+          getDefaultLandingPath('customer'),
+        );
+        navigate(redirectPath);
       }
     },
   });
@@ -51,6 +61,16 @@ const LoginForm = () => {
       <Typography variant="h5" fontWeight="900" textAlign="center" mb={3}>
         Login to Account
       </Typography>
+
+      {sessionNotice && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setSessionNotice(null)}
+        >
+          {sessionNotice}
+        </Alert>
+      )}
 
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
@@ -118,4 +138,3 @@ const LoginForm = () => {
 };
 
 export default LoginForm;
-

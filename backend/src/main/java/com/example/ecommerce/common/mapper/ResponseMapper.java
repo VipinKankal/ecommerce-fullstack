@@ -4,10 +4,12 @@ import com.example.ecommerce.modal.Address;
 import com.example.ecommerce.modal.Category;
 import com.example.ecommerce.modal.Order;
 import com.example.ecommerce.modal.OrderItem;
+import com.example.ecommerce.modal.OrderTaxSnapshot;
 import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.ProductVariant;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.modal.User;
+import com.example.ecommerce.order.response.OrderTaxSnapshotResponse;
 import com.example.ecommerce.catalog.response.ProductResponse;
 import com.example.ecommerce.seller.response.SellerOrderResponse;
 import com.example.ecommerce.seller.response.SellerResponse;
@@ -42,6 +44,14 @@ public final class ResponseMapper {
         response.setWarrantyType(product.getWarrantyType());
         response.setWarrantyDays(product.getWarrantyDays());
         response.setColor(product.getColor());
+        response.setHsnCode(product.getHsnCode());
+        response.setPricingMode(product.getPricingMode());
+        response.setTaxClass(product.getTaxClass());
+        response.setTaxRuleVersion(product.getTaxRuleVersion());
+        response.setTaxPercentage(product.getTaxPercentage());
+        response.setCostPrice(product.getCostPrice());
+        response.setPlatformCommission(product.getPlatformCommission());
+        response.setCurrency(product.getCurrencyCode());
         response.setImages(product.getImages() == null ? Collections.emptyList() : product.getImages());
         response.setNumRatings(product.getNumRatings());
         response.setCategory(toCategorySummary(product.getCategory()));
@@ -150,6 +160,7 @@ public final class ResponseMapper {
         response.setDeliveredAt(order.getDeliveredAt());
         response.setUser(toCustomerSummary(order.getUser()));
         response.setShippingAddress(toOrderAddress(order.getShippingAddress()));
+        response.setOrderTaxSnapshot(toOrderTaxSnapshotResponse(order.getOrderTaxSnapshot()));
         response.setOrderItems(order.getOrderItems() == null ? Collections.emptyList() : order.getOrderItems().stream().map(ResponseMapper::toOrderItemSummary).collect(Collectors.toList()));
         return response;
     }
@@ -252,6 +263,32 @@ public final class ResponseMapper {
         summary.setSellerStock(variant.getSellerStock());
         summary.setWarehouseStock(variant.getWarehouseStock());
         return summary;
+    }
+
+    public static OrderTaxSnapshotResponse toOrderTaxSnapshotResponse(OrderTaxSnapshot snapshot) {
+        if (snapshot == null) {
+            return null;
+        }
+        OrderTaxSnapshotResponse response = new OrderTaxSnapshotResponse();
+        response.setId(snapshot.getId());
+        response.setOrderType(snapshot.getOrderType());
+        response.setSupplierGstin(snapshot.getSupplierGstin());
+        response.setSellerStateCode(snapshot.getSellerStateCode());
+        response.setPosStateCode(snapshot.getPosStateCode());
+        response.setSupplyType(snapshot.getSupplyType());
+        response.setTotalTaxableValue(snapshot.getTotalTaxableValue());
+        response.setTotalGstAmount(snapshot.getTotalGstAmount());
+        response.setTotalAmountCharged(snapshot.getTotalAmountCharged());
+        response.setTotalAmountWithTax(snapshot.getTotalAmountWithTax());
+        response.setTotalCommissionAmount(snapshot.getTotalCommissionAmount());
+        response.setTotalCommissionGstAmount(snapshot.getTotalCommissionGstAmount());
+        response.setTcsRatePercentage(snapshot.getTcsRatePercentage());
+        response.setTcsAmount(snapshot.getTcsAmount());
+        response.setGstRuleVersion(snapshot.getGstRuleVersion());
+        response.setTcsRuleVersion(snapshot.getTcsRuleVersion());
+        response.setSnapshotSource(snapshot.getSnapshotSource());
+        response.setFrozenAt(snapshot.getFrozenAt());
+        return response;
     }
 
     private static String maskCustomerName(String fullName) {

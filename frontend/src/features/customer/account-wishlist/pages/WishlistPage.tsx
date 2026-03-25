@@ -10,6 +10,7 @@ import {
   removeWishlistProduct,
 } from 'State/features/customer/wishlist/slice';
 import { addToCart } from 'State/features/customer/cart/slice';
+import { redirectToLogin } from 'shared/auth/redirectToLogin';
 
 type WishlistItem = {
   id?: number;
@@ -66,6 +67,14 @@ const Wishlist = () => {
   const handleAddToCart = async (e: React.MouseEvent, item: WishlistItem) => {
     e.stopPropagation();
     if (!item?.id) return;
+    if (!customer) {
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to add wishlist items to your cart.',
+      );
+      return;
+    }
     try {
       await dispatch(
         addToCart({
@@ -74,8 +83,17 @@ const Wishlist = () => {
           size: getDefaultSize(item.sizes),
         }),
       ).unwrap();
-    } catch {
-      // Keep UX simple for now and use existing app alert pattern.
+    } catch (error) {
+      const message =
+        typeof error === 'string' ? error : 'Failed to add product to cart.';
+      if (/login|auth|unauth|session/i.test(message)) {
+        redirectToLogin(
+          navigate,
+          'customer',
+          'Please log in again to continue with your cart.',
+        );
+        return;
+      }
       alert('Failed to add product to cart.');
     }
   };

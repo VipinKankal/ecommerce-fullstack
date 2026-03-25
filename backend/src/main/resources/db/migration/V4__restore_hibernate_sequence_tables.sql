@@ -40,6 +40,27 @@ INSERT INTO coupon_seq (next_val)
 SELECT 1
 WHERE NOT EXISTS (SELECT 1 FROM coupon_seq);
 
+CREATE TABLE IF NOT EXISTS coupon_event_log_seq (
+    next_val BIGINT
+);
+INSERT INTO coupon_event_log_seq (next_val)
+SELECT 1
+WHERE NOT EXISTS (SELECT 1 FROM coupon_event_log_seq);
+
+CREATE TABLE IF NOT EXISTS coupon_user_map_seq (
+    next_val BIGINT
+);
+INSERT INTO coupon_user_map_seq (next_val)
+SELECT 1
+WHERE NOT EXISTS (SELECT 1 FROM coupon_user_map_seq);
+
+CREATE TABLE IF NOT EXISTS coupon_usage_seq (
+    next_val BIGINT
+);
+INSERT INTO coupon_usage_seq (next_val)
+SELECT 1
+WHERE NOT EXISTS (SELECT 1 FROM coupon_usage_seq);
+
 CREATE TABLE IF NOT EXISTS orders_seq (
     next_val BIGINT
 );
@@ -74,6 +95,27 @@ CREATE TABLE IF NOT EXISTS seller_report_seq (
 INSERT INTO seller_report_seq (next_val)
 SELECT 1
 WHERE NOT EXISTS (SELECT 1 FROM seller_report_seq);
+
+CREATE TABLE IF NOT EXISTS product_variant_seq (
+    next_val BIGINT
+);
+INSERT INTO product_variant_seq (next_val)
+SELECT 1
+WHERE NOT EXISTS (SELECT 1 FROM product_variant_seq);
+
+CREATE TABLE IF NOT EXISTS product_restock_subscriptions_seq (
+    next_val BIGINT
+);
+INSERT INTO product_restock_subscriptions_seq (next_val)
+SELECT 1
+WHERE NOT EXISTS (SELECT 1 FROM product_restock_subscriptions_seq);
+
+CREATE TABLE IF NOT EXISTS product_restock_notification_logs_seq (
+    next_val BIGINT
+);
+INSERT INTO product_restock_notification_logs_seq (next_val)
+SELECT 1
+WHERE NOT EXISTS (SELECT 1 FROM product_restock_notification_logs_seq);
 
 CREATE TABLE IF NOT EXISTS wishlist_seq (
     next_val BIGINT

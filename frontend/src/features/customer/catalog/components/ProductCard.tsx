@@ -9,6 +9,7 @@ import { Product } from 'shared/types/product.types';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import { addToCart } from 'State/features/customer/cart/slice';
 import { toggleWishlistProduct } from 'State/features/customer/wishlist/slice';
+import { redirectToLogin } from 'shared/auth/redirectToLogin';
 
 const ProductCard = ({ item }: { item: Product }) => {
   const [currentImage, setCurrentImage] = useState(0);
@@ -58,7 +59,11 @@ const ProductCard = ({ item }: { item: Product }) => {
   const handleToggleWishlist = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to save products to your wishlist.',
+      );
       return;
     }
     if (!item.id) return;
@@ -68,34 +73,67 @@ const ProductCard = ({ item }: { item: Product }) => {
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to add items to your cart.',
+      );
       return;
     }
     if (!item.id) return;
-    await dispatch(
-      addToCart({
-        productId: item.id,
-        quantity: 1,
-        size: getDefaultSize(),
-      }),
-    );
+    try {
+      await dispatch(
+        addToCart({
+          productId: item.id,
+          quantity: 1,
+          size: getDefaultSize(),
+        }),
+      ).unwrap();
+    } catch (error) {
+      const message =
+        typeof error === 'string' ? error : 'Failed to add item to cart';
+      if (/login|auth|unauth|session/i.test(message)) {
+        redirectToLogin(
+          navigate,
+          'customer',
+          'Please log in again to continue with your cart.',
+        );
+      }
+    }
   };
 
   const handleBuyNow = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!customer) {
-      navigate('/login');
+      redirectToLogin(
+        navigate,
+        'customer',
+        'Please log in to continue to checkout.',
+      );
       return;
     }
     if (!item.id) return;
-    await dispatch(
-      addToCart({
-        productId: item.id,
-        quantity: 1,
-        size: getDefaultSize(),
-      }),
-    );
-    navigate('/checkout/cart');
+    try {
+      await dispatch(
+        addToCart({
+          productId: item.id,
+          quantity: 1,
+          size: getDefaultSize(),
+        }),
+      ).unwrap();
+      navigate('/checkout/cart');
+    } catch (error) {
+      const message =
+        typeof error === 'string' ? error : 'Failed to process Buy Now';
+      if (/login|auth|unauth|session/i.test(message)) {
+        redirectToLogin(
+          navigate,
+          'customer',
+          'Please log in again to continue to checkout.',
+        );
+        return;
+      }
+    }
   };
 
   const colorValue = item.color as unknown;

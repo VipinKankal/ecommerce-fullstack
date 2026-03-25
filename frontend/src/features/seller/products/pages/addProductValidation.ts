@@ -16,16 +16,42 @@ export const addProductValidationSchema = Yup.object({
     )
     .required('Description is required'),
   shortDescription: Yup.string().required('Short description is required'),
+  hsnCode: Yup.string()
+    .trim()
+    .matches(/^\d{4,8}$/, 'HSN code must be 4 to 8 digits')
+    .required('HSN code is required'),
   mrpPrice: Yup.number().positive().required('MRP is required'),
   sellingPrice: Yup.number().positive().required('Selling price is required'),
+  pricingMode: Yup.string()
+    .oneOf(['INCLUSIVE', 'EXCLUSIVE'])
+    .required('Pricing mode is required'),
+  taxClass: Yup.string().trim().required('Tax class is required'),
+  taxRuleVersion: Yup.string().trim().required('Tax rule version is required'),
+  taxPercentage: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === '' ? undefined : value,
+    )
+    .min(0, 'Tax percentage cannot be negative')
+    .max(100, 'Tax percentage cannot exceed 100')
+    .required('Tax percentage is required'),
+  platformCommission: Yup.number()
+    .transform((value, originalValue) =>
+      originalValue === '' ? undefined : value,
+    )
+    .min(0, 'Platform commission cannot be negative')
+    .required('Platform commission is required'),
+  costPrice: Yup.number()
+    .transform((value, originalValue) => (originalValue === '' ? null : value))
+    .nullable()
+    .min(0, 'Cost price cannot be negative'),
   stockQuantity: Yup.number().min(0).required('Stock quantity is required'),
   warrantyType: Yup.string().oneOf(['NONE', 'BRAND', 'SELLER']),
   warrantyDays: Yup.number().when('warrantyType', {
     is: (value: string) => value && value !== 'NONE',
     then: (schema) =>
-      schema.min(1, 'Warranty days must be at least 1').required(
-        'Warranty days are required',
-      ),
+      schema
+        .min(1, 'Warranty days must be at least 1')
+        .required('Warranty days are required'),
     otherwise: (schema) => schema.min(0),
   }),
   category: Yup.string().required('Required'),

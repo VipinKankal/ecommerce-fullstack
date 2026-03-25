@@ -1,4 +1,8 @@
-import axios, { type AxiosInstance, type AxiosResponse } from 'axios';
+import axios, {
+  AxiosError,
+  type AxiosInstance,
+  type AxiosResponse,
+} from 'axios';
 
 const BASE_URL = (
   process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080'
@@ -7,6 +11,7 @@ const BASE_URL = (
 export const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  withXSRFToken: true,
   xsrfCookieName: 'XSRF-TOKEN',
   xsrfHeaderName: 'X-CSRF-Token',
   headers: {
@@ -17,6 +22,7 @@ export const api = axios.create({
 export const publicApi = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  withXSRFToken: true,
   xsrfCookieName: 'XSRF-TOKEN',
   xsrfHeaderName: 'X-CSRF-Token',
   headers: {
@@ -44,6 +50,13 @@ type SetAuthTokenOptions = {
   persistToken?: boolean;
 };
 
+type UnauthorizedEvent = {
+  path: string;
+  status: number;
+};
+
+let unauthorizedHandler: ((event: UnauthorizedEvent) => void) | null = null;
+
 const isApiEnvelope = (value: unknown): value is ApiEnvelope => {
   if (typeof value !== 'object' || value === null) return false;
 
@@ -70,8 +83,72 @@ const attachApiEnvelopeInterceptor = (client: AxiosInstance) => {
   });
 };
 
+const readCookieValue = (name: string) => {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const target = `${name}=`;
+  const cookie = document.cookie
+    .split(';')
+    .map((item) => item.trim())
+    .find((item) => item.startsWith(target));
+
+  if (!cookie) {
+    return null;
+  }
+
+  return decodeURIComponent(cookie.slice(target.length));
+};
+
+const attachXsrfInterceptor = (client: AxiosInstance) => {
+  client.interceptors.request.use((config) => {
+    const xsrfToken = readCookieValue('XSRF-TOKEN');
+    if (!xsrfToken) {
+      return config;
+    }
+
+    config.headers.set?.('X-CSRF-Token', xsrfToken);
+    return config;
+  });
+};
+
+const attachUnauthorizedInterceptor = (client: AxiosInstance) => {
+  client.interceptors.response.use(
+    (response) => response,
+    (error: AxiosError) => {
+      const status = error.response?.status;
+      const requestUrl = error.config?.url || '';
+      const isPublicAuthEndpoint =
+        requestUrl.includes('/api/auth/signin') ||
+        requestUrl.includes('/api/auth/signup') ||
+        requestUrl.includes('/api/auth/sent/login-signup-otp') ||
+        requestUrl.includes('/api/auth/logout');
+
+      if (status === 401 && unauthorizedHandler && !isPublicAuthEndpoint) {
+        setAuthToken(null);
+        unauthorizedHandler({
+          path: requestUrl,
+          status,
+        });
+      }
+
+      return Promise.reject(error);
+    },
+  );
+};
+
 attachApiEnvelopeInterceptor(api);
 attachApiEnvelopeInterceptor(publicApi);
+attachXsrfInterceptor(api);
+attachXsrfInterceptor(publicApi);
+attachUnauthorizedInterceptor(api);
+
+export const registerUnauthorizedHandler = (
+  handler: ((event: UnauthorizedEvent) => void) | null,
+) => {
+  unauthorizedHandler = handler;
+};
 
 export const getAuthRole = () => {
   if (globalThis.sessionStorage === undefined) return null;

@@ -11,6 +11,7 @@ import {
   Paper,
   TextField,
   Typography,
+  Chip,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
 import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
@@ -55,6 +56,34 @@ const AddProductFormBody = ({
     formik.touched.description && formik.errors.description
       ? `${formik.errors.description} (${descriptionLength}/${PRODUCT_DESCRIPTION_MAX_LENGTH})`
       : `${descriptionLength}/${PRODUCT_DESCRIPTION_MAX_LENGTH} characters`;
+
+  const pricingMode =
+    formik.values.pricingMode === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'INCLUSIVE';
+  const sellingPrice = Number(formik.values.sellingPrice || 0);
+  const taxRate = Number(formik.values.taxPercentage || 0);
+  const commissionAmount = Number(formik.values.platformCommission || 0);
+  const costPrice = Number(formik.values.costPrice || 0);
+
+  const taxableValue =
+    pricingMode === 'INCLUSIVE'
+      ? sellingPrice / (1 + taxRate / 100 || 1)
+      : sellingPrice;
+  const gstAmount =
+    pricingMode === 'INCLUSIVE'
+      ? sellingPrice - taxableValue
+      : taxableValue * (taxRate / 100);
+  const finalCustomerPrice =
+    pricingMode === 'INCLUSIVE' ? sellingPrice : sellingPrice + gstAmount;
+  const commissionGst = commissionAmount * 0.18;
+  const netReceivable = finalCustomerPrice - commissionAmount - commissionGst;
+  const estimatedProfit = costPrice > 0 ? netReceivable - costPrice : null;
+  const appliedTaxRuleVersion = formik.values.taxRuleVersion || 'AUTO_ACTIVE';
+  const slabHint =
+    taxableValue <= 1000
+      ? 'Likely apparel lower slab bucket (<= Rs 1000 per piece).'
+      : taxableValue <= 2500
+        ? 'Near slab transition range (Rs 1000 - Rs 2500). Verify active rule version.'
+        : 'Likely apparel higher slab bucket (> Rs 2500 per piece).';
 
   return (
     <Grid container spacing={3}>
@@ -300,6 +329,7 @@ const AddProductFormBody = ({
         ['sellingPrice', 'Selling Price'],
         ['taxPercentage', 'Tax Percentage'],
         ['platformCommission', 'Platform Commission'],
+        ['costPrice', 'Cost Price (optional)'],
       ].map(([field, label]) => (
         <Grid key={field} size={{ xs: 12, sm: 6, md: 4 }}>
           <TextField
@@ -311,6 +341,7 @@ const AddProductFormBody = ({
                 'sellingPrice',
                 'taxPercentage',
                 'platformCommission',
+                'costPrice',
               ].includes(field)
                 ? 'number'
                 : 'text'
@@ -323,12 +354,120 @@ const AddProductFormBody = ({
         <TextField
           select
           fullWidth
+          label="Pricing Mode"
+          {...formik.getFieldProps('pricingMode')}
+        >
+          <MenuItem value="INCLUSIVE">Tax Inclusive</MenuItem>
+          <MenuItem value="EXCLUSIVE">Tax Exclusive</MenuItem>
+        </TextField>
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <TextField
+          fullWidth
+          label="Tax Class"
+          {...formik.getFieldProps('taxClass')}
+          error={formik.touched.taxClass && !!formik.errors.taxClass}
+          helperText={
+            (formik.touched.taxClass && formik.errors.taxClass) ||
+            'Example: APPAREL_STANDARD'
+          }
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <TextField
+          fullWidth
+          label="Tax Rule Version"
+          {...formik.getFieldProps('taxRuleVersion')}
+          error={
+            formik.touched.taxRuleVersion && !!formik.errors.taxRuleVersion
+          }
+          helperText={
+            (formik.touched.taxRuleVersion && formik.errors.taxRuleVersion) ||
+            'AUTO_ACTIVE or fixed version'
+          }
+        />
+      </Grid>
+      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
+        <TextField
+          select
+          fullWidth
           label="Currency"
           {...formik.getFieldProps('currency')}
         >
           <MenuItem value="INR">INR</MenuItem>
           <MenuItem value="USD">USD</MenuItem>
         </TextField>
+      </Grid>
+      <Grid size={{ xs: 12 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            p: 2,
+            borderRadius: 2,
+            bgcolor: '#f8fafc',
+            borderColor: '#dbeafe',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 1,
+              mb: 1.5,
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+              GST / Profit Preview
+            </Typography>
+            <Chip
+              size="small"
+              color="info"
+              label={`Rule: ${appliedTaxRuleVersion}`}
+            />
+          </Box>
+          <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
+            <div>
+              <strong>Taxable:</strong> Rs {taxableValue.toFixed(2)}
+            </div>
+            <div>
+              <strong>GST ({taxRate}%):</strong> Rs {gstAmount.toFixed(2)}
+            </div>
+            <div>
+              <strong>Customer Price:</strong> Rs{' '}
+              {finalCustomerPrice.toFixed(2)}
+            </div>
+            <div>
+              <strong>Commission:</strong> Rs {commissionAmount.toFixed(2)}
+            </div>
+            <div>
+              <strong>Commission GST (18%):</strong> Rs{' '}
+              {commissionGst.toFixed(2)}
+            </div>
+            <div>
+              <strong>Net Receivable:</strong> Rs {netReceivable.toFixed(2)}
+            </div>
+          </div>
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', mt: 1, color: '#334155' }}
+          >
+            {slabHint}
+          </Typography>
+          {estimatedProfit !== null && (
+            <Typography
+              variant="body2"
+              sx={{
+                mt: 1,
+                fontWeight: 700,
+                color: estimatedProfit >= 0 ? '#166534' : '#b91c1c',
+              }}
+            >
+              Estimated Profit: Rs {estimatedProfit.toFixed(2)}
+            </Typography>
+          )}
+        </Paper>
       </Grid>
 
       <Grid size={{ xs: 12 }}>

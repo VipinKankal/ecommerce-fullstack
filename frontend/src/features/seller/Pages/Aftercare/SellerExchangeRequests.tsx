@@ -20,6 +20,19 @@ import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { getErrorMessage } from 'State/backend/masterApi/shared';
 
+type TaxAdjustmentDelta = {
+  grossAmount?: number;
+  gstAmount?: number;
+  sellerPayableAmount?: number;
+};
+
+type ExchangeTaxAdjustmentSummary = {
+  noteType?: string;
+  postingStatus?: string;
+  summary?: string;
+  netDelta?: TaxAdjustmentDelta | null;
+};
+
 type SellerExchangeRequest = {
   id: number;
   requestNumber?: string;
@@ -35,7 +48,16 @@ type SellerExchangeRequest = {
     newPrice?: number;
     priceDifference?: number;
   };
+  taxAdjustment?: ExchangeTaxAdjustmentSummary | null;
 };
+
+const label = (value?: string | null) => (value || '-').replaceAll('_', ' ');
+const money = (value?: number | null) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
 
 const SellerExchangeRequests = () => {
   const [requests, setRequests] = useState<SellerExchangeRequest[]>([]);
@@ -90,6 +112,7 @@ const SellerExchangeRequests = () => {
         request.oldProductTitle || '',
         request.newProductTitle || '',
         request.exchangeReason || '',
+        request.taxAdjustment?.summary || '',
       ]
         .join(' ')
         .toLowerCase();
@@ -104,8 +127,8 @@ const SellerExchangeRequests = () => {
           Exchange Requests
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Read-only exchange visibility for sellers. Admin handles approval,
-          replacement, and reverse-logistics decisions.
+          Read-only exchange visibility for sellers, now with net GST and payout
+          delta preview from the tax snapshot plus replacement pricing.
         </Typography>
       </div>
 
@@ -168,6 +191,7 @@ const SellerExchangeRequests = () => {
                 <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Swap</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Price Diff</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tax Adjustment</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Requested</TableCell>
               </TableRow>
@@ -175,13 +199,13 @@ const SellerExchangeRequests = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : filteredRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     No exchange requests found.
                   </TableCell>
                 </TableRow>
@@ -206,7 +230,35 @@ const SellerExchangeRequests = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      Rs {request.priceSummary?.priceDifference ?? 0}
+                      {money(request.priceSummary?.priceDifference)}
+                    </TableCell>
+                    <TableCell>
+                      {request.taxAdjustment ? (
+                        <div className="flex flex-col gap-1">
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {label(request.taxAdjustment.noteType)} /{' '}
+                            {label(request.taxAdjustment.postingStatus)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            GST{' '}
+                            {money(request.taxAdjustment.netDelta?.gstAmount)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Net{' '}
+                            {money(
+                              request.taxAdjustment.netDelta
+                                ?.sellerPayableAmount,
+                            )}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {request.taxAdjustment.summary || '-'}
+                          </Typography>
+                        </div>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          No tax delta yet
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Chip

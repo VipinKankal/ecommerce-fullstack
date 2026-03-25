@@ -6,17 +6,32 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface OrderRepository extends JpaRepository<Order , Long> {
+public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    @EntityGraph(attributePaths = {"user", "shippingAddress", "orderItems", "orderItems.product", "orderItems.product.images"})
+    @EntityGraph(attributePaths = {
+            "user",
+            "shippingAddress",
+            "orderTaxSnapshot",
+            "orderItems",
+            "orderItems.product",
+            "orderItems.product.images"
+    })
     List<Order> findByUserId(Long userId);
 
-    @EntityGraph(attributePaths = {"user", "shippingAddress", "orderItems", "orderItems.product", "orderItems.product.images"})
+    @EntityGraph(attributePaths = {
+            "user",
+            "shippingAddress",
+            "orderTaxSnapshot",
+            "orderItems",
+            "orderItems.product",
+            "orderItems.product.images"
+    })
     List<Order> findBySellerId(Long sellerId);
 
     @EntityGraph(attributePaths = {
             "user",
             "shippingAddress",
+            "orderTaxSnapshot",
             "orderItems",
             "orderItems.product",
             "orderItems.product.images",
@@ -28,6 +43,7 @@ public interface OrderRepository extends JpaRepository<Order , Long> {
     @EntityGraph(attributePaths = {
             "user",
             "shippingAddress",
+            "orderTaxSnapshot",
             "orderItems",
             "orderItems.product",
             "orderItems.product.images"
@@ -37,6 +53,7 @@ public interface OrderRepository extends JpaRepository<Order , Long> {
     @EntityGraph(attributePaths = {
             "user",
             "shippingAddress",
+            "orderTaxSnapshot",
             "orderItems",
             "orderItems.product",
             "orderItems.product.images"

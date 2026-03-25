@@ -20,6 +20,19 @@ import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { getErrorMessage } from 'State/backend/masterApi/shared';
 
+type TaxAdjustmentDelta = {
+  grossAmount?: number;
+  gstAmount?: number;
+  sellerPayableAmount?: number;
+};
+
+type TaxAdjustmentSummary = {
+  noteType?: string;
+  postingStatus?: string;
+  summary?: string;
+  delta?: TaxAdjustmentDelta | null;
+};
+
 type SellerReturnRequest = {
   id: number;
   requestNumber?: string;
@@ -30,7 +43,16 @@ type SellerReturnRequest = {
   productTitle?: string;
   quantityRequested?: number;
   requestedAt?: string;
+  taxAdjustment?: TaxAdjustmentSummary | null;
 };
+
+const label = (value?: string | null) => (value || '-').replaceAll('_', ' ');
+const money = (value?: number | null) =>
+  new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 2,
+  }).format(Number(value || 0));
 
 const SellerReturnRequests = () => {
   const [requests, setRequests] = useState<SellerReturnRequest[]>([]);
@@ -51,7 +73,9 @@ const SellerReturnRequests = () => {
         setRequests(Array.isArray(response.data) ? response.data : []);
       } catch (requestError: unknown) {
         if (!mounted) return;
-        setError(getErrorMessage(requestError, 'Failed to load return requests'));
+        setError(
+          getErrorMessage(requestError, 'Failed to load return requests'),
+        );
       } finally {
         if (mounted) setLoading(false);
       }
@@ -82,6 +106,7 @@ const SellerReturnRequests = () => {
         request.customerName || '',
         request.productTitle || '',
         request.returnReason || '',
+        request.taxAdjustment?.summary || '',
       ]
         .join(' ')
         .toLowerCase();
@@ -96,8 +121,8 @@ const SellerReturnRequests = () => {
           Return Requests
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Read-only return visibility for seller operations. Admin handles
-          approval, rejection, and warehouse stock updates.
+          Read-only return visibility for seller operations, now with GST and
+          payout reversal preview from the frozen tax snapshot.
         </Typography>
       </div>
 
@@ -160,6 +185,7 @@ const SellerReturnRequests = () => {
                 <TableCell sx={{ fontWeight: 700 }}>Customer</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Reason</TableCell>
+                <TableCell sx={{ fontWeight: 700 }}>Tax Adjustment</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Requested</TableCell>
               </TableRow>
@@ -167,13 +193,13 @@ const SellerReturnRequests = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 5 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 5 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : filteredRequests.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     No return requests found.
                   </TableCell>
                 </TableRow>
@@ -198,6 +224,32 @@ const SellerReturnRequests = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>{request.returnReason || '-'}</TableCell>
+                    <TableCell>
+                      {request.taxAdjustment ? (
+                        <div className="flex flex-col gap-1">
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            {label(request.taxAdjustment.noteType)} /{' '}
+                            {label(request.taxAdjustment.postingStatus)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            GST {money(request.taxAdjustment.delta?.gstAmount)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            Net{' '}
+                            {money(
+                              request.taxAdjustment.delta?.sellerPayableAmount,
+                            )}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {request.taxAdjustment.summary || '-'}
+                          </Typography>
+                        </div>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          No tax reversal yet
+                        </Typography>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Chip
                         size="small"

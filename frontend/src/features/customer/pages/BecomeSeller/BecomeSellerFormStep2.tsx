@@ -51,9 +51,12 @@ const BecomeSellerFormStep2 = ({ formik }: { formik: SellerAccountFormik }) => (
       name="gstin"
       label="GST Number"
       value={formik.values.gstin}
-      onChange={formik.handleChange}
+      onChange={(event) =>
+        formik.setFieldValue('gstin', event.target.value.toUpperCase())
+      }
       error={formik.touched.gstin && Boolean(formik.errors.gstin)}
       helperText={formik.touched.gstin && formik.errors.gstin}
+      inputProps={{ maxLength: 15 }}
     />
     <TextField
       fullWidth

@@ -1,7 +1,13 @@
 import { ThemeProvider } from '@emotion/react';
 import customTheme from './shared/theme/customTheme';
 import './App.css';
-import { Route, Routes, useLocation, Navigate } from 'react-router-dom';
+import {
+  Route,
+  Routes,
+  useLocation,
+  Navigate,
+  useNavigate,
+} from 'react-router-dom';
 
 import Home from './features/customer/pages/Home/Home';
 import Product from './features/customer/pages/Product/Product';
@@ -25,102 +31,148 @@ import CourierDashboard from './features/courier/pages/CourierDashboard';
 
 import Auth from './features/customer/pages/Auth/Auth';
 import { useAppDispatch, useAppSelector } from './app/store/Store';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getUserProfile } from './State/features/customer/auth/thunks';
 import { fetchSellerProfile } from './State/features/seller/auth/thunks';
 import { getAdminProfile } from './State/features/admin/auth/thunks';
-import { getAuthRole } from './shared/api/Api';
+import {
+  getAuthRole,
+  registerUnauthorizedHandler,
+  setAuthToken,
+} from './shared/api/Api';
 import RouteApiDispatcher from './app/providers/RouteApiDispatcher';
+import ProtectedRoute from './app/components/ProtectedRoute';
+import {
+  getCurrentAppPath,
+  getLoginPathForRole,
+  getRequiredRoleForPath,
+  setPostLoginRedirect,
+  type AuthRole,
+} from './shared/auth/session';
+import { resetCustomerAuthState } from './State/features/customer/auth/slice';
+import { resetSellerAuthState } from './State/features/seller/auth/slice';
+import { resetAdminAuthState } from './State/features/admin/auth/slice';
+import { resetCartState } from './State/features/customer/cart/slice';
+import { resetWishlistState } from './State/features/customer/wishlist/slice';
 
 function App() {
   const dispatch = useAppDispatch();
-  const didBootstrap = useRef(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const lastBootstrapKey = useRef<string | null>(null);
+  const [isAuthBootstrapLoading, setIsAuthBootstrapLoading] = useState(false);
 
   const seller = useAppSelector((s) => s.sellerAuth.profile);
   const customer = useAppSelector((s) => s.customerAuth.user);
   const admin = useAppSelector((s) => s.adminAuth.user);
 
-  useEffect(() => {
-    const runtimeToken =
-      globalThis.sessionStorage !== undefined
-        ? globalThis.sessionStorage.getItem('auth_jwt')
-        : null;
-    const authRole = getAuthRole();
-    const shouldBootstrap = Boolean(runtimeToken || authRole);
+  const authRole = getAuthRole() as AuthRole | null;
+  const requiredRole = useMemo(
+    () => getRequiredRoleForPath(location.pathname),
+    [location.pathname],
+  );
 
-    if (!shouldBootstrap) return;
-    if (didBootstrap.current || seller || customer || admin) return;
-    didBootstrap.current = true;
+  useEffect(() => {
+    const resetSessionState = () => {
+      dispatch(resetCustomerAuthState());
+      dispatch(resetSellerAuthState());
+      dispatch(resetAdminAuthState());
+      dispatch(resetCartState());
+      dispatch(resetWishlistState());
+    };
+
+    const getUnauthorizedMessage = (role: AuthRole, requestPath: string) => {
+      if (
+        requestPath.includes('/api/cart') ||
+        requestPath.includes('/api/wishlist')
+      ) {
+        return 'Your session expired. Please log in again to continue with your cart.';
+      }
+
+      if (role === 'seller') {
+        return 'Your seller session expired. Please log in again.';
+      }
+
+      if (role === 'admin') {
+        return 'Your admin session expired. Please log in again.';
+      }
+
+      return 'Your session expired. Please log in again to continue.';
+    };
+
+    registerUnauthorizedHandler(({ path }) => {
+      const fallbackRole = path.includes('/api/admin')
+        ? 'admin'
+        : path.includes('/api/seller') || path.includes('/sellers/')
+          ? 'seller'
+          : 'customer';
+      const targetRole = requiredRole || authRole || fallbackRole;
+
+      resetSessionState();
+      setPostLoginRedirect(
+        getCurrentAppPath(),
+        getUnauthorizedMessage(targetRole, path),
+      );
+      navigate(getLoginPathForRole(targetRole), { replace: true });
+    });
+
+    return () => {
+      registerUnauthorizedHandler(null);
+    };
+  }, [authRole, dispatch, navigate, requiredRole]);
+
+  useEffect(() => {
+    const bootstrapRole = authRole || requiredRole;
+    const hasProfile =
+      (bootstrapRole === 'customer' && Boolean(customer)) ||
+      (bootstrapRole === 'seller' && Boolean(seller)) ||
+      (bootstrapRole === 'admin' && Boolean(admin));
+
+    if (!bootstrapRole || hasProfile) {
+      setIsAuthBootstrapLoading(false);
+      return;
+    }
+
+    const bootstrapKey = `${bootstrapRole}:${location.pathname}`;
+    if (lastBootstrapKey.current === bootstrapKey) {
+      return;
+    }
+    lastBootstrapKey.current = bootstrapKey;
+    setIsAuthBootstrapLoading(true);
 
     const bootstrapProfile = async () => {
-      if (authRole === 'admin') {
-        try {
+      try {
+        if (bootstrapRole === 'admin') {
           await dispatch(getAdminProfile()).unwrap();
-        } catch {
-          // No active admin session.
+          setAuthToken(null, 'admin');
+          return;
         }
-        return;
-      }
 
-      if (authRole === 'seller') {
-        try {
-          await dispatch(
-            fetchSellerProfile(runtimeToken || undefined),
-          ).unwrap();
-        } catch {
-          // No active authenticated session.
+        if (bootstrapRole === 'seller') {
+          await dispatch(fetchSellerProfile()).unwrap();
+          setAuthToken(null, 'seller');
+          return;
         }
-        return;
-      }
 
-      if (authRole === 'customer') {
-        try {
-          await dispatch(getUserProfile(runtimeToken || undefined)).unwrap();
-        } catch {
-          // No active authenticated session.
-        }
-        return;
-      }
-
-      if (
-        location.pathname.startsWith('/seller') ||
-        location.pathname.startsWith('/admin')
-      ) {
-        if (location.pathname.startsWith('/admin')) {
-          try {
-            await dispatch(getAdminProfile()).unwrap();
-          } catch {
-            // No active admin session.
-          }
-        } else {
-          try {
-            await dispatch(
-              fetchSellerProfile(runtimeToken || undefined),
-            ).unwrap();
-          } catch {
-            // No active seller session on seller route.
-          }
-        }
-        return;
-      }
-
-      if (
-        location.pathname.startsWith('/account') ||
-        location.pathname.startsWith('/wishlist') ||
-        location.pathname.startsWith('/cart') ||
-        location.pathname.startsWith('/checkout')
-      ) {
-        try {
-          await dispatch(getUserProfile(runtimeToken || undefined)).unwrap();
-        } catch {
-          // No active customer session on account/cart/checkout route.
-        }
+        await dispatch(getUserProfile()).unwrap();
+        setAuthToken(null, 'customer');
+      } catch {
+        // ProtectedRoute will handle the redirect after bootstrap finishes.
+      } finally {
+        setIsAuthBootstrapLoading(false);
       }
     };
 
     bootstrapProfile();
-  }, [admin, customer, dispatch, seller, location.pathname]);
+  }, [
+    admin,
+    authRole,
+    customer,
+    dispatch,
+    location.pathname,
+    requiredRole,
+    seller,
+  ]);
 
   useEffect(() => {
     if (globalThis.sessionStorage === undefined) return;
@@ -152,7 +204,20 @@ function App() {
             path="/checkout"
             element={<Navigate to="/checkout/cart" replace />}
           />
-          <Route path="/checkout/*" element={<Checkout />} />
+          <Route
+            path="/checkout/*"
+            element={
+              <ProtectedRoute
+                requiredRole="customer"
+                isAllowed={Boolean(customer)}
+                isLoading={
+                  isAuthBootstrapLoading && requiredRole === 'customer'
+                }
+              >
+                <Checkout />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/payment-success/:paymentOrderId"
             element={<PaymentSuccess />}
@@ -163,10 +228,58 @@ function App() {
           <Route path="/courier/login" element={<CourierLogin />} />
           <Route path="/courier/dashboard" element={<CourierDashboard />} />
           <Route path="/admin/login" element={<AdminAuth />} />
-          <Route path="/account/*" element={<Account />} />
-          <Route path="/wishlist" element={<Wishlist />} />
-          <Route path="/seller/*" element={<SellerDashboard />} />
-          <Route path="/admin/*" element={<AdminDashboard />} />
+          <Route
+            path="/account/*"
+            element={
+              <ProtectedRoute
+                requiredRole="customer"
+                isAllowed={Boolean(customer)}
+                isLoading={
+                  isAuthBootstrapLoading && requiredRole === 'customer'
+                }
+              >
+                <Account />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/wishlist"
+            element={
+              <ProtectedRoute
+                requiredRole="customer"
+                isAllowed={Boolean(customer)}
+                isLoading={
+                  isAuthBootstrapLoading && requiredRole === 'customer'
+                }
+              >
+                <Wishlist />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/seller/*"
+            element={
+              <ProtectedRoute
+                requiredRole="seller"
+                isAllowed={Boolean(seller)}
+                isLoading={isAuthBootstrapLoading && requiredRole === 'seller'}
+              >
+                <SellerDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/*"
+            element={
+              <ProtectedRoute
+                requiredRole="admin"
+                isAllowed={Boolean(admin)}
+                isLoading={isAuthBootstrapLoading && requiredRole === 'admin'}
+              >
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </ThemeProvider>
@@ -174,4 +287,3 @@ function App() {
 }
 
 export default App;
-

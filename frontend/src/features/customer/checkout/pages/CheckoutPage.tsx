@@ -28,6 +28,15 @@ import { useCheckoutSubmit } from '../hooks/useCheckoutSubmit';
 import { resolveStep } from '../utils/checkoutStep';
 import { OrderSummaryResponse } from '../utils/pricing';
 
+const normalizeNumber = (...candidates: unknown[]) => {
+  for (const value of candidates) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
 const toOrderSummary = (payload: unknown): OrderSummaryResponse | null => {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -38,32 +47,64 @@ const toOrderSummary = (payload: unknown): OrderSummaryResponse | null => {
     record.priceBreakdown && typeof record.priceBreakdown === 'object'
       ? (record.priceBreakdown as Record<string, unknown>)
       : null;
+  const rawTaxBreakdown =
+    record.taxBreakdown && typeof record.taxBreakdown === 'object'
+      ? (record.taxBreakdown as Record<string, unknown>)
+      : null;
 
   return {
     estimatedDeliveryDate:
       typeof record.estimatedDeliveryDate === 'string'
         ? record.estimatedDeliveryDate
         : undefined,
-    priceBreakdown: rawPriceBreakdown
-      ? {
-          platformFee:
-            typeof rawPriceBreakdown.platformFee === 'number'
-              ? rawPriceBreakdown.platformFee
-              : undefined,
-          totalMRP:
-            typeof rawPriceBreakdown.totalMRP === 'number'
-              ? rawPriceBreakdown.totalMRP
-              : undefined,
-          totalSellingPrice:
-            typeof rawPriceBreakdown.totalSellingPrice === 'number'
-              ? rawPriceBreakdown.totalSellingPrice
-              : undefined,
-          totalDiscount:
-            typeof rawPriceBreakdown.totalDiscount === 'number'
-              ? rawPriceBreakdown.totalDiscount
-              : undefined,
-        }
-      : undefined,
+    priceBreakdown:
+      rawPriceBreakdown || rawTaxBreakdown
+        ? {
+            platformFee: normalizeNumber(rawPriceBreakdown?.platformFee),
+            totalMRP: normalizeNumber(
+              rawPriceBreakdown?.totalMRP,
+              rawPriceBreakdown?.totalMrp,
+            ),
+            totalSellingPrice: normalizeNumber(
+              rawPriceBreakdown?.totalSellingPrice,
+              rawPriceBreakdown?.totalSelling,
+            ),
+            totalDiscount: normalizeNumber(
+              rawPriceBreakdown?.totalDiscount,
+              rawPriceBreakdown?.discount,
+            ),
+            taxableAmount: normalizeNumber(
+              rawPriceBreakdown?.taxableAmount,
+              rawPriceBreakdown?.taxableValue,
+              rawTaxBreakdown?.taxableAmount,
+              rawTaxBreakdown?.taxableValue,
+            ),
+            cgst: normalizeNumber(
+              rawPriceBreakdown?.cgst,
+              rawPriceBreakdown?.cgstAmount,
+              rawTaxBreakdown?.cgst,
+              rawTaxBreakdown?.cgstAmount,
+            ),
+            sgst: normalizeNumber(
+              rawPriceBreakdown?.sgst,
+              rawPriceBreakdown?.sgstAmount,
+              rawTaxBreakdown?.sgst,
+              rawTaxBreakdown?.sgstAmount,
+            ),
+            igst: normalizeNumber(
+              rawPriceBreakdown?.igst,
+              rawPriceBreakdown?.igstAmount,
+              rawTaxBreakdown?.igst,
+              rawTaxBreakdown?.igstAmount,
+            ),
+            totalTax: normalizeNumber(
+              rawPriceBreakdown?.totalTax,
+              rawPriceBreakdown?.gstAmount,
+              rawTaxBreakdown?.totalTax,
+              rawTaxBreakdown?.gstAmount,
+            ),
+          }
+        : undefined,
     orderItems: Array.isArray(record.orderItems)
       ? record.orderItems
           .filter(
@@ -380,7 +421,9 @@ const CheckoutPage = () => {
                   appliedCouponCode={cart?.couponCode}
                   couponDiscountAmount={cart?.couponDiscountAmount}
                   recommendedCouponCode={
-                    recommendation?.recommended ? recommendation.couponCode : null
+                    recommendation?.recommended
+                      ? recommendation.couponCode
+                      : null
                   }
                   recommendedDiscount={recommendation?.estimatedDiscount}
                   onUseRecommended={setCouponCode}
@@ -395,6 +438,13 @@ const CheckoutPage = () => {
                 selectedPriceMrp={pricing.selectedPriceMrp}
                 selectedDiscount={pricing.selectedDiscount}
                 platformFee={currentSummary?.priceBreakdown?.platformFee ?? 0}
+                taxableAmount={
+                  currentSummary?.priceBreakdown?.taxableAmount ?? null
+                }
+                cgst={currentSummary?.priceBreakdown?.cgst ?? null}
+                sgst={currentSummary?.priceBreakdown?.sgst ?? null}
+                igst={currentSummary?.priceBreakdown?.igst ?? null}
+                totalTax={currentSummary?.priceBreakdown?.totalTax ?? null}
                 totalAmount={pricing.selectedPriceSelling}
               />
 
@@ -424,5 +474,3 @@ const CheckoutPage = () => {
 };
 
 export default CheckoutPage;
-
-

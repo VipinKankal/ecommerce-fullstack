@@ -26,6 +26,7 @@ public class OrderHistoryResponse {
     private String cancelReasonCode;
     private String cancelReasonText;
     private OrderShippingAddressResponse shippingAddress;
+    private OrderTaxSnapshotResponse orderTaxSnapshot;
     private List<OrderHistoryItemResponse> orderItems = new ArrayList<>();
 }
 

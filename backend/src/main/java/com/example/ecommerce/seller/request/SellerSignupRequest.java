@@ -8,6 +8,7 @@ import com.example.ecommerce.modal.StoreDetails;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -30,6 +31,10 @@ public class SellerSignupRequest {
     private LocalDate dateOfBirth;
 
     @NotBlank(message = "GSTIN is required")
+    @Pattern(
+            regexp = "^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][A-Za-z0-9]Z[A-Za-z0-9]$",
+            message = "Invalid GSTIN format"
+    )
     private String GSTIN;
 
     @Valid

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFormik } from 'formik';
 import {
   TextField,
@@ -17,10 +17,18 @@ import {
   signinSeller,
 } from 'State/features/seller/auth/thunks';
 import { clearAuthError } from 'State/features/seller/auth/slice';
+import {
+  consumePostLoginRedirect,
+  getDefaultLandingPath,
+  getPendingAuthNotice,
+} from 'shared/auth/session';
 
 const SellerLoginForm = () => {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [sessionNotice, setSessionNotice] = useState<string | null>(() =>
+    getPendingAuthNotice(),
+  );
   const { loading, error, message, otpSent } = useAppSelector(
     (state) => state.sellerAuth,
   );
@@ -30,9 +38,11 @@ const SellerLoginForm = () => {
     onSubmit: async (values) => {
       const result = await dispatch(signinSeller(values));
       if (signinSeller.fulfilled.match(result)) {
-        const jwt = (result.payload as { jwt?: string })?.jwt;
-        await dispatch(fetchSellerProfile(jwt));
-        navigate('/');
+        await dispatch(fetchSellerProfile()).unwrap();
+        const { redirectPath } = consumePostLoginRedirect(
+          getDefaultLandingPath('seller'),
+        );
+        navigate(redirectPath);
       }
     },
   });
@@ -64,6 +74,15 @@ const SellerLoginForm = () => {
         Seller Portal Login
       </Typography>
 
+      {sessionNotice && (
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          onClose={() => setSessionNotice(null)}
+        >
+          {sessionNotice}
+        </Alert>
+      )}
       {error && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {error}
@@ -132,4 +151,3 @@ const SellerLoginForm = () => {
 };
 
 export default SellerLoginForm;
-

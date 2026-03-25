@@ -88,6 +88,7 @@ const sellerAuthSlice = createSlice({
       state.error = null;
       state.message = null;
     },
+    resetSellerAuthState: () => initialState,
   },
   extraReducers: (builder) => {
     builder
@@ -211,5 +212,5 @@ const sellerAuthSlice = createSlice({
   },
 });
 
-export const { clearAuthError } = sellerAuthSlice.actions;
+export const { clearAuthError, resetSellerAuthState } = sellerAuthSlice.actions;
 export default sellerAuthSlice.reducer;

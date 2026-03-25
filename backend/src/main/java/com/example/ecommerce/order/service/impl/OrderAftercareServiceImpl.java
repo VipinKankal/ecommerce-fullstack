@@ -40,6 +40,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
     private final ProductRepository productRepository;
     private final InventoryService inventoryService;
     private final CouponService couponService;
+    private final OrderAftercareTaxAdjustmentService orderAftercareTaxAdjustmentService;
 
     @Override
     @Transactional(readOnly = true)
@@ -669,6 +670,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         response.put("pickupScheduledAt", request.getPickupScheduledAt());
         response.put("receivedAt", request.getReceivedAt());
         response.put("completedAt", request.getCompletedAt());
+        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildReturnTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -707,7 +709,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         replacementOrder.put("proofUrl", request.getReplacementProofUrl());
         replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
         response.put("replacementOrder", replacementOrder);
-
+        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildExchangeTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -752,6 +754,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         refund.put("eligibleAfter", request.getRefundEligibleAfter());
         refund.put("status", request.getRefundStatus());
         response.put("refund", refund);
+        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildReturnTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -843,7 +846,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         replacementOrder.put("proofUrl", request.getReplacementProofUrl());
         replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
         response.put("replacementOrder", replacementOrder);
-
+        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildExchangeTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -873,3 +876,8 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         return trimmed.charAt(0) + "***";
     }
 }
+
+
+
+
+

@@ -16,6 +16,7 @@ import com.example.ecommerce.repository.SellerRepository;
 import com.example.ecommerce.repository.VerificationCodeRepository;
 import com.example.ecommerce.seller.request.SellerSignupRequest;
 import com.example.ecommerce.seller.request.SellerUpdateRequest;
+import com.example.ecommerce.seller.service.GstinVerificationService;
 import com.example.ecommerce.seller.service.SellerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,6 +38,7 @@ public class SellerServiceImpl implements SellerService {
     private final VerificationCodeRepository verificationCodeRepository;
     private final JdbcTemplate jdbcTemplate;
     private final AuthenticatedPrincipalService authenticatedPrincipalService;
+    private final GstinVerificationService gstinVerificationService;
 
     @Override
     public Seller getSellerProfile(String jwt) throws Exception {
@@ -51,6 +53,8 @@ public class SellerServiceImpl implements SellerService {
         repairSellerSchemaIfNeeded();
 
         String normalizedEmail = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
+        String normalizedGstin = gstinVerificationService.normalizeAndValidate(request.getGSTIN());
+        gstinVerificationService.assertActive(normalizedGstin);
         Seller sellerExist = sellerRepository.findByEmail(normalizedEmail);
         if (sellerExist != null) {
             throw new IllegalArgumentException(SELLER_ALREADY_REGISTERED_MESSAGE);
@@ -61,7 +65,7 @@ public class SellerServiceImpl implements SellerService {
         newSeller.setPassword(passwordEncoder.encode(request.getPassword()));
         newSeller.setSellerName(request.getSellerName());
         newSeller.setPickupAddress(request.getPickupAddress() == null ? new Address() : request.getPickupAddress());
-        newSeller.setGSTIN(request.getGSTIN());
+        newSeller.setGSTIN(normalizedGstin);
         newSeller.setRole(UserRole.ROLE_SELLER);
         newSeller.setAccountStatus(AccountStatus.ACTIVE);
         newSeller.setMobileNumber(request.getMobileNumber());
@@ -70,7 +74,9 @@ public class SellerServiceImpl implements SellerService {
 
         BusinessDetails businessDetails = request.getBusinessDetails() == null ? new BusinessDetails() : request.getBusinessDetails();
         if (businessDetails.getGstNumber() == null || businessDetails.getGstNumber().isBlank()) {
-            businessDetails.setGstNumber(request.getGSTIN());
+            businessDetails.setGstNumber(normalizedGstin);
+        } else {
+            businessDetails.setGstNumber(normalizedGstin);
         }
         newSeller.setBusinessDetails(businessDetails);
         newSeller.setKycDetails(request.getKycDetails() == null ? new KycDetails() : request.getKycDetails());
@@ -175,7 +181,9 @@ public class SellerServiceImpl implements SellerService {
             existingSeller.setDateOfBirth(request.getDateOfBirth());
         }
         if (request.getGSTIN() != null) {
-            existingSeller.setGSTIN(request.getGSTIN());
+            String normalizedGstin = gstinVerificationService.normalizeAndValidate(request.getGSTIN());
+            gstinVerificationService.assertActive(normalizedGstin);
+            existingSeller.setGSTIN(normalizedGstin);
         }
 
         if (existingSeller.getBusinessDetails() == null) {
@@ -199,9 +207,13 @@ public class SellerServiceImpl implements SellerService {
             BusinessDetails incoming = request.getBusinessDetails();
             if (incoming.getBusinessName() != null) current.setBusinessName(incoming.getBusinessName());
             if (incoming.getBusinessType() != null) current.setBusinessType(incoming.getBusinessType());
-            if (incoming.getGstNumber() != null) current.setGstNumber(incoming.getGstNumber());
+            if (incoming.getGstNumber() != null) {
+                String normalizedGstin = gstinVerificationService.normalizeAndValidate(incoming.getGstNumber());
+                gstinVerificationService.assertActive(normalizedGstin);
+                current.setGstNumber(normalizedGstin);
+                existingSeller.setGSTIN(normalizedGstin);
+            }
             if (incoming.getPanNumber() != null) current.setPanNumber(incoming.getPanNumber());
-            if (incoming.getGstNumber() != null) existingSeller.setGSTIN(incoming.getGstNumber());
         }
 
         if (request.getBankDetails() != null) {
