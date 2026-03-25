@@ -16,9 +16,9 @@
 - [x] Removed JWT params from cart/seller thunks and components.
 
 ## 3. Frontend Follow-up
-- [ ] Add centralized 401 handling (clear auth state + redirect).
-- [ ] Add loading guards for routes dependent on profile bootstrap.
-- [ ] Add UI for unauthenticated cart/add-to-cart server 401 responses.
+- [x] Add centralized 401 handling (clear auth state + redirect).
+- [x] Add loading guards for routes dependent on profile bootstrap.
+- [x] Add UI for unauthenticated cart/add-to-cart server 401 responses.
 
 ## 4. Testing Checklist
 - [ ] Customer login via OTP sets cookie, profile fetch succeeds.
@@ -32,3 +32,4 @@
 - [ ] Frontend and backend deployed on HTTPS.
 - [ ] Cookie flags verified in production (`Secure`, `HttpOnly`, `SameSite`).
 - [ ] CORS origin list restricted to trusted frontend domains.
+

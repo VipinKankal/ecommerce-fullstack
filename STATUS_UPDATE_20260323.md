@@ -1,53 +1,39 @@
-# Consolidated Status Update (2026-03-23)
+# Coupon Workstream Final Status (2026-03-23)
 
-Branch: `main`
-Commit: `cf36c9a1711246c45eb578e9e70a883de0dfea73`
+Branch: `main`  
+Commit: `094e99f`
 
-## Verified Complete
-- `#19` Baseline Verification: `npm run typecheck` passes.
-- `#20` Baseline Verification: `npm run test:ci` passes.
-- `#21` Baseline Verification: `npm run build` passes.
-- `#34` Frontend Lint: `selectedVariant` issue no longer present in current frontend build/typecheck path.
-- `#35` Frontend Lint: `loadLogs` dependency issue no longer present in current frontend build/typecheck path.
-- `#36` Frontend Test: `App.test.tsx` now passes.
-- `#37` Backend Test: `EcommerceApplicationTests` passes.
-- `#38` Backend Test: `SecurityIntegrationTests` passes.
+## Final Worksheet
 
-## Implemented In This Batch (QA Still Needed)
-- `#1` Backend Contract: auth cookie set on signup/signin responses.
-- `#2` Backend Contract: logout endpoint added and auth cookie clear wired.
-- `#3` Backend Contract: `/api/auth/users/profile` now accepts cookie-auth without Bearer.
-- `#4` Backend Contract: `/sellers/profile` now accepts cookie-auth without Bearer.
-- `#5` Backend Contract: CORS credentials remain enabled for configured frontend origins.
-- `#6` Backend Contract: CSRF cookie/header strategy wired as `XSRF-TOKEN` + `X-CSRF-Token`.
-- `#12` Testing Checklist: frontend bootstrap updated toward cookie-backed refresh on protected routes.
-- `#13` Testing Checklist: logout path now clears auth cookie server-side.
-- `#14` Testing Checklist: customer protected controllers now accept cookie session instead of requiring Bearer header.
-- `#15` Testing Checklist: seller protected controllers now accept cookie session instead of requiring Bearer header.
+| ID | Workstream | Status | Notes |
+| --- | --- | --- | --- |
+| 10 | Advanced user eligibility | Completed | New/returning/inactive eligibility rules implemented |
+| 16 | Best coupon suggestion / non-applicable messaging | Completed | Recommendation + reject reason UX mapping done |
+| 18 | Idempotency / concurrency / reservation | Completed | Checkout request id + reserve/release/consume flow |
+| 20 | Payment failure + retry flow | Completed | Retry endpoint + safe reservation handling |
+| 21 | Cancel / return / refund policy | Completed | Cancellation + full return refund coupon restore rules |
+| 22 | Fraud control | Completed | User/IP/device velocity throttles and block reasons |
+| 23 | Cache layer | Completed | Coupon cache fast-path, cache metrics, eviction scheduler |
+| 24 | Rule-based recommendation engine | Completed | Rule-driven best coupon logic |
+| 25 | A/B testing | Completed | Group-based recommendation tracking |
+| 26 | Funnel analytics tracking | Completed | Apply/reject/reserve/release/consume/restore event logs |
+| 27 | Metrics dashboard | Completed | Single coupon tab me metrics + monitoring cards |
+| 31 | Coupon unit tests | Completed | Backend and frontend test coverage added |
+| 32 | Coupon integration tests | Completed | Controller-level integration tests added and passed |
+| 33 | Edge-case tests | Completed | Full-return, partial-return, throttle, alert cases covered |
+| 34 | Monitoring / alerts | Completed | Monitoring snapshot + alert trigger + admin warning UI |
 
-## Still Pending
-- `#7` Frontend Follow-up: centralized 401 handling.
-- `#8` Frontend Follow-up: global profile-bootstrap loading guards.
-- `#9` Frontend Follow-up: unauthenticated cart/add-to-cart 401 UI handling.
-- `#10` Testing Checklist: customer OTP login cookie + profile success needs explicit QA/test coverage.
-- `#11` Testing Checklist: seller OTP login cookie + profile success needs explicit QA/test coverage.
-- `#16` Deployment Checklist: frontend + backend HTTPS deployment.
-- `#17` Deployment Checklist: production cookie flags verification.
-- `#18` Deployment Checklist: production CORS restriction to trusted domains.
-- `#22` Baseline Verification: oversized `.ts/.tsx` files still present.
-- `#23` Baseline Snapshot: branch/SHA not yet captured in release notes artifact.
-- `#24` Baseline Snapshot: command outputs not yet captured in release notes artifact.
-- `#25` Baseline Snapshot: not marked as no-behavior-change baseline.
-- `#26` Migration Guardrails: wrapper-based migrations only.
-- `#27` Migration Guardrails: route contract change note discipline.
-- `#28` Migration Guardrails: API contract change coordination discipline.
-- `#29` Migration Guardrails: feature-by-feature compile-safe PR slicing.
-- `#30` PR Gate Criteria: scope statement.
-- `#31` PR Gate Criteria: proof bundle for typecheck/test/build.
-- `#32` PR Gate Criteria: critical-flow risk note.
-- `#33` PR Gate Criteria: rollback path.
+## Verification Snapshot
 
-## Current Counts
-- Verified complete: `8`
-- Implemented, QA pending: `10`
-- Still pending: `20`
+- Frontend: `npx tsc --noEmit` passed.
+- Frontend tests passed:
+  - `src/features/customer/checkout/hooks/useCheckoutSubmit.test.ts`
+  - `src/features/customer/checkout/components/CouponSection.test.tsx`
+- Backend targeted tests passed:
+  - `CouponServiceImplTest`
+  - `OrderAftercareServiceImplTest`
+  - `AdminCouponControllerIntegrationTest`
+
+## Pending Count
+
+Pending for this coupon workstream list: `0`
