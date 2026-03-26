@@ -110,5 +110,80 @@ class OrderTaxSnapshotServiceSmokeTest {
 
         assertEquals("Order tax snapshot already frozen", ex.getMessage());
     }
+
+    @Test
+    void freezeSnapshotRejectsWhenNoEffectiveGstRuleExists() {
+        OrderTaxSnapshotRepository repository = mock(OrderTaxSnapshotRepository.class);
+        TaxRuleVersionService taxRuleVersionService = mock(TaxRuleVersionService.class);
+        TaxComputationSupport taxComputationSupport = new TaxComputationSupport(taxRuleVersionService);
+        OrderTaxSnapshotServiceImpl service =
+                new OrderTaxSnapshotServiceImpl(repository, taxComputationSupport, new ObjectMapper());
+
+        Seller seller = new Seller();
+        seller.setGSTIN("07ABCDE1234F1Z5");
+
+        Product product = new Product();
+        product.setId(12L);
+        product.setTitle("Black T-Shirt");
+        product.setSeller(seller);
+        product.setPricingMode("INCLUSIVE");
+        product.setTaxClass("APPAREL_STANDARD");
+        product.setHsnCode("6109");
+
+        OrderItem orderItem = new OrderItem();
+        orderItem.setId(202L);
+        orderItem.setProduct(product);
+        orderItem.setQuantity(1);
+        orderItem.setSellingPrice(999);
+
+        Address address = new Address();
+        address.setState("Delhi");
+
+        Order order = new Order();
+        order.setId(88L);
+        order.setShippingAddress(address);
+        order.setOrderDate(LocalDateTime.of(2026, 3, 25, 11, 15));
+        order.setTotalSellingPrice(999);
+
+        when(repository.findByOrderId(88L)).thenReturn(Optional.empty());
+        when(taxRuleVersionService.resolveRule(any())).thenThrow(
+                new IllegalArgumentException("No published tax rule available for the provided criteria")
+        );
+
+        IllegalStateException ex = assertThrows(
+                IllegalStateException.class,
+                () -> service.freezeSnapshot(order, List.of(orderItem), 0)
+        );
+
+        assertEquals("No effective GST rule found for order item 202", ex.getMessage());
+    }
+
+    @Test
+    void freezeSnapshotRejectsFutureOrderDate() {
+        OrderTaxSnapshotRepository repository = mock(OrderTaxSnapshotRepository.class);
+        TaxRuleVersionService taxRuleVersionService = mock(TaxRuleVersionService.class);
+        TaxComputationSupport taxComputationSupport = new TaxComputationSupport(taxRuleVersionService);
+        OrderTaxSnapshotServiceImpl service =
+                new OrderTaxSnapshotServiceImpl(repository, taxComputationSupport, new ObjectMapper());
+
+        Order order = new Order();
+        order.setId(99L);
+        order.setOrderDate(LocalDateTime.now().plusDays(1));
+
+        OrderItem orderItem = new OrderItem();
+        orderItem.setId(303L);
+        orderItem.setProduct(new Product());
+        orderItem.setQuantity(1);
+        orderItem.setSellingPrice(1000);
+
+        when(repository.findByOrderId(99L)).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.freezeSnapshot(order, List.of(orderItem), 0)
+        );
+
+        assertEquals("Order date cannot be in the future for tax snapshot freeze", ex.getMessage());
+    }
 }
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 import { getUserProfile } from './State/features/customer/auth/thunks';
@@ -60,6 +60,7 @@ jest.mock('./features/customer/pages/Auth/Auth', () => () => (
   <div>auth page</div>
 ));
 jest.mock('./app/providers/RouteApiDispatcher', () => () => null);
+jest.mock('./app/components/ComplianceNoteShortcut', () => () => null);
 
 jest.mock('./State/features/customer/auth/thunks', () => ({
   getUserProfile: jest.fn(() => ({ type: 'mock/getUserProfile' })),
@@ -138,12 +139,39 @@ describe('App refresh bootstrap', () => {
     );
 
     expect(window.sessionStorage.getItem('auth_role')).toBeNull();
+    expect(screen.getByText(/restoring your session/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(mockedGetUserProfile).toHaveBeenCalledTimes(1);
     });
 
     expect(mockedFetchSellerProfile).not.toHaveBeenCalled();
+    expect(mockedGetAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it('bootstraps seller profile on protected refresh without sessionStorage auth_role', async () => {
+    mockedGetAuthRole.mockReturnValue(null);
+
+    render(
+      <MemoryRouter
+        initialEntries={['/seller/products']}
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
+        <App />
+      </MemoryRouter>,
+    );
+
+    expect(window.sessionStorage.getItem('auth_role')).toBeNull();
+    expect(screen.getByText(/checking seller session/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockedFetchSellerProfile).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockedGetUserProfile).not.toHaveBeenCalled();
     expect(mockedGetAdminProfile).not.toHaveBeenCalled();
   });
 });

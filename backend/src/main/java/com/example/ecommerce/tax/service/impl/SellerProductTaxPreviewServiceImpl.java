@@ -22,7 +22,7 @@ public class SellerProductTaxPreviewServiceImpl implements SellerProductTaxPrevi
 
     @Override
     public SellerProductTaxPreviewResponse preview(Seller seller, ProductTaxPreviewRequest request) {
-        LocalDate effectiveDate = request.getEffectiveDate() == null ? LocalDate.now() : request.getEffectiveDate();
+        LocalDate effectiveDate = resolveEffectiveDate(request.getEffectiveDate());
         String normalizedUiCategoryKey = normalizeCategory(request.getUiCategoryKey());
         String normalizedConstructionType = normalizeUpper(request.getConstructionType());
         String normalizedGender = normalizeUpper(request.getGender());
@@ -68,6 +68,7 @@ public class SellerProductTaxPreviewServiceImpl implements SellerProductTaxPrevi
                         sellingPricePerPiece,
                         effectiveDate
                 );
+        boolean hasEffectiveGstRule = gstResolution != null && gstResolution.getRuleCode() != null;
         double appliedRate = gstResolution == null || gstResolution.getAppliedRatePercentage() == null
                 ? 0.0
                 : gstResolution.getAppliedRatePercentage();
@@ -124,12 +125,12 @@ public class SellerProductTaxPreviewServiceImpl implements SellerProductTaxPrevi
         response.setNetPayoutPreview(netPayout);
         response.setEstimatedProfitPreview(estimatedProfit);
         response.setRequiresFiberSelection(requiresFiberSelection);
-        response.setRequiresReview(requiresReview);
-        response.setReviewStatus(requiresReview ? "PENDING_REVIEW" : "NOT_REQUIRED");
+        response.setRequiresReview(requiresReview || !hasEffectiveGstRule);
+        response.setReviewStatus((requiresReview || !hasEffectiveGstRule) ? "PENDING_REVIEW" : "NOT_REQUIRED");
         response.setSellerTaxEligible(isSellerTaxEligible(seller));
         response.setSellerTaxEligibilityStatus(resolveSellerComplianceStatus(seller));
         response.setSellerOnboardingPolicy(seller == null ? null : seller.getGstOnboardingPolicy());
-        response.setNote(buildNote(seller, hsnRule, requiresFiberSelection, requiresReview));
+        response.setNote(buildNote(seller, hsnRule, requiresFiberSelection, requiresReview, hasEffectiveGstRule));
         return response;
     }
 
@@ -137,7 +138,8 @@ public class SellerProductTaxPreviewServiceImpl implements SellerProductTaxPrevi
             Seller seller,
             HsnMasterRule hsnRule,
             boolean requiresFiberSelection,
-            boolean requiresReview
+            boolean requiresReview,
+            boolean hasEffectiveGstRule
     ) {
         if (!isSellerTaxEligible(seller)) {
             return "Seller tax eligibility is incomplete. Complete GST/compliance onboarding before publish.";
@@ -148,10 +150,21 @@ public class SellerProductTaxPreviewServiceImpl implements SellerProductTaxPrevi
         if (hsnRule == null) {
             return "No CA-approved HSN mapping is available for the selected category yet.";
         }
+        if (!hasEffectiveGstRule) {
+            return "No effective GST rule is active for the selected date. Please contact admin or wait for publish date.";
+        }
         if (requiresReview) {
             return "This product needs admin tax review before it can go live with the selected HSN.";
         }
         return "Preview uses the currently CA-approved, published tax rule version.";
+    }
+
+    private LocalDate resolveEffectiveDate(LocalDate requestedDate) {
+        LocalDate resolvedDate = requestedDate == null ? LocalDate.now() : requestedDate;
+        if (resolvedDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Effective date cannot be in the future for seller preview");
+        }
+        return resolvedDate;
     }
 
     private boolean isSellerTaxEligible(Seller seller) {

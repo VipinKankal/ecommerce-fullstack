@@ -30,7 +30,6 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
     private static final String SNAPSHOT_SOURCE = "ORDER_CREATE_FREEZE_V1";
     private static final String DEFAULT_PRICING_MODE = "INCLUSIVE";
     private static final String DEFAULT_TAX_CLASS = "APPAREL_STANDARD";
-    private static final String AUTO_ACTIVE_RULE_VERSION = "AUTO_ACTIVE";
 
     private final OrderTaxSnapshotRepository orderTaxSnapshotRepository;
     private final TaxComputationSupport taxComputationSupport;
@@ -52,7 +51,7 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
             throw new IllegalArgumentException("Order items are required for tax snapshot freeze");
         }
 
-        LocalDate effectiveDate = order.getOrderDate() == null ? LocalDate.now() : order.getOrderDate().toLocalDate();
+        LocalDate effectiveDate = resolveEffectiveDate(order);
         String supplierGstin = resolveSupplierGstin(items);
         String sellerStateCode = taxComputationSupport.resolveSellerStateCode(supplierGstin);
         String posStateCode = taxComputationSupport.resolvePosStateCode(
@@ -141,32 +140,25 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         String pricingMode = normalizePricingMode(product == null ? null : product.getPricingMode());
         String taxClass = normalizeTaxClass(product == null ? null : product.getTaxClass());
         String hsnCode = normalizeNullable(product == null ? null : product.getHsnCode());
-        String declaredRuleVersion = normalizeNullable(product == null ? null : product.getTaxRuleVersion());
-        Double declaredRate = product == null || product.getTaxPercentage() == null ? 0.0 : Math.max(product.getTaxPercentage(), 0.0);
         double originalLineAmount = item.getSellingPrice() == null ? 0.0 : item.getSellingPrice();
         double chargedAmount = Math.max(originalLineAmount - allocatedDiscount, 0.0);
-        boolean usesActiveEngine = declaredRuleVersion == null || AUTO_ACTIVE_RULE_VERSION.equalsIgnoreCase(declaredRuleVersion);
-        double provisionalTaxableValue = pricingMode.equals("EXCLUSIVE")
-                ? chargedAmount
-                : (usesActiveEngine || declaredRate <= 0
-                ? chargedAmount
-                : chargedAmount / (1 + (declaredRate / 100.0)));
+        double provisionalTaxableValue = chargedAmount;
         int quantity = Math.max(item.getQuantity(), 1);
         double sellingPricePerPiece = chargedAmount / quantity;
 
-        TaxRuleResolutionResponse gstResolution = usesActiveEngine
-                ? taxComputationSupport.resolveGstRule(
-                        taxClass,
-                        hsnCode,
-                        provisionalTaxableValue,
-                        sellingPricePerPiece,
-                        effectiveDate
-                )
-                : null;
-
-        double appliedRate = gstResolution != null && gstResolution.getAppliedRatePercentage() != null
-                ? gstResolution.getAppliedRatePercentage()
-                : declaredRate;
+        TaxRuleResolutionResponse gstResolution = taxComputationSupport.resolveGstRule(
+                taxClass,
+                hsnCode,
+                provisionalTaxableValue,
+                sellingPricePerPiece,
+                effectiveDate
+        );
+        if (gstResolution == null || gstResolution.getAppliedRatePercentage() == null) {
+            throw new IllegalStateException(
+                    "No effective GST rule found for order item " + (item.getId() == null ? "UNKNOWN" : item.getId())
+            );
+        }
+        double appliedRate = gstResolution.getAppliedRatePercentage();
 
         TaxComputationSupport.TaxAmounts taxAmounts = taxComputationSupport.computeAmounts(
                 pricingMode,
@@ -179,9 +171,7 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
                 : Math.max(product.getPlatformCommission(), 0.0);
         double commissionAmount = commissionPerUnit * Math.max(item.getQuantity(), 0);
         double commissionGstAmount = commissionAmount * 0.18;
-        String appliedRuleVersion = gstResolution != null && gstResolution.getRuleCode() != null
-                ? gstResolution.getRuleCode()
-                : declaredRuleVersion;
+        String appliedRuleVersion = gstResolution.getRuleCode();
 
         return new LineSnapshot(
                 item.getId(),
@@ -191,7 +181,7 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
                 hsnCode,
                 taxClass,
                 pricingMode,
-                taxComputationSupport.roundCurrency(declaredRate),
+                taxComputationSupport.roundCurrency(appliedRate),
                 taxComputationSupport.roundCurrency(originalLineAmount),
                 taxComputationSupport.roundCurrency(allocatedDiscount),
                 taxComputationSupport.roundCurrency(chargedAmount),
@@ -203,6 +193,14 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
                 taxComputationSupport.roundCurrency(commissionGstAmount),
                 appliedRuleVersion
         );
+    }
+
+    private LocalDate resolveEffectiveDate(Order order) {
+        LocalDate resolvedDate = order.getOrderDate() == null ? LocalDate.now() : order.getOrderDate().toLocalDate();
+        if (resolvedDate.isAfter(LocalDate.now())) {
+            throw new IllegalArgumentException("Order date cannot be in the future for tax snapshot freeze");
+        }
+        return resolvedDate;
     }
 
     private List<Double> allocateDiscounts(List<OrderItem> items, double orderLevelDiscount) {

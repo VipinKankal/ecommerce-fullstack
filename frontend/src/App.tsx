@@ -42,6 +42,7 @@ import {
 } from './shared/api/Api';
 import RouteApiDispatcher from './app/providers/RouteApiDispatcher';
 import ProtectedRoute from './app/components/ProtectedRoute';
+import ComplianceNoteShortcut from './app/components/ComplianceNoteShortcut';
 import {
   getCurrentAppPath,
   getLoginPathForRole,
@@ -71,6 +72,16 @@ function App() {
     () => getRequiredRoleForPath(location.pathname),
     [location.pathname],
   );
+  const bootstrapRole = authRole || requiredRole;
+  const hasBootstrapProfile =
+    (bootstrapRole === 'customer' && Boolean(customer)) ||
+    (bootstrapRole === 'seller' && Boolean(seller)) ||
+    (bootstrapRole === 'admin' && Boolean(admin));
+  const bootstrapKey = bootstrapRole ? `${bootstrapRole}:${location.pathname}` : null;
+  const shouldHoldProtectedRouteForBootstrap =
+    Boolean(bootstrapKey) &&
+    !hasBootstrapProfile &&
+    (isAuthBootstrapLoading || lastBootstrapKey.current !== bootstrapKey);
 
   useEffect(() => {
     const resetSessionState = () => {
@@ -122,19 +133,12 @@ function App() {
   }, [authRole, dispatch, navigate, requiredRole]);
 
   useEffect(() => {
-    const bootstrapRole = authRole || requiredRole;
-    const hasProfile =
-      (bootstrapRole === 'customer' && Boolean(customer)) ||
-      (bootstrapRole === 'seller' && Boolean(seller)) ||
-      (bootstrapRole === 'admin' && Boolean(admin));
-
-    if (!bootstrapRole || hasProfile) {
+    if (!bootstrapRole || hasBootstrapProfile) {
       setIsAuthBootstrapLoading(false);
       return;
     }
 
-    const bootstrapKey = `${bootstrapRole}:${location.pathname}`;
-    if (lastBootstrapKey.current === bootstrapKey) {
+    if (!bootstrapKey || lastBootstrapKey.current === bootstrapKey) {
       return;
     }
     lastBootstrapKey.current = bootstrapKey;
@@ -167,8 +171,11 @@ function App() {
   }, [
     admin,
     authRole,
+    bootstrapKey,
+    bootstrapRole,
     customer,
     dispatch,
+    hasBootstrapProfile,
     location.pathname,
     requiredRole,
     seller,
@@ -187,6 +194,7 @@ function App() {
       <div>
         <RouteApiDispatcher />
         <Navbar />
+        <ComplianceNoteShortcut />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Auth />} />
@@ -211,7 +219,8 @@ function App() {
                 requiredRole="customer"
                 isAllowed={Boolean(customer)}
                 isLoading={
-                  isAuthBootstrapLoading && requiredRole === 'customer'
+                  shouldHoldProtectedRouteForBootstrap &&
+                  requiredRole === 'customer'
                 }
               >
                 <Checkout />
@@ -235,7 +244,8 @@ function App() {
                 requiredRole="customer"
                 isAllowed={Boolean(customer)}
                 isLoading={
-                  isAuthBootstrapLoading && requiredRole === 'customer'
+                  shouldHoldProtectedRouteForBootstrap &&
+                  requiredRole === 'customer'
                 }
               >
                 <Account />
@@ -248,9 +258,7 @@ function App() {
               <ProtectedRoute
                 requiredRole="customer"
                 isAllowed={Boolean(customer)}
-                isLoading={
-                  isAuthBootstrapLoading && requiredRole === 'customer'
-                }
+                isLoading={shouldHoldProtectedRouteForBootstrap && requiredRole === 'customer'}
               >
                 <Wishlist />
               </ProtectedRoute>
@@ -262,7 +270,7 @@ function App() {
               <ProtectedRoute
                 requiredRole="seller"
                 isAllowed={Boolean(seller)}
-                isLoading={isAuthBootstrapLoading && requiredRole === 'seller'}
+                isLoading={shouldHoldProtectedRouteForBootstrap && requiredRole === 'seller'}
               >
                 <SellerDashboard />
               </ProtectedRoute>
@@ -274,7 +282,7 @@ function App() {
               <ProtectedRoute
                 requiredRole="admin"
                 isAllowed={Boolean(admin)}
-                isLoading={isAuthBootstrapLoading && requiredRole === 'admin'}
+                isLoading={shouldHoldProtectedRouteForBootstrap && requiredRole === 'admin'}
               >
                 <AdminDashboard />
               </ProtectedRoute>

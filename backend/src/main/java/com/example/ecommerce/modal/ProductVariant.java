@@ -16,7 +16,7 @@ import lombok.Setter;
 public class ProductVariant {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     private String variantType;

@@ -19,6 +19,7 @@ import AdminCourierManagement from '../../features/admin/Courier/AdminCourierMan
 import AdminReturnRequests from '../../features/admin/returns/AdminReturnRequests';
 import AdminExchangeRequests from '../../features/admin/exchanges/AdminExchangeRequests';
 import AdminAuditLogs from '../../features/admin/Pages/Dashboard/AdminAuditLogs';
+import AdminComplianceNotesPage from '../pages/admin/AdminComplianceNotesPage';
 
 const AdminRoutes = () => {
   return (
@@ -35,6 +36,7 @@ const AdminRoutes = () => {
         <Route path="/return-requests" element={<AdminReturnRequests />} />
         <Route path="/exchange-requests" element={<AdminExchangeRequests />} />
         <Route path="/audit-logs" element={<AdminAuditLogs />} />
+        <Route path="/compliance-notes" element={<AdminComplianceNotesPage />} />
         <Route path="/couriers" element={<AdminCourierManagement />} />
         <Route path="/reports" element={<AdminReports />} />
         <Route path="/account" element={<AdminAccount />} />

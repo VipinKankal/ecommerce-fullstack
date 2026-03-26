@@ -10,6 +10,8 @@ import SellerDashboardHome from '../../features/seller/Pages/SellerDashboard/Sel
 import SellerReturnRequests from '../../features/seller/Pages/Aftercare/SellerReturnRequests';
 import SellerExchangeRequests from '../../features/seller/Pages/Aftercare/SellerExchangeRequests';
 import SellerTransfers from '../../features/seller/Pages/Transfers/SellerTransfers';
+import SellerComplianceNotesPage from '../pages/seller/SellerComplianceNotesPage';
+import SellerComplianceNoteDetailPage from '../pages/seller/SellerComplianceNoteDetailPage';
 
 const SellerRoutes = () => {
   return (
@@ -24,6 +26,8 @@ const SellerRoutes = () => {
       <Route path="/payments" element={<Payment />} />
       <Route path="/transactions" element={<Transaction />} />
       <Route path="/account" element={<Profile />} />
+      <Route path="/notes" element={<SellerComplianceNotesPage />} />
+      <Route path="/notes/:noteId" element={<SellerComplianceNoteDetailPage />} />
     </Routes>
   );
 };

@@ -64,6 +64,16 @@ export const API_ROUTES = {
       byId: (id: number | string) => `/api/admin/product-tax-reviews/${id}`,
     },
     complianceChallans: '/api/admin/compliance/challans',
+    complianceNotes: {
+      base: '/api/admin/compliance/notes',
+      byId: (id: number | string) => `/api/admin/compliance/notes/${id}`,
+      publish: (id: number | string) =>
+        `/api/admin/compliance/notes/${id}/publish`,
+      archive: (id: number | string) =>
+        `/api/admin/compliance/notes/${id}/archive`,
+      attachmentDownload: (id: number | string, attachmentId: string) =>
+        `/api/admin/compliance/notes/${id}/attachments/${attachmentId}/download`,
+    },
     updateSellerStatus: (id: number | string, status: string) =>
       `/api/admin/seller/${id}/status/${status}`,
     profileAlias: '/api/profile',
@@ -256,6 +266,17 @@ export const API_ROUTES = {
   sellerAftercare: {
     returns: '/api/seller/aftercare/returns',
     exchanges: '/api/seller/aftercare/exchanges',
+  },
+
+  sellerComplianceNotes: {
+    base: '/api/seller/compliance/notes',
+    byId: (id: number | string) => `/api/seller/compliance/notes/${id}`,
+    read: (id: number | string) => `/api/seller/compliance/notes/${id}/read`,
+    unread: (id: number | string) =>
+      `/api/seller/compliance/notes/${id}/unread`,
+    unreadCount: '/api/seller/compliance/notes/unread-count',
+    attachmentDownload: (id: number | string, attachmentId: string) =>
+      `/api/seller/compliance/notes/${id}/attachments/${attachmentId}/download`,
   },
 
   sellerTransfers: {

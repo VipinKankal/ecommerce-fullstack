@@ -106,7 +106,7 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, noRollbackFor = IllegalArgumentException.class)
     public TaxRuleResolutionResponse resolveRule(ResolveTaxRuleRequest request) {
         String normalizedRuleType = normalizeRuleType(request.getRuleType());
         String requestedTaxClass = normalizeNullable(request.getTaxClass());

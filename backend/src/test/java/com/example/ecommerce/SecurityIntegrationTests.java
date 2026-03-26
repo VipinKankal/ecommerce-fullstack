@@ -340,7 +340,7 @@ class SecurityIntegrationTests {
                 .build();
         HttpResponse<String> createResponse = cookieClient.send(createRequest, HttpResponse.BodyHandlers.ofString());
 
-        assertEquals(201, createResponse.statusCode());
+        assertEquals(201, createResponse.statusCode(), createResponse.body());
         assertTrue(createResponse.body().contains("\"title\":\"Seller Cookie Product\""));
 
         String listUrl = "http://localhost:" + port + "/api/sellers/products";

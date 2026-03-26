@@ -86,7 +86,9 @@ public class ProductServiceImpl implements ProductService {
                 request.getQuantity(),
                 "Seller added product to catalog"
         );
-        syncTaxReview(savedProduct, previewRequest, taxPreview);
+        if (Boolean.TRUE.equals(taxPreview.getRequiresReview())) {
+            syncTaxReview(savedProduct, previewRequest, taxPreview);
+        }
         initializeCollections(savedProduct);
         return savedProduct;
     }
@@ -496,7 +498,9 @@ public class ProductServiceImpl implements ProductService {
     private boolean shouldBeActive(SellerProductTaxPreviewResponse taxPreview) {
         return Boolean.TRUE.equals(taxPreview.getSellerTaxEligible())
                 && !Boolean.TRUE.equals(taxPreview.getRequiresFiberSelection())
-                && !Boolean.TRUE.equals(taxPreview.getRequiresReview());
+                && !Boolean.TRUE.equals(taxPreview.getRequiresReview())
+                && taxPreview.getGstRuleCode() != null
+                && !taxPreview.getGstRuleCode().isBlank();
     }
 
     private String resolveUiCategoryKey(String first, String second, String third, String fourth) {
