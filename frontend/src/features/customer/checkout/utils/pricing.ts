@@ -14,6 +14,9 @@ export interface OrderSummaryPriceBreakdown {
 
 export interface OrderSummaryResponse {
   estimatedDeliveryDate?: string;
+  appliedGstRuleVersion?: string;
+  effectiveRuleDate?: string;
+  valueBasis?: string;
   priceBreakdown?: OrderSummaryPriceBreakdown;
   orderItems?: Array<{ id?: number | string }>;
 }

@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -57,6 +58,7 @@ class TaxRuleVersionServiceImplTest {
         request.setRuleCode("apparel_gst_v2026_0101");
         request.setRuleType("gst");
         request.setTaxClass("apparel_standard");
+        request.setValueBasis("selling_price_per_piece");
         request.setMinTaxableValue(0.0);
         request.setMaxTaxableValue(2000.0);
         request.setRatePercentage(5.0);
@@ -76,6 +78,7 @@ class TaxRuleVersionServiceImplTest {
         assertEquals("APPAREL_GST_V2026_0101", response.getRuleCode());
         assertEquals("GST", response.getRuleType());
         assertEquals("APPAREL_STANDARD", response.getTaxClass());
+        assertEquals("SELLING_PRICE_PER_PIECE", response.getValueBasis());
         assertEquals(false, response.isPublished());
     }
 
@@ -95,10 +98,12 @@ class TaxRuleVersionServiceImplTest {
         specificRule.setRuleCode("GST_APPAREL_SPECIFIC");
         specificRule.setRuleType("GST");
         specificRule.setTaxClass("APPAREL_STANDARD");
+        specificRule.setValueBasis("SELLING_PRICE_PER_PIECE");
         specificRule.setMinTaxableValue(0.0);
         specificRule.setMaxTaxableValue(2500.0);
         specificRule.setRatePercentage(5.0);
         specificRule.setPublished(true);
+        specificRule.setApprovalStatus("CA_APPROVED");
         specificRule.setEffectiveFrom(LocalDate.of(2025, 9, 22));
 
         when(taxRuleVersionRepository.findByRuleTypeIgnoreCaseAndPublishedTrueAndEffectiveFromLessThanEqual(
@@ -110,6 +115,7 @@ class TaxRuleVersionServiceImplTest {
         request.setRuleType("GST");
         request.setTaxClass("APPAREL_STANDARD");
         request.setTaxableValue(1120.0);
+        request.setSellingPricePerPiece(1120.0);
         request.setEffectiveDate(LocalDate.of(2026, 3, 25));
 
         TaxRuleResolutionResponse response = taxRuleVersionService.resolveRule(request);
@@ -117,6 +123,43 @@ class TaxRuleVersionServiceImplTest {
         assertEquals("GST_APPAREL_SPECIFIC", response.getRuleCode());
         assertEquals(5.0, response.getAppliedRatePercentage());
         assertEquals(56.0, response.getTaxAmount());
+        assertEquals("SELLING_PRICE_PER_PIECE", response.getValueBasis());
+        assertEquals(1120.0, response.getComparisonValue());
+    }
+
+    @Test
+    void resolveRuleRejectsPublishedButUnapprovedRuleWhenProductionApprovalIsRequired() {
+        ReflectionTestUtils.setField(taxRuleVersionService, "productionApprovedOnly", true);
+
+        TaxRuleVersion unapprovedRule = new TaxRuleVersion();
+        unapprovedRule.setId(4L);
+        unapprovedRule.setRuleCode("GST_UNAPPROVED");
+        unapprovedRule.setRuleType("GST");
+        unapprovedRule.setTaxClass("APPAREL_STANDARD");
+        unapprovedRule.setValueBasis("SELLING_PRICE_PER_PIECE");
+        unapprovedRule.setRatePercentage(5.0);
+        unapprovedRule.setPublished(true);
+        unapprovedRule.setApprovalStatus("DRAFT");
+        unapprovedRule.setEffectiveFrom(LocalDate.of(2025, 1, 1));
+
+        when(taxRuleVersionRepository.findByRuleTypeIgnoreCaseAndPublishedTrueAndEffectiveFromLessThanEqual(
+                "GST",
+                LocalDate.of(2026, 3, 25)
+        )).thenReturn(List.of(unapprovedRule));
+
+        ResolveTaxRuleRequest request = new ResolveTaxRuleRequest();
+        request.setRuleType("GST");
+        request.setTaxClass("APPAREL_STANDARD");
+        request.setSellingPricePerPiece(1200.0);
+        request.setTaxableValue(1000.0);
+        request.setEffectiveDate(LocalDate.of(2026, 3, 25));
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> taxRuleVersionService.resolveRule(request)
+        );
+
+        assertEquals("No published tax rule available for the provided criteria", ex.getMessage());
     }
 
     @Test

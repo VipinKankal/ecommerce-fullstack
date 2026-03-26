@@ -1,11 +1,27 @@
 # Live Deployment Worksheet (#16, #17, #18)
 
-Date: ____________________  
-Owner: ____________________  
-Environment: ____________________  
+Date: 2026-03-26  
+Owner: Codex  
+Environment: Blocked (no live HTTPS deployment URL available in repo/session)  
 Frontend URL (HTTPS): ____________________  
 Backend URL (HTTPS): ____________________  
 Release / Commit: ____________________
+
+## Source/Test Proof Collected
+
+- Backend prod template expects trusted HTTPS origin only: `..\backend\docs\deployment\prod.env.example`
+  - `CORS_ALLOWED_ORIGINS=https://your-frontend-domain.com`
+- Backend runtime config uses explicit origin list, not wildcard: `..\backend\src\main\java\com\example\ecommerce\common\configuration\AppConfiguration.java`
+  - `config.setAllowedOrigins(origins)`
+  - `config.setAllowCredentials(true)`
+- Auth cookie service is config-driven: `..\backend\src\main\java\com\example\ecommerce\common\configuration\AuthCookieService.java`
+  - cookie name default `ECOM_AUTH`
+  - `secure` flag from `app.auth.cookie.secure`
+  - `sameSite` from `app.auth.cookie.same-site`
+- Targeted backend integration tests passed on 2026-03-26:
+  - `SecurityIntegrationTests#logoutClearsCookieWithHttpOnlyAndSameSiteAttributes`
+  - `SecurityIntegrationTests#corsPreflightAllowsConfiguredOriginAndCredentials`
+  - Result: `BUILD SUCCESS`
 
 ## #16 Frontend + backend HTTPS deployment check
 
@@ -26,8 +42,8 @@ Release / Commit: ____________________
 - Screenshot (frontend URL bar): ____________________
 - Screenshot (network request URL): ____________________
 - Screenshot (console clean/no mixed content): ____________________
-- Result: Pass / Fail
-- Notes: ____________________
+- Result: Fail (blocked)
+- Notes: No deployed frontend/backend URL available to verify real `https://` transport, Network tab requests, or browser mixed-content behavior.
 
 ---
 
@@ -52,8 +68,8 @@ Release / Commit: ____________________
 - SameSite value: ____________________
 - Screenshot (cookie attributes): ____________________
 - Screenshot (`Set-Cookie` on logout): ____________________
-- Result: Pass / Fail
-- Notes: ____________________
+- Result: Fail (blocked)
+- Notes: Source/test proof exists for `ECOM_AUTH`, `HttpOnly`, logout clear, and `SameSite=Lax`, but `Secure=true` must be confirmed on real HTTPS deployment.
 
 ---
 
@@ -76,8 +92,8 @@ Release / Commit: ____________________
 - Credentials header seen: ____________________
 - Screenshot (CORS headers): ____________________
 - Config proof note: ____________________
-- Result: Pass / Fail
-- Notes: ____________________
+- Result: Fail (blocked)
+- Notes: Source/test proof confirms explicit origin + credentials behavior, but deployed origin value cannot be captured without the real host.
 
 ---
 
@@ -87,5 +103,5 @@ Release / Commit: ____________________
 - [ ] #17 Passed
 - [ ] #18 Passed
 
-Overall status: ____________________  
+Overall status: Blocked (needs live deployment)  
 Sign-off by: ____________________

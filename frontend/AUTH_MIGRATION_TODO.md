@@ -1,12 +1,12 @@
 # Auth Migration TODO (JWT Storage -> HttpOnly Cookie)
 
 ## 1. Backend Contract (Required)
-- [ ] Login and signup endpoints set auth cookie via `Set-Cookie` (HttpOnly, Secure, SameSite).
-- [ ] Add/confirm logout endpoint that clears auth cookie.
-- [ ] Ensure `/api/auth/users/profile` works from cookie session (no bearer header).
-- [ ] Ensure `/sellers/profile` works from cookie session.
-- [ ] CORS allows credentials for frontend origin.
-- [ ] CSRF strategy finalized (`XSRF-TOKEN` cookie + `X-CSRF-Token` header).
+- [x] Login and signup endpoints set auth cookie via `Set-Cookie` (HttpOnly, Secure, SameSite).
+- [x] Add/confirm logout endpoint that clears auth cookie.
+- [x] Ensure `/api/auth/users/profile` works from cookie session (no bearer header).
+- [x] Ensure `/sellers/profile` works from cookie session.
+- [x] CORS allows credentials for frontend origin.
+- [x] CSRF strategy finalized (`XSRF-TOKEN` cookie + `X-CSRF-Token` header).
 
 ## 2. Frontend Implemented in this change
 - [x] Removed client-side JWT persistence (`localStorage`).
@@ -21,15 +21,15 @@
 - [x] Add UI for unauthenticated cart/add-to-cart server 401 responses.
 
 ## 4. Testing Checklist
-- [ ] Customer login via OTP sets cookie, profile fetch succeeds.
-- [ ] Seller login via OTP sets cookie, seller profile fetch succeeds.
-- [ ] Page refresh keeps session (no localStorage dependency).
-- [ ] Logout clears session cookie and protected APIs return 401.
-- [ ] Cart CRUD works with cookie session.
-- [ ] Seller product list/create works with cookie session.
+- [x] Customer login via OTP sets cookie, profile fetch succeeds.
+- [x] Seller login via OTP sets cookie, seller profile fetch succeeds.
+- [x] Page refresh keeps session (no localStorage dependency).
+- [x] Logout clears session cookie and protected APIs return 401.
+- [x] Cart CRUD works with cookie session.
+- [x] Seller product list/create works with cookie session.
 
 ## 5. Deployment Checklist
-- [ ] Frontend and backend deployed on HTTPS.
+- [ ] Deployed frontend and backend are on HTTPS (local development may stay on HTTP).
 - [ ] Cookie flags verified in production (`Secure`, `HttpOnly`, `SameSite`).
 - [ ] CORS origin list restricted to trusted frontend domains.
 

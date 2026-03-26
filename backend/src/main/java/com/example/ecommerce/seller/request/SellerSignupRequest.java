@@ -30,12 +30,13 @@ public class SellerSignupRequest {
 
     private LocalDate dateOfBirth;
 
-    @NotBlank(message = "GSTIN is required")
     @Pattern(
-            regexp = "^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][A-Za-z0-9]Z[A-Za-z0-9]$",
+            regexp = "^$|^[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][A-Za-z0-9]Z[A-Za-z0-9]$",
             message = "Invalid GSTIN format"
     )
     private String GSTIN;
+    private String gstRegistrationType;
+    private Boolean gstDeclarationAccepted;
 
     @Valid
     private BusinessDetails businessDetails;

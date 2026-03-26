@@ -8,6 +8,7 @@ import com.example.ecommerce.tax.response.TaxRuleResolutionResponse;
 import com.example.ecommerce.tax.response.TaxRuleVersionResponse;
 import com.example.ecommerce.tax.service.TaxRuleVersionService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +23,20 @@ import java.util.List;
 public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
 
     private static final List<String> SUPPORTED_RULE_TYPES = List.of("GST", "TCS");
+    private static final List<String> SUPPORTED_VALUE_BASIS = List.of(
+            "TAXABLE_VALUE",
+            "SELLING_PRICE_PER_PIECE"
+    );
+    private static final List<String> SUPPORTED_APPROVAL_STATUSES = List.of(
+            "DRAFT",
+            "CA_APPROVED",
+            "REJECTED"
+    );
 
     private final TaxRuleVersionRepository taxRuleVersionRepository;
+
+    @Value("${app.tax.production-approved-only:true}")
+    private boolean productionApprovedOnly;
 
     @Override
     @Transactional
@@ -45,6 +58,7 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         rule.setTaxClass(normalizeNullable(request.getTaxClass()));
         rule.setHsnCode(normalizeNullable(request.getHsnCode()));
         rule.setSupplyType(normalizeNullable(request.getSupplyType()));
+        rule.setValueBasis(normalizeValueBasis(request.getValueBasis()));
         rule.setMinTaxableValue(request.getMinTaxableValue());
         rule.setMaxTaxableValue(request.getMaxTaxableValue());
         rule.setRatePercentage(roundRate(request.getRatePercentage()));
@@ -52,6 +66,10 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         rule.setEffectiveTo(request.getEffectiveTo());
         rule.setSourceReference(trimToNull(request.getSourceReference()));
         rule.setNotes(trimToNull(request.getNotes()));
+        rule.setApprovalStatus(normalizeApprovalStatus(request.getApprovalStatus()));
+        rule.setApprovedAt(request.getApprovedAt() == null ? null : request.getApprovedAt().atStartOfDay());
+        rule.setApprovedBy(trimToNull(request.getApprovedBy()));
+        rule.setSignedMemoReference(trimToNull(request.getSignedMemoReference()));
         rule.setPublished(false);
 
         return toVersionResponse(taxRuleVersionRepository.save(rule));
@@ -62,6 +80,9 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
     public TaxRuleVersionResponse publishRule(Long ruleId) {
         TaxRuleVersion rule = taxRuleVersionRepository.findById(ruleId)
                 .orElseThrow(() -> new IllegalArgumentException("Tax rule not found"));
+        if (!"CA_APPROVED".equalsIgnoreCase(rule.getApprovalStatus())) {
+            throw new IllegalArgumentException("Only CA-approved tax rules can be published");
+        }
 
         rule.setPublished(true);
         return toVersionResponse(taxRuleVersionRepository.save(rule));
@@ -93,21 +114,33 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         String requestedSupplyType = normalizeNullable(request.getSupplyType());
         LocalDate effectiveDate = request.getEffectiveDate() == null ? LocalDate.now() : request.getEffectiveDate();
         Double taxableValue = request.getTaxableValue();
+        Double sellingPricePerPiece = request.getSellingPricePerPiece();
 
         if (taxableValue != null && taxableValue < 0) {
             throw new IllegalArgumentException("Taxable value cannot be negative");
+        }
+        if (sellingPricePerPiece != null && sellingPricePerPiece < 0) {
+            throw new IllegalArgumentException("Selling price per piece cannot be negative");
         }
 
         List<TaxRuleVersion> candidates = taxRuleVersionRepository
                 .findByRuleTypeIgnoreCaseAndPublishedTrueAndEffectiveFromLessThanEqual(normalizedRuleType, effectiveDate)
                 .stream()
                 .filter(rule -> rule.getEffectiveTo() == null || !rule.getEffectiveTo().isBefore(effectiveDate))
+                .filter(rule -> !productionApprovedOnly || "CA_APPROVED".equalsIgnoreCase(rule.getApprovalStatus()))
                 .filter(rule -> matchesRuleDimension(rule.getTaxClass(), requestedTaxClass))
                 .filter(rule -> matchesRuleDimension(rule.getHsnCode(), requestedHsnCode))
                 .filter(rule -> matchesRuleDimension(rule.getSupplyType(), requestedSupplyType))
-                .filter(rule -> matchesTaxableRange(rule, taxableValue))
+                .filter(rule -> matchesComparisonRange(rule, taxableValue, sellingPricePerPiece))
                 .sorted(Comparator
-                        .comparingInt((TaxRuleVersion rule) -> scoreRule(rule, requestedTaxClass, requestedHsnCode, requestedSupplyType, taxableValue))
+                        .comparingInt((TaxRuleVersion rule) -> scoreRule(
+                                rule,
+                                requestedTaxClass,
+                                requestedHsnCode,
+                                requestedSupplyType,
+                                taxableValue,
+                                sellingPricePerPiece
+                        ))
                         .reversed()
                         .thenComparing(TaxRuleVersion::getEffectiveFrom, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(TaxRuleVersion::getId, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -119,6 +152,7 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
 
         TaxRuleVersion selected = candidates.get(0);
         double normalizedTaxableValue = taxableValue == null ? 0.0 : taxableValue;
+        double comparisonValue = resolveComparisonValue(selected, taxableValue, sellingPricePerPiece);
         double taxAmount = BigDecimal.valueOf(normalizedTaxableValue)
                 .multiply(BigDecimal.valueOf(selected.getRatePercentage() / 100.0))
                 .setScale(2, RoundingMode.HALF_UP)
@@ -131,12 +165,18 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         response.setTaxClass(selected.getTaxClass());
         response.setHsnCode(selected.getHsnCode());
         response.setSupplyType(selected.getSupplyType());
+        response.setValueBasis(selected.getValueBasis());
+        response.setComparisonValue(roundCurrency(comparisonValue));
         response.setAppliedRatePercentage(selected.getRatePercentage());
         response.setTaxableValue(roundCurrency(normalizedTaxableValue));
         response.setTaxAmount(taxAmount);
         response.setEffectiveFrom(selected.getEffectiveFrom());
         response.setEffectiveTo(selected.getEffectiveTo());
         response.setResolvedForDate(effectiveDate);
+        response.setApprovalStatus(selected.getApprovalStatus());
+        response.setApprovedAt(selected.getApprovedAt() == null ? null : selected.getApprovedAt().toLocalDate());
+        response.setApprovedBy(selected.getApprovedBy());
+        response.setSignedMemoReference(selected.getSignedMemoReference());
         return response;
     }
 
@@ -145,7 +185,8 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
             String requestedTaxClass,
             String requestedHsnCode,
             String requestedSupplyType,
-            Double taxableValue
+            Double taxableValue,
+            Double sellingPricePerPiece
     ) {
         int score = 0;
         if (isExactMatch(rule.getTaxClass(), requestedTaxClass)) {
@@ -157,7 +198,8 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         if (isExactMatch(rule.getSupplyType(), requestedSupplyType)) {
             score += 25;
         }
-        if (taxableValue != null && (rule.getMinTaxableValue() != null || rule.getMaxTaxableValue() != null)) {
+        if (resolveComparisonValue(rule, taxableValue, sellingPricePerPiece) > 0
+                && (rule.getMinTaxableValue() != null || rule.getMaxTaxableValue() != null)) {
             score += 20;
         }
         if (!isWildcard(rule.getTaxClass())) {
@@ -172,14 +214,19 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         return score;
     }
 
-    private boolean matchesTaxableRange(TaxRuleVersion rule, Double taxableValue) {
-        if (taxableValue == null) {
+    private boolean matchesComparisonRange(
+            TaxRuleVersion rule,
+            Double taxableValue,
+            Double sellingPricePerPiece
+    ) {
+        Double comparisonValue = resolveNullableComparisonValue(rule, taxableValue, sellingPricePerPiece);
+        if (comparisonValue == null) {
             return rule.getMinTaxableValue() == null && rule.getMaxTaxableValue() == null;
         }
-        if (rule.getMinTaxableValue() != null && taxableValue < rule.getMinTaxableValue()) {
+        if (rule.getMinTaxableValue() != null && comparisonValue < rule.getMinTaxableValue()) {
             return false;
         }
-        if (rule.getMaxTaxableValue() != null && taxableValue > rule.getMaxTaxableValue()) {
+        if (rule.getMaxTaxableValue() != null && comparisonValue > rule.getMaxTaxableValue()) {
             return false;
         }
         return true;
@@ -237,6 +284,32 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         }
     }
 
+    private String normalizeValueBasis(String valueBasis) {
+        String normalized = normalizeNullable(valueBasis);
+        if (normalized == null) {
+            return "TAXABLE_VALUE";
+        }
+        if (SUPPORTED_VALUE_BASIS.stream().noneMatch(value -> value.equalsIgnoreCase(normalized))) {
+            throw new IllegalArgumentException(
+                    "Unsupported value basis. Allowed values: TAXABLE_VALUE, SELLING_PRICE_PER_PIECE"
+            );
+        }
+        return normalized;
+    }
+
+    private String normalizeApprovalStatus(String approvalStatus) {
+        String normalized = normalizeNullable(approvalStatus);
+        if (normalized == null) {
+            return "DRAFT";
+        }
+        if (SUPPORTED_APPROVAL_STATUSES.stream().noneMatch(value -> value.equalsIgnoreCase(normalized))) {
+            throw new IllegalArgumentException(
+                    "Unsupported approval status. Allowed values: DRAFT, CA_APPROVED, REJECTED"
+            );
+        }
+        return normalized;
+    }
+
     private String normalizeRuleType(String ruleType) {
         String normalized = normalizeRequired(ruleType, "Rule type is required");
         if (SUPPORTED_RULE_TYPES.stream().noneMatch(type -> type.equalsIgnoreCase(normalized))) {
@@ -284,6 +357,27 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
                 .doubleValue();
     }
 
+    private double resolveComparisonValue(
+            TaxRuleVersion rule,
+            Double taxableValue,
+            Double sellingPricePerPiece
+    ) {
+        Double value = resolveNullableComparisonValue(rule, taxableValue, sellingPricePerPiece);
+        return value == null ? 0.0 : value;
+    }
+
+    private Double resolveNullableComparisonValue(
+            TaxRuleVersion rule,
+            Double taxableValue,
+            Double sellingPricePerPiece
+    ) {
+        String valueBasis = normalizeValueBasis(rule.getValueBasis());
+        if ("SELLING_PRICE_PER_PIECE".equalsIgnoreCase(valueBasis)) {
+            return sellingPricePerPiece;
+        }
+        return taxableValue;
+    }
+
     private TaxRuleVersionResponse toVersionResponse(TaxRuleVersion rule) {
         TaxRuleVersionResponse response = new TaxRuleVersionResponse();
         response.setId(rule.getId());
@@ -292,6 +386,7 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         response.setTaxClass(rule.getTaxClass());
         response.setHsnCode(rule.getHsnCode());
         response.setSupplyType(rule.getSupplyType());
+        response.setValueBasis(rule.getValueBasis());
         response.setMinTaxableValue(rule.getMinTaxableValue());
         response.setMaxTaxableValue(rule.getMaxTaxableValue());
         response.setRatePercentage(rule.getRatePercentage());
@@ -300,6 +395,10 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         response.setPublished(rule.isPublished());
         response.setSourceReference(rule.getSourceReference());
         response.setNotes(rule.getNotes());
+        response.setApprovalStatus(rule.getApprovalStatus());
+        response.setApprovedAt(rule.getApprovedAt() == null ? null : rule.getApprovedAt().toLocalDate());
+        response.setApprovedBy(rule.getApprovedBy());
+        response.setSignedMemoReference(rule.getSignedMemoReference());
         return response;
     }
 }

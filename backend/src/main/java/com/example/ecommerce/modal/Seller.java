@@ -49,6 +49,10 @@ public class Seller {
     private Address pickupAddress = new Address();
 
     private String GSTIN;
+    private String gstRegistrationType;
+    private String gstOnboardingPolicy;
+    private Boolean gstDeclarationAccepted = false;
+    private String gstComplianceStatus;
 
     @Convert(converter = UserRoleConverter.class)
     private UserRole role = UserRole.ROLE_SELLER;

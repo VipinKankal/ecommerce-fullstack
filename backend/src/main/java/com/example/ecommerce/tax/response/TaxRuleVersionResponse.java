@@ -12,6 +12,7 @@ public class TaxRuleVersionResponse {
     private String taxClass;
     private String hsnCode;
     private String supplyType;
+    private String valueBasis;
     private Double minTaxableValue;
     private Double maxTaxableValue;
     private Double ratePercentage;
@@ -20,4 +21,8 @@ public class TaxRuleVersionResponse {
     private boolean published;
     private String sourceReference;
     private String notes;
+    private String approvalStatus;
+    private LocalDate approvedAt;
+    private String approvedBy;
+    private String signedMemoReference;
 }

@@ -37,6 +37,18 @@ public class Product {
     private Integer warrantyDays;
     private String color;
     private String hsnCode;
+    private String uiCategoryKey;
+    private String subcategoryKey;
+    private String gender;
+    private String fabricType;
+    private String constructionType;
+    private String fiberFamily;
+    private String hsnSelectionMode;
+    private String suggestedHsnCode;
+    private String overrideRequestedHsnCode;
+    @Column(columnDefinition = "TEXT")
+    private String hsnOverrideReason;
+    private String taxReviewStatus;
     private String pricingMode;
     private String taxClass;
     private String taxRuleVersion;

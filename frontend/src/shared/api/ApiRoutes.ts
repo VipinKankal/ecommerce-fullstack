@@ -49,6 +49,21 @@ export const API_ROUTES = {
     },
     payments: '/api/admin/payments',
     salesReport: '/api/admin/reports/sales',
+    taxRules: {
+      base: '/api/admin/tax-rules',
+      publish: (id: number | string) => `/api/admin/tax-rules/${id}/publish`,
+      resolve: '/api/admin/tax-rules/resolve',
+    },
+    hsnMaster: {
+      base: '/api/admin/hsn-master',
+      byId: (id: number | string) => `/api/admin/hsn-master/${id}`,
+      publish: (id: number | string) => `/api/admin/hsn-master/${id}/publish`,
+    },
+    productTaxReviews: {
+      base: '/api/admin/product-tax-reviews',
+      byId: (id: number | string) => `/api/admin/product-tax-reviews/${id}`,
+    },
+    complianceChallans: '/api/admin/compliance/challans',
     updateSellerStatus: (id: number | string, status: string) =>
       `/api/admin/seller/${id}/status/${status}`,
     profileAlias: '/api/profile',
@@ -215,6 +230,7 @@ export const API_ROUTES = {
     delete: (id: number | string) => `/sellers/${id}`,
     updateStatus: (id: number | string) => `/sellers/${id}/status`,
     report: '/sellers/report',
+    taxPreview: '/api/sellers/tax-rules/preview',
   },
 
   sellerProducts: {

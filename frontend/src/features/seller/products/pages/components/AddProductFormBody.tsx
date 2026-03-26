@@ -1,6 +1,7 @@
 import React from 'react';
 import { FormikProps } from 'formik';
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -21,8 +22,15 @@ import {
   AddProductFormValues,
   categoryThree,
   categoryTwo,
+  CONSTRUCTION_OPTIONS,
   emptyVariant,
+  FABRIC_OPTIONS,
+  FIBER_FAMILY_OPTIONS,
+  GENDER_OPTIONS,
+  HSN_SELECTION_MODE_OPTIONS,
   PRODUCT_DESCRIPTION_MAX_LENGTH,
+  resolveSelectedCategoryLabel,
+  SellerProductTaxPreview,
   VariantRow,
 } from '../addProductConfig';
 
@@ -40,7 +48,22 @@ type AddProductFormBodyProps = {
     value: string,
   ) => void;
   loading: boolean;
+  taxPreview: SellerProductTaxPreview | null;
+  taxPreviewLoading: boolean;
+  taxPreviewError: string | null;
 };
+
+const formatMoney = (value?: number | null) =>
+  value == null
+    ? 'Pending'
+    : new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2,
+      }).format(value);
+
+const labelize = (value?: string | null) =>
+  value ? value.replaceAll('_', ' ') : '-';
 
 const AddProductFormBody = ({
   formik,
@@ -50,6 +73,9 @@ const AddProductFormBody = ({
   setVariants,
   updateVariant,
   loading,
+  taxPreview,
+  taxPreviewLoading,
+  taxPreviewError,
 }: AddProductFormBodyProps) => {
   const descriptionLength = formik.values.description.length;
   const descriptionHelperText =
@@ -60,30 +86,46 @@ const AddProductFormBody = ({
   const pricingMode =
     formik.values.pricingMode === 'EXCLUSIVE' ? 'EXCLUSIVE' : 'INCLUSIVE';
   const sellingPrice = Number(formik.values.sellingPrice || 0);
-  const taxRate = Number(formik.values.taxPercentage || 0);
-  const commissionAmount = Number(formik.values.platformCommission || 0);
+  const localTaxRate = Number(formik.values.taxPercentage || 0);
+  const taxRate = taxPreview?.gstRatePreview ?? localTaxRate;
+  const commissionAmount =
+    taxPreview?.commissionAmountPreview ??
+    Number(formik.values.platformCommission || 0);
   const costPrice = Number(formik.values.costPrice || 0);
 
-  const taxableValue =
+  const fallbackTaxableValue =
+    pricingMode === 'INCLUSIVE' ? sellingPrice / (1 + localTaxRate / 100 || 1) : sellingPrice;
+  const fallbackGstAmount =
     pricingMode === 'INCLUSIVE'
-      ? sellingPrice / (1 + taxRate / 100 || 1)
-      : sellingPrice;
-  const gstAmount =
-    pricingMode === 'INCLUSIVE'
-      ? sellingPrice - taxableValue
-      : taxableValue * (taxRate / 100);
-  const finalCustomerPrice =
-    pricingMode === 'INCLUSIVE' ? sellingPrice : sellingPrice + gstAmount;
-  const commissionGst = commissionAmount * 0.18;
-  const netReceivable = finalCustomerPrice - commissionAmount - commissionGst;
-  const estimatedProfit = costPrice > 0 ? netReceivable - costPrice : null;
-  const appliedTaxRuleVersion = formik.values.taxRuleVersion || 'AUTO_ACTIVE';
-  const slabHint =
-    taxableValue <= 1000
-      ? 'Likely apparel lower slab bucket (<= Rs 1000 per piece).'
+      ? sellingPrice - fallbackTaxableValue
+      : fallbackTaxableValue * (localTaxRate / 100);
+  const fallbackCommissionGst = commissionAmount * 0.18;
+  const fallbackNetReceivable =
+    sellingPrice - commissionAmount - fallbackCommissionGst;
+  const fallbackProfit = costPrice > 0 ? fallbackNetReceivable - costPrice : null;
+
+  const taxableValue = taxPreview?.taxableValuePreview ?? fallbackTaxableValue;
+  const gstAmount = taxPreview?.gstAmountPreview ?? fallbackGstAmount;
+  const commissionGst =
+    taxPreview?.commissionGstPreview ?? fallbackCommissionGst;
+  const tcsAmount = taxPreview?.tcsAmountPreview ?? 0;
+  const netReceivable =
+    taxPreview?.netPayoutPreview ?? fallbackNetReceivable;
+  const estimatedProfit =
+    taxPreview?.estimatedProfitPreview ?? fallbackProfit;
+  const appliedTaxRuleVersion =
+    taxPreview?.gstRuleCode || formik.values.taxRuleVersion || 'AUTO_ACTIVE';
+  const selectedCategoryLabel = resolveSelectedCategoryLabel(formik.values);
+  const slabHint = taxPreview?.valueBasis
+    ? `${labelize(taxPreview.valueBasis)} based preview for ${selectedCategoryLabel || 'selected category'}.`
+    : taxableValue <= 1000
+      ? 'Lower slab preview based on the current draft inputs.'
       : taxableValue <= 2500
-        ? 'Near slab transition range (Rs 1000 - Rs 2500). Verify active rule version.'
-        : 'Likely apparel higher slab bucket (> Rs 2500 per piece).';
+        ? 'Near slab transition range. Verify the active rule version before publishing.'
+        : 'Higher slab preview based on the current draft inputs.';
+  const submitLabel = taxPreview?.requiresReview
+    ? 'CREATE PRODUCT (PENDING REVIEW)'
+    : 'CREATE PRODUCT';
 
   return (
     <Grid container spacing={3}>
@@ -242,7 +284,7 @@ const AddProductFormBody = ({
       </Grid>
       <Grid size={{ xs: 12 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-          Category
+          Category And Classification
         </Typography>
       </Grid>
       <Grid size={{ xs: 12, sm: 4 }}>
@@ -309,25 +351,91 @@ const AddProductFormBody = ({
           )}
         </TextField>
       </Grid>
+      <Grid size={{ xs: 12, sm: 4 }}>
+        <TextField
+          select
+          fullWidth
+          label="Gender"
+          {...formik.getFieldProps('gender')}
+        >
+          <MenuItem value="">Not specified</MenuItem>
+          {GENDER_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid size={{ xs: 12, sm: 4 }}>
+        <TextField
+          select
+          fullWidth
+          label="Fabric"
+          {...formik.getFieldProps('fabricType')}
+        >
+          <MenuItem value="">Not specified</MenuItem>
+          {FABRIC_OPTIONS.map((option) => (
+            <MenuItem key={option} value={option.toUpperCase().replaceAll(' ', '_')}>
+              {option}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid size={{ xs: 12, sm: 4 }}>
+        <TextField
+          select
+          fullWidth
+          label="Construction"
+          {...formik.getFieldProps('constructionType')}
+          error={
+            formik.touched.constructionType &&
+            !!formik.errors.constructionType
+          }
+          helperText={
+            (formik.touched.constructionType && formik.errors.constructionType) ||
+            'Required for HSN chapter and GST rule mapping'
+          }
+        >
+          {CONSTRUCTION_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <TextField
+          select
+          fullWidth
+          label="Fibre Family (required for fibre-based categories)"
+          {...formik.getFieldProps('fiberFamily')}
+          helperText="Use this for saree / dhoti / textile mappings when CA-approved HSN depends on fibre."
+        >
+          <MenuItem value="">Not applicable</MenuItem>
+          {FIBER_FAMILY_OPTIONS.map((option) => (
+            <MenuItem key={option} value={option.toUpperCase().replaceAll(' ', '_')}>
+              {option}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
 
       <Grid size={{ xs: 12 }}>
         <Divider />
       </Grid>
       <Grid size={{ xs: 12 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-          Identification & Pricing
+          Identification And Pricing
         </Typography>
       </Grid>
       {[
         ['sku', 'Primary SKU'],
         ['barcode', 'Barcode'],
         ['modelNumber', 'Model Number'],
-        ['hsnCode', 'HSN Code'],
         ['manufacturerPartNumber', 'Manufacturer Part Number'],
         ['countryOfOrigin', 'Country of Origin'],
         ['mrpPrice', 'MRP Price'],
         ['sellingPrice', 'Selling Price'],
-        ['taxPercentage', 'Tax Percentage'],
         ['platformCommission', 'Platform Commission'],
         ['costPrice', 'Cost Price (optional)'],
       ].map(([field, label]) => (
@@ -339,7 +447,6 @@ const AddProductFormBody = ({
               [
                 'mrpPrice',
                 'sellingPrice',
-                'taxPercentage',
                 'platformCommission',
                 'costPrice',
               ].includes(field)
@@ -363,32 +470,6 @@ const AddProductFormBody = ({
       </Grid>
       <Grid size={{ xs: 12, sm: 6, md: 4 }}>
         <TextField
-          fullWidth
-          label="Tax Class"
-          {...formik.getFieldProps('taxClass')}
-          error={formik.touched.taxClass && !!formik.errors.taxClass}
-          helperText={
-            (formik.touched.taxClass && formik.errors.taxClass) ||
-            'Example: APPAREL_STANDARD'
-          }
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-        <TextField
-          fullWidth
-          label="Tax Rule Version"
-          {...formik.getFieldProps('taxRuleVersion')}
-          error={
-            formik.touched.taxRuleVersion && !!formik.errors.taxRuleVersion
-          }
-          helperText={
-            (formik.touched.taxRuleVersion && formik.errors.taxRuleVersion) ||
-            'AUTO_ACTIVE or fixed version'
-          }
-        />
-      </Grid>
-      <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-        <TextField
           select
           fullWidth
           label="Currency"
@@ -397,6 +478,83 @@ const AddProductFormBody = ({
           <MenuItem value="INR">INR</MenuItem>
           <MenuItem value="USD">USD</MenuItem>
         </TextField>
+      </Grid>
+
+      <Grid size={{ xs: 12 }}>
+        <Divider />
+      </Grid>
+      <Grid size={{ xs: 12 }}>
+        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+          GST / HSN Resolution
+        </Typography>
+      </Grid>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <TextField
+          select
+          fullWidth
+          label="HSN Selection Mode"
+          {...formik.getFieldProps('hsnSelectionMode')}
+          helperText="Manual override creates an admin review queue item."
+          onChange={(event) => {
+            const nextMode = event.target.value;
+            formik.setFieldValue('hsnSelectionMode', nextMode);
+            if (nextMode === 'AUTO') {
+              formik.setFieldValue('overrideRequestedHsnCode', '');
+              formik.setFieldValue('hsnOverrideReason', '');
+            }
+          }}
+        >
+          {HSN_SELECTION_MODE_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Grid>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <TextField
+          fullWidth
+          label="Override HSN Request"
+          {...formik.getFieldProps('overrideRequestedHsnCode')}
+          disabled={formik.values.hsnSelectionMode !== 'MANUAL'}
+          error={
+            formik.touched.overrideRequestedHsnCode &&
+            !!formik.errors.overrideRequestedHsnCode
+          }
+          helperText={
+            (formik.touched.overrideRequestedHsnCode &&
+              formik.errors.overrideRequestedHsnCode) ||
+            '4 to 8 digit code, only if seller wants manual review'
+          }
+        />
+      </Grid>
+      <Grid size={{ xs: 12, md: 4 }}>
+        <TextField
+          fullWidth
+          label="Resolved HSN"
+          value={taxPreview?.resolvedHsnCode || formik.values.hsnCode || ''}
+          InputProps={{ readOnly: true }}
+          helperText="Final HSN used for preview and product save"
+        />
+      </Grid>
+      <Grid size={{ xs: 12 }}>
+        <TextField
+          fullWidth
+          multiline
+          minRows={2}
+          label="Override Reason"
+          {...formik.getFieldProps('hsnOverrideReason')}
+          disabled={formik.values.hsnSelectionMode !== 'MANUAL'}
+          error={
+            formik.touched.hsnOverrideReason &&
+            !!formik.errors.hsnOverrideReason
+          }
+          helperText={
+            (formik.touched.hsnOverrideReason &&
+              formik.errors.hsnOverrideReason) ||
+            'Mandatory when manual HSN override is requested'
+          }
+        />
       </Grid>
       <Grid size={{ xs: 12 }}>
         <Paper
@@ -421,32 +579,86 @@ const AddProductFormBody = ({
             <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
               GST / Profit Preview
             </Typography>
-            <Chip
-              size="small"
-              color="info"
-              label={`Rule: ${appliedTaxRuleVersion}`}
-            />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {taxPreviewLoading && (
+                <Chip size="small" color="info" label="Resolving preview" />
+              )}
+              <Chip
+                size="small"
+                color={taxPreview?.requiresReview ? 'warning' : 'info'}
+                label={`Rule: ${appliedTaxRuleVersion}`}
+              />
+              <Chip
+                size="small"
+                color={
+                  taxPreview?.sellerTaxEligible === false ? 'error' : 'success'
+                }
+                label={labelize(
+                  taxPreview?.sellerTaxEligibilityStatus || 'ELIGIBLE',
+                )}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={labelize(
+                  taxPreview?.reviewStatus || formik.values.taxReviewStatus,
+                )}
+              />
+            </Box>
           </Box>
+          {taxPreviewError && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              {taxPreviewError}
+            </Alert>
+          )}
+          {taxPreview?.note && (
+            <Alert
+              severity={taxPreview.sellerTaxEligible === false ? 'error' : 'info'}
+              sx={{ mb: 2 }}
+            >
+              {taxPreview.note}
+            </Alert>
+          )}
           <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-3">
             <div>
-              <strong>Taxable:</strong> Rs {taxableValue.toFixed(2)}
+              <strong>Suggested HSN:</strong>{' '}
+              {taxPreview?.suggestedHsnCode || formik.values.suggestedHsnCode || 'Pending'}
             </div>
             <div>
-              <strong>GST ({taxRate}%):</strong> Rs {gstAmount.toFixed(2)}
+              <strong>HSN Chapter:</strong> {taxPreview?.hsnChapter || 'Pending'}
             </div>
             <div>
-              <strong>Customer Price:</strong> Rs{' '}
-              {finalCustomerPrice.toFixed(2)}
+              <strong>Tax Class:</strong>{' '}
+              {taxPreview?.taxClass || formik.values.taxClass || 'Pending'}
             </div>
             <div>
-              <strong>Commission:</strong> Rs {commissionAmount.toFixed(2)}
+              <strong>Effective Rule Date:</strong>{' '}
+              {taxPreview?.effectiveRuleDate || 'Pending'}
             </div>
             <div>
-              <strong>Commission GST (18%):</strong> Rs{' '}
-              {commissionGst.toFixed(2)}
+              <strong>Rule Basis:</strong> {labelize(taxPreview?.valueBasis)}
             </div>
             <div>
-              <strong>Net Receivable:</strong> Rs {netReceivable.toFixed(2)}
+              <strong>GST Rate:</strong>{' '}
+              {taxRate ? `${taxRate}%` : 'Pending'}
+            </div>
+            <div>
+              <strong>Taxable:</strong> {formatMoney(taxableValue)}
+            </div>
+            <div>
+              <strong>GST Amount:</strong> {formatMoney(gstAmount)}
+            </div>
+            <div>
+              <strong>Commission:</strong> {formatMoney(commissionAmount)}
+            </div>
+            <div>
+              <strong>Commission GST:</strong> {formatMoney(commissionGst)}
+            </div>
+            <div>
+              <strong>TCS Preview:</strong> {formatMoney(tcsAmount)}
+            </div>
+            <div>
+              <strong>Net Payout:</strong> {formatMoney(netReceivable)}
             </div>
           </div>
           <Typography
@@ -455,6 +667,11 @@ const AddProductFormBody = ({
           >
             {slabHint}
           </Typography>
+          {taxPreview?.requiresFiberSelection && (
+            <Typography variant="body2" sx={{ mt: 1, fontWeight: 700, color: '#b45309' }}>
+              Fibre family is required before this product can receive a CA-approved HSN mapping.
+            </Typography>
+          )}
           {estimatedProfit !== null && (
             <Typography
               variant="body2"
@@ -464,7 +681,7 @@ const AddProductFormBody = ({
                 color: estimatedProfit >= 0 ? '#166534' : '#b91c1c',
               }}
             >
-              Estimated Profit: Rs {estimatedProfit.toFixed(2)}
+              Estimated Profit: {formatMoney(estimatedProfit)}
             </Typography>
           )}
         </Paper>
@@ -725,13 +942,13 @@ const AddProductFormBody = ({
           variant="contained"
           fullWidth
           size="large"
-          disabled={loading || uploading}
+          disabled={loading || uploading || taxPreviewLoading}
           sx={{ py: 1.5, bgcolor: '#10b981', fontWeight: 'bold' }}
         >
           {loading ? (
             <CircularProgress size={24} color="inherit" />
           ) : (
-            'CREATE PRODUCT'
+            submitLabel
           )}
         </Button>
       </Grid>

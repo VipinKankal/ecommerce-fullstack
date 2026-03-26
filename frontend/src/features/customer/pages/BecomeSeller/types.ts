@@ -7,6 +7,8 @@ export interface SellerAccountFormValues {
   password: string;
   dateOfBirth: string;
   gstin: string;
+  gstRegistrationType: 'GST_REGISTERED' | 'NON_GST_DECLARATION';
+  gstDeclarationAccepted: boolean;
   pickupAddress: {
     name: string;
     mobile: string;

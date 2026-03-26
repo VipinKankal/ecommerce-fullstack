@@ -10,24 +10,22 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
-import { SellerOrder } from 'State/features/seller/orders/thunks';
-
-interface SellerOrderItem {
-  id?: number | string;
-  size?: string;
-  quantity?: number;
-  sellingPrice?: number;
-  product?: {
-    title?: string;
-    description?: string;
-  };
-}
+import { SellerOrder, SellerOrderItem } from 'State/features/seller/orders/thunks';
 
 interface OrderDetailsDialogProps {
   order: SellerOrder | null;
   onClose: () => void;
   getOrderDate: (order: SellerOrder) => string;
 }
+
+const formatMoney = (value?: number | null) =>
+  value == null
+    ? '-'
+    : new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        maximumFractionDigits: 2,
+      }).format(value);
 
 const OrderDetailsDialog = ({
   order,
@@ -64,7 +62,8 @@ const OrderDetailsDialog = ({
                     {order.paymentStatus || 'PENDING'}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Payment Method:</strong> {order.paymentMethod || 'N/A'}
+                    <strong>Payment Method:</strong>{' '}
+                    {order.paymentMethod || 'N/A'}
                     {order.paymentType ? ` | ${order.paymentType}` : ''}
                     {order.provider ? ` | ${order.provider}` : ''}
                   </Typography>
@@ -73,10 +72,11 @@ const OrderDetailsDialog = ({
                     {order.totalItems || order.orderItems?.length || 0}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Total Selling:</strong> Rs {order.totalSellingPrice}
+                    <strong>Total Selling:</strong>{' '}
+                    {formatMoney(order.totalSellingPrice)}
                   </Typography>
                   <Typography variant="body2">
-                    <strong>Total MRP:</strong> Rs {order.totalMrpPrice}
+                    <strong>Total MRP:</strong> {formatMoney(order.totalMrpPrice)}
                   </Typography>
                   <Typography variant="body2">
                     <strong>Created:</strong> {getOrderDate(order)}
@@ -108,6 +108,48 @@ const OrderDetailsDialog = ({
                 </Stack>
               </Paper>
             </div>
+
+            {order.orderTaxSnapshot && (
+              <Paper
+                sx={{
+                  p: 2,
+                  borderRadius: '16px',
+                  boxShadow: 'none',
+                  border: '1px solid #d1fae5',
+                  bgcolor: '#f0fdf4',
+                }}
+              >
+                <Typography variant="subtitle2" sx={{ mb: 2, fontWeight: 800 }}>
+                  Frozen Tax Snapshot
+                </Typography>
+                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-3">
+                  <div>
+                    <strong>Taxable Value:</strong>{' '}
+                    {formatMoney(order.orderTaxSnapshot.totalTaxableValue)}
+                  </div>
+                  <div>
+                    <strong>Total GST:</strong>{' '}
+                    {formatMoney(order.orderTaxSnapshot.totalGstAmount)}
+                  </div>
+                  <div>
+                    <strong>TCS:</strong>{' '}
+                    {formatMoney(order.orderTaxSnapshot.tcsAmount)}
+                  </div>
+                  <div>
+                    <strong>Commission GST:</strong>{' '}
+                    {formatMoney(order.orderTaxSnapshot.totalCommissionGstAmount)}
+                  </div>
+                  <div>
+                    <strong>GST Rule:</strong>{' '}
+                    {order.orderTaxSnapshot.gstRuleVersion || '-'}
+                  </div>
+                  <div>
+                    <strong>Effective Date:</strong>{' '}
+                    {order.orderTaxSnapshot.effectiveTaxDate || '-'}
+                  </div>
+                </div>
+              </Paper>
+            )}
 
             <Paper
               sx={{
@@ -141,14 +183,12 @@ const OrderDetailsDialog = ({
                             {item.product?.description || 'No description'}
                           </Typography>
                         </div>
-                        <Chip
-                          size="small"
-                          label={`Qty ${item.quantity || 0}`}
-                        />
+                        <Chip size="small" label={`Qty ${item.quantity || 0}`} />
                       </div>
                       <div className="mt-2 flex flex-wrap gap-3 text-sm text-gray-600">
                         <span>Size: {item.size || '-'}</span>
-                        <span>Price: Rs {item.sellingPrice || 0}</span>
+                        <span>Price: {formatMoney(item.sellingPrice)}</span>
+                        <span>MRP: {formatMoney(item.mrpPrice)}</span>
                       </div>
                     </div>
                   ))}

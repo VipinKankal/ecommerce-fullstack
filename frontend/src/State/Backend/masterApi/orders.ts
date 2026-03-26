@@ -1,6 +1,22 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { API_ROUTES, api, getApiError, getErrorMessage } from './shared';
 
+type CheckoutSummaryAddress = {
+  name: string;
+  mobileNumber: string;
+  street?: string;
+  address: string;
+  locality?: string;
+  city: string;
+  state: string;
+  pinCode: string;
+  country?: string;
+};
+
+export type CheckoutOrderSummaryRequest = {
+  shippingAddress: CheckoutSummaryAddress;
+};
+
 // Orders
 export const createOrder = createAsyncThunk(
   'masterApi/createOrder',
@@ -32,14 +48,19 @@ export const createCheckoutOrder = createAsyncThunk(
       const response = await api.post(API_ROUTES.orders.create, payload);
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(getApiError(error, 'Failed to create checkout order'));
+      return rejectWithValue(
+        getApiError(error, 'Failed to create checkout order'),
+      );
     }
   },
 );
 
 export const orderSummary = createAsyncThunk(
   'masterApi/orderSummary',
-  async (shippingAddress: unknown, { rejectWithValue }) => {
+  async (
+    shippingAddress: CheckoutOrderSummaryRequest,
+    { rejectWithValue },
+  ) => {
     try {
       const response = await api.post(
         API_ROUTES.orders.summary,

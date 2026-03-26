@@ -46,6 +46,9 @@ public class TaxRuleVersion {
     @Column(name = "supply_type", length = 32)
     private String supplyType;
 
+    @Column(name = "value_basis", length = 32)
+    private String valueBasis;
+
     @Column(name = "min_taxable_value")
     private Double minTaxableValue;
 
@@ -69,6 +72,18 @@ public class TaxRuleVersion {
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
+
+    @Column(name = "approval_status", length = 32)
+    private String approvalStatus;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "approved_by", length = 120)
+    private String approvedBy;
+
+    @Column(name = "signed_memo_reference", length = 255)
+    private String signedMemoReference;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

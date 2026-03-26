@@ -1,6 +1,5 @@
 package com.example.ecommerce.order.service.impl;
 
-import com.example.ecommerce.common.utils.IndianStateCodeResolver;
 import com.example.ecommerce.modal.Order;
 import com.example.ecommerce.modal.OrderItem;
 import com.example.ecommerce.modal.OrderTaxSnapshot;
@@ -8,16 +7,13 @@ import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.order.service.OrderTaxSnapshotService;
 import com.example.ecommerce.repository.OrderTaxSnapshotRepository;
-import com.example.ecommerce.tax.request.ResolveTaxRuleRequest;
 import com.example.ecommerce.tax.response.TaxRuleResolutionResponse;
-import com.example.ecommerce.tax.service.TaxRuleVersionService;
+import com.example.ecommerce.tax.service.TaxComputationSupport;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -37,7 +33,7 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
     private static final String AUTO_ACTIVE_RULE_VERSION = "AUTO_ACTIVE";
 
     private final OrderTaxSnapshotRepository orderTaxSnapshotRepository;
-    private final TaxRuleVersionService taxRuleVersionService;
+    private final TaxComputationSupport taxComputationSupport;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -58,11 +54,11 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
 
         LocalDate effectiveDate = order.getOrderDate() == null ? LocalDate.now() : order.getOrderDate().toLocalDate();
         String supplierGstin = resolveSupplierGstin(items);
-        String sellerStateCode = resolveSellerStateCode(supplierGstin);
-        String posStateCode = IndianStateCodeResolver.resolveStateCode(
+        String sellerStateCode = taxComputationSupport.resolveSellerStateCode(supplierGstin);
+        String posStateCode = taxComputationSupport.resolvePosStateCode(
                 order.getShippingAddress() == null ? null : order.getShippingAddress().getState()
         );
-        String supplyType = resolveSupplyType(sellerStateCode, posStateCode);
+        String supplyType = taxComputationSupport.resolveSupplyType(sellerStateCode, posStateCode);
 
         List<Double> allocatedDiscounts = allocateDiscounts(items, orderLevelDiscount);
         List<LineSnapshot> lineSnapshots = new ArrayList<>();
@@ -77,7 +73,11 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         double totalCommissionAmount = lineSnapshots.stream().mapToDouble(LineSnapshot::commissionAmount).sum();
         double totalCommissionGstAmount = lineSnapshots.stream().mapToDouble(LineSnapshot::commissionGstAmount).sum();
 
-        TaxRuleResolutionResponse tcsResolution = resolveTcsRule(totalTaxableValue, supplyType, effectiveDate);
+        TaxRuleResolutionResponse tcsResolution = taxComputationSupport.resolveTcsRule(
+                totalTaxableValue,
+                supplyType,
+                effectiveDate
+        );
         String gstRuleVersion = resolveAggregateRuleVersion(lineSnapshots.stream().map(LineSnapshot::gstRuleVersion).toList());
         String tcsRuleVersion = tcsResolution == null ? null : tcsResolution.getRuleCode();
         double tcsRatePercentage = tcsResolution == null || tcsResolution.getAppliedRatePercentage() == null
@@ -97,14 +97,14 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         payload.put("effectiveDate", effectiveDate.toString());
         payload.put("sourceOrderTotalSellingPrice", order.getTotalSellingPrice());
         payload.put("sourceOrderDiscount", orderLevelDiscount);
-        payload.put("totalTaxableValue", roundCurrency(totalTaxableValue));
-        payload.put("totalGstAmount", roundCurrency(totalGstAmount));
-        payload.put("totalAmountCharged", roundCurrency(totalAmountCharged));
-        payload.put("totalAmountWithTax", roundCurrency(totalAmountWithTax));
-        payload.put("totalCommissionAmount", roundCurrency(totalCommissionAmount));
-        payload.put("totalCommissionGstAmount", roundCurrency(totalCommissionGstAmount));
-        payload.put("tcsRatePercentage", roundCurrency(tcsRatePercentage));
-        payload.put("tcsAmount", roundCurrency(tcsAmount));
+        payload.put("totalTaxableValue", taxComputationSupport.roundCurrency(totalTaxableValue));
+        payload.put("totalGstAmount", taxComputationSupport.roundCurrency(totalGstAmount));
+        payload.put("totalAmountCharged", taxComputationSupport.roundCurrency(totalAmountCharged));
+        payload.put("totalAmountWithTax", taxComputationSupport.roundCurrency(totalAmountWithTax));
+        payload.put("totalCommissionAmount", taxComputationSupport.roundCurrency(totalCommissionAmount));
+        payload.put("totalCommissionGstAmount", taxComputationSupport.roundCurrency(totalCommissionGstAmount));
+        payload.put("tcsRatePercentage", taxComputationSupport.roundCurrency(tcsRatePercentage));
+        payload.put("tcsAmount", taxComputationSupport.roundCurrency(tcsAmount));
         payload.put("gstRuleVersion", gstRuleVersion);
         payload.put("tcsRuleVersion", tcsRuleVersion);
         payload.put("lineItems", lineSnapshots.stream().map(this::toLineItemPayload).toList());
@@ -116,17 +116,18 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         snapshot.setSellerStateCode(sellerStateCode);
         snapshot.setPosStateCode(posStateCode);
         snapshot.setSupplyType(supplyType);
-        snapshot.setTotalTaxableValue(roundCurrency(totalTaxableValue));
-        snapshot.setTotalGstAmount(roundCurrency(totalGstAmount));
-        snapshot.setTotalAmountCharged(roundCurrency(totalAmountCharged));
-        snapshot.setTotalAmountWithTax(roundCurrency(totalAmountWithTax));
-        snapshot.setTotalCommissionAmount(roundCurrency(totalCommissionAmount));
-        snapshot.setTotalCommissionGstAmount(roundCurrency(totalCommissionGstAmount));
-        snapshot.setTcsRatePercentage(roundCurrency(tcsRatePercentage));
-        snapshot.setTcsAmount(roundCurrency(tcsAmount));
+        snapshot.setTotalTaxableValue(taxComputationSupport.roundCurrency(totalTaxableValue));
+        snapshot.setTotalGstAmount(taxComputationSupport.roundCurrency(totalGstAmount));
+        snapshot.setTotalAmountCharged(taxComputationSupport.roundCurrency(totalAmountCharged));
+        snapshot.setTotalAmountWithTax(taxComputationSupport.roundCurrency(totalAmountWithTax));
+        snapshot.setTotalCommissionAmount(taxComputationSupport.roundCurrency(totalCommissionAmount));
+        snapshot.setTotalCommissionGstAmount(taxComputationSupport.roundCurrency(totalCommissionGstAmount));
+        snapshot.setTcsRatePercentage(taxComputationSupport.roundCurrency(tcsRatePercentage));
+        snapshot.setTcsAmount(taxComputationSupport.roundCurrency(tcsAmount));
         snapshot.setGstRuleVersion(gstRuleVersion);
         snapshot.setTcsRuleVersion(tcsRuleVersion);
         snapshot.setSnapshotSource(SNAPSHOT_SOURCE);
+        snapshot.setEffectiveTaxDate(effectiveDate);
         snapshot.setSnapshotPayload(writePayload(payload));
         snapshot.setFrozenAt(LocalDateTime.now());
 
@@ -150,31 +151,28 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
                 : (usesActiveEngine || declaredRate <= 0
                 ? chargedAmount
                 : chargedAmount / (1 + (declaredRate / 100.0)));
+        int quantity = Math.max(item.getQuantity(), 1);
+        double sellingPricePerPiece = chargedAmount / quantity;
 
         TaxRuleResolutionResponse gstResolution = usesActiveEngine
-                ? resolveGstRule(taxClass, hsnCode, provisionalTaxableValue, effectiveDate)
+                ? taxComputationSupport.resolveGstRule(
+                        taxClass,
+                        hsnCode,
+                        provisionalTaxableValue,
+                        sellingPricePerPiece,
+                        effectiveDate
+                )
                 : null;
 
         double appliedRate = gstResolution != null && gstResolution.getAppliedRatePercentage() != null
                 ? gstResolution.getAppliedRatePercentage()
                 : declaredRate;
 
-        double taxableValue;
-        double gstAmount;
-        double amountWithTax;
-        if ("EXCLUSIVE".equals(pricingMode)) {
-            taxableValue = chargedAmount;
-            gstAmount = taxableValue * (appliedRate / 100.0);
-            amountWithTax = chargedAmount + gstAmount;
-        } else if (appliedRate > 0) {
-            taxableValue = chargedAmount / (1 + (appliedRate / 100.0));
-            gstAmount = chargedAmount - taxableValue;
-            amountWithTax = chargedAmount;
-        } else {
-            taxableValue = chargedAmount;
-            gstAmount = 0.0;
-            amountWithTax = chargedAmount;
-        }
+        TaxComputationSupport.TaxAmounts taxAmounts = taxComputationSupport.computeAmounts(
+                pricingMode,
+                chargedAmount,
+                appliedRate
+        );
 
         double commissionPerUnit = product == null || product.getPlatformCommission() == null
                 ? 0.0
@@ -193,54 +191,18 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
                 hsnCode,
                 taxClass,
                 pricingMode,
-                roundCurrency(declaredRate),
-                roundCurrency(originalLineAmount),
-                roundCurrency(allocatedDiscount),
-                roundCurrency(chargedAmount),
-                roundCurrency(taxableValue),
-                roundCurrency(appliedRate),
-                roundCurrency(gstAmount),
-                roundCurrency(amountWithTax),
-                roundCurrency(commissionAmount),
-                roundCurrency(commissionGstAmount),
+                taxComputationSupport.roundCurrency(declaredRate),
+                taxComputationSupport.roundCurrency(originalLineAmount),
+                taxComputationSupport.roundCurrency(allocatedDiscount),
+                taxComputationSupport.roundCurrency(chargedAmount),
+                taxAmounts.taxableValue(),
+                taxComputationSupport.roundCurrency(appliedRate),
+                taxAmounts.gstAmount(),
+                taxAmounts.amountWithTax(),
+                taxComputationSupport.roundCurrency(commissionAmount),
+                taxComputationSupport.roundCurrency(commissionGstAmount),
                 appliedRuleVersion
         );
-    }
-
-    private TaxRuleResolutionResponse resolveGstRule(
-            String taxClass,
-            String hsnCode,
-            double taxableValue,
-            LocalDate effectiveDate
-    ) {
-        try {
-            ResolveTaxRuleRequest request = new ResolveTaxRuleRequest();
-            request.setRuleType("GST");
-            request.setTaxClass(taxClass);
-            request.setHsnCode(hsnCode);
-            request.setTaxableValue(roundCurrency(taxableValue));
-            request.setEffectiveDate(effectiveDate);
-            return taxRuleVersionService.resolveRule(request);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
-    private TaxRuleResolutionResponse resolveTcsRule(double totalTaxableValue, String supplyType, LocalDate effectiveDate) {
-        if (totalTaxableValue <= 0 || supplyType == null || supplyType.isBlank() || "UNKNOWN".equalsIgnoreCase(supplyType)) {
-            return null;
-        }
-        try {
-            ResolveTaxRuleRequest request = new ResolveTaxRuleRequest();
-            request.setRuleType("TCS");
-            request.setTaxClass(ORDER_TYPE_MARKETPLACE);
-            request.setSupplyType(supplyType);
-            request.setTaxableValue(roundCurrency(totalTaxableValue));
-            request.setEffectiveDate(effectiveDate);
-            return taxRuleVersionService.resolveRule(request);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
     }
 
     private List<Double> allocateDiscounts(List<OrderItem> items, double orderLevelDiscount) {
@@ -266,11 +228,11 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
             } else if (normalizedDiscount <= 0 || totalLineAmount <= 0 || lineAmount <= 0) {
                 allocatedDiscount = 0.0;
             } else {
-                allocatedDiscount = roundCurrency((lineAmount / totalLineAmount) * normalizedDiscount);
+                allocatedDiscount = taxComputationSupport.roundCurrency((lineAmount / totalLineAmount) * normalizedDiscount);
             }
             allocatedDiscount = Math.min(allocatedDiscount, Math.max(lineAmount, 0.0));
-            remainingDiscount = roundCurrency(Math.max(remainingDiscount - allocatedDiscount, 0.0));
-            discounts.add(roundCurrency(allocatedDiscount));
+            remainingDiscount = taxComputationSupport.roundCurrency(Math.max(remainingDiscount - allocatedDiscount, 0.0));
+            discounts.add(taxComputationSupport.roundCurrency(allocatedDiscount));
         }
         return discounts;
     }
@@ -287,21 +249,6 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
                 .filter(value -> !value.isBlank())
                 .findFirst()
                 .orElse(null);
-    }
-
-    private String resolveSellerStateCode(String supplierGstin) {
-        if (supplierGstin == null || supplierGstin.length() < 2) {
-            return null;
-        }
-        String prefix = supplierGstin.substring(0, 2);
-        return prefix.matches("\\d{2}") ? prefix : null;
-    }
-
-    private String resolveSupplyType(String sellerStateCode, String posStateCode) {
-        if (sellerStateCode == null || posStateCode == null) {
-            return "UNKNOWN";
-        }
-        return sellerStateCode.equalsIgnoreCase(posStateCode) ? "INTRA_STATE" : "INTER_STATE";
     }
 
     private String resolveAggregateRuleVersion(List<String> ruleVersions) {
@@ -369,12 +316,6 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         }
         String trimmed = value.trim();
         return trimmed.isBlank() ? null : trimmed.toUpperCase();
-    }
-
-    private double roundCurrency(double value) {
-        return BigDecimal.valueOf(value)
-                .setScale(2, RoundingMode.HALF_UP)
-                .doubleValue();
     }
 
     private record LineSnapshot(

@@ -13,6 +13,7 @@ import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -76,6 +77,9 @@ public class OrderTaxSnapshot {
 
     @Column(name = "snapshot_source", length = 64)
     private String snapshotSource;
+
+    @Column(name = "effective_tax_date")
+    private LocalDate effectiveTaxDate;
 
     @Column(name = "snapshot_payload", columnDefinition = "LONGTEXT")
     private String snapshotPayload;

@@ -12,6 +12,18 @@ export interface ProductVariant {
   warehouseStock?: number;
 }
 
+export interface ProductTaxReviewSummary {
+  id?: number;
+  productId?: number;
+  suggestedHsnCode?: string;
+  requestedHsnCode?: string;
+  overrideReason?: string;
+  reviewStatus?: string;
+  reviewerNote?: string;
+  requestedAt?: string;
+  reviewedAt?: string;
+}
+
 export interface Product {
   id?: number;
   title: string;
@@ -34,6 +46,24 @@ export interface Product {
   sizes: string;
   active?: boolean;
   variants?: ProductVariant[];
+  hsnCode?: string;
+  taxClass?: string;
+  taxRuleVersion?: string;
+  taxPercentage?: number;
+  pricingMode?: 'INCLUSIVE' | 'EXCLUSIVE' | string;
+  platformCommission?: number;
+  uiCategoryKey?: string;
+  subcategoryKey?: string;
+  gender?: string;
+  fabricType?: string;
+  constructionType?: string;
+  fiberFamily?: string;
+  hsnSelectionMode?: string;
+  suggestedHsnCode?: string;
+  overrideRequestedHsnCode?: string;
+  hsnOverrideReason?: string;
+  taxReviewStatus?: string;
+  taxReview?: ProductTaxReviewSummary;
 }
 
 export interface Category {

@@ -34,6 +34,28 @@ export type DeliveryHistoryLite = {
   updatedAt?: string;
 };
 
+export type OrderTaxSnapshotLite = {
+  id?: number;
+  orderType?: string;
+  supplierGstin?: string;
+  sellerStateCode?: string;
+  posStateCode?: string;
+  supplyType?: string;
+  totalTaxableValue?: number;
+  totalGstAmount?: number;
+  totalAmountCharged?: number;
+  totalAmountWithTax?: number;
+  totalCommissionAmount?: number;
+  totalCommissionGstAmount?: number;
+  tcsRatePercentage?: number;
+  tcsAmount?: number;
+  gstRuleVersion?: string;
+  tcsRuleVersion?: string;
+  snapshotSource?: string;
+  effectiveTaxDate?: string;
+  frozenAt?: string;
+};
+
 export type ReturnRefundRequestLite = {
   orderItemId?: number | string;
   requestNumber?: string;
@@ -79,6 +101,7 @@ export type OrderLite = {
   courierPhone?: string;
   deliveryHistory?: DeliveryHistoryLite[];
   deliveryDate?: string;
+  orderTaxSnapshot?: OrderTaxSnapshotLite | null;
 };
 
 export type CancelReasonOption = { code: string; label: string };

@@ -19,5 +19,8 @@ public class ResolveTaxRuleRequest {
     @Min(value = 0, message = "Taxable value cannot be negative")
     private Double taxableValue;
 
+    @Min(value = 0, message = "Selling price per piece cannot be negative")
+    private Double sellingPricePerPiece;
+
     private LocalDate effectiveDate;
 }

@@ -16,10 +16,6 @@ export const addProductValidationSchema = Yup.object({
     )
     .required('Description is required'),
   shortDescription: Yup.string().required('Short description is required'),
-  hsnCode: Yup.string()
-    .trim()
-    .matches(/^\d{4,8}$/, 'HSN code must be 4 to 8 digits')
-    .required('HSN code is required'),
   mrpPrice: Yup.number().positive().required('MRP is required'),
   sellingPrice: Yup.number().positive().required('Selling price is required'),
   pricingMode: Yup.string()
@@ -33,7 +29,7 @@ export const addProductValidationSchema = Yup.object({
     )
     .min(0, 'Tax percentage cannot be negative')
     .max(100, 'Tax percentage cannot exceed 100')
-    .required('Tax percentage is required'),
+    .nullable(),
   platformCommission: Yup.number()
     .transform((value, originalValue) =>
       originalValue === '' ? undefined : value,
@@ -74,6 +70,31 @@ export const addProductValidationSchema = Yup.object({
       return Boolean(value);
     },
   ),
-  images: Yup.array().min(3, 'Minimum 3 images are required'),
+  constructionType: Yup.string().trim().required('Construction is required'),
+  hsnSelectionMode: Yup.string()
+    .oneOf(['AUTO', 'MANUAL'])
+    .required('HSN mode is required'),
+  overrideRequestedHsnCode: Yup.string().when('hsnSelectionMode', {
+    is: 'MANUAL',
+    then: (schema) =>
+      schema
+        .trim()
+        .matches(/^\d{4,8}$/, 'HSN code must be 4 to 8 digits')
+        .required('Override HSN is required for manual review'),
+    otherwise: (schema) =>
+      schema
+        .trim()
+        .matches(/^$|^\d{4,8}$/, 'HSN code must be 4 to 8 digits'),
+  }),
+  hsnOverrideReason: Yup.string().when('hsnSelectionMode', {
+    is: 'MANUAL',
+    then: (schema) =>
+      schema
+        .trim()
+        .min(10, 'Please explain why the override is needed')
+        .required('Override reason is required'),
+    otherwise: (schema) => schema.trim().nullable(),
+  }),
+  images: Yup.array().min(1, 'Main image is required'),
   manufacturerName: Yup.string().required('Manufacturer name is required'),
 });

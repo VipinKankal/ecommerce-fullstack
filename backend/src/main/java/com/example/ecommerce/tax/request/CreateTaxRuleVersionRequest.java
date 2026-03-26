@@ -20,6 +20,7 @@ public class CreateTaxRuleVersionRequest {
     private String taxClass;
     private String hsnCode;
     private String supplyType;
+    private String valueBasis;
 
     @Min(value = 0, message = "Minimum taxable value cannot be negative")
     private Double minTaxableValue;
@@ -38,4 +39,8 @@ public class CreateTaxRuleVersionRequest {
     private LocalDate effectiveTo;
     private String sourceReference;
     private String notes;
+    private String approvalStatus;
+    private LocalDate approvedAt;
+    private String approvedBy;
+    private String signedMemoReference;
 }

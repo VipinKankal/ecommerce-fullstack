@@ -11,6 +11,7 @@ import com.example.ecommerce.common.mapper.ResponseMapper;
 import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.modal.*;
 import com.example.ecommerce.order.request.CheckoutOrderRequest;
+import com.example.ecommerce.order.request.CheckoutOrderSummaryRequest;
 import com.example.ecommerce.order.request.CancelOrderRequest;
 import com.example.ecommerce.repository.PaymentOrderRepository;
 import com.example.ecommerce.order.response.CheckoutOrderSummaryResponse;
@@ -21,6 +22,7 @@ import com.example.ecommerce.order.response.OrderShippingAddressResponse;
 import com.example.ecommerce.order.response.PaymentLinkResponse;
 import com.example.ecommerce.order.response.PhonePePaymentSession;
 import com.example.ecommerce.order.service.CartService;
+import com.example.ecommerce.order.service.CheckoutTaxSummaryService;
 import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.OrderService;
 import com.example.ecommerce.order.service.PaymentService;
@@ -62,6 +64,7 @@ public class OrderController {
     private final OrderService orderService;
     private final UserService userService;
     private final CartService cartService;
+    private final CheckoutTaxSummaryService checkoutTaxSummaryService;
     private final CouponService couponService;
     private final SellerService sellerService;
     private final SellerReportService sellerReportService;
@@ -124,33 +127,12 @@ public class OrderController {
     @PostMapping("/summary")
     @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
     public ResponseEntity<CheckoutOrderSummaryResponse> getCheckoutSummary(
+            @Valid @RequestBody CheckoutOrderSummaryRequest request,
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Cart cart = requireCart(user);
-
-        CheckoutOrderSummaryResponse response = new CheckoutOrderSummaryResponse();
-        CheckoutOrderSummaryResponse.PriceBreakdown priceBreakdown =
-                new CheckoutOrderSummaryResponse.PriceBreakdown();
-        priceBreakdown.setPlatformFee(0);
-        priceBreakdown.setTotalMRP(cart.getTotalMrpPrice());
-        priceBreakdown.setTotalSellingPrice((int) Math.round(cart.getTotalSellingPrice()));
-        priceBreakdown.setTotalDiscount(cart.getDiscount());
-        response.setPriceBreakdown(priceBreakdown);
-        response.setEstimatedDeliveryDate(LocalDate.now().plusDays(5).toString());
-        response.setOrderItems(
-                cart.getCartItems().stream()
-                        .sorted(Comparator.comparing(CartItem::getId, Comparator.nullsLast(Long::compareTo)))
-                        .map(item -> {
-                            CheckoutOrderSummaryResponse.OrderItemSummary summary =
-                                    new CheckoutOrderSummaryResponse.OrderItemSummary();
-                            summary.setId(item.getId());
-                            return summary;
-                        })
-                        .toList()
-        );
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(checkoutTaxSummaryService.buildSummary(cart, request.getShippingAddress()));
     }
 
     @GetMapping("/user/history")

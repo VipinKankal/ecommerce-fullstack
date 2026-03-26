@@ -43,7 +43,7 @@ export interface StoreDetails {
 export interface Seller {
   id?: number;
   mobileNumber: string;
-  GSTIN: string;
+  GSTIN?: string | null;
   pickupAddress: PickupAddress;
   bankDetails: BankDetails;
   sellerName: string;
@@ -55,6 +55,13 @@ export interface Seller {
   emailVerified?: boolean;
   role?: string;
   accountStatus?: string;
+  gstRegistrationType?: 'GST_REGISTERED' | 'NON_GST_DECLARATION' | string;
+  gstOnboardingPolicy?:
+    | 'MANDATORY_ACTIVE_GSTIN'
+    | 'ALLOW_NON_GST_WITH_DECLARATION'
+    | string;
+  gstDeclarationAccepted?: boolean;
+  gstComplianceStatus?: string;
 }
 
 export interface SellerReport {

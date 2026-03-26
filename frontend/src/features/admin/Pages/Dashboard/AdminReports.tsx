@@ -22,7 +22,11 @@ import {
 } from 'State/backend/MasterApiThunks';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import { api } from 'shared/api/Api';
+import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { getErrorMessage } from 'State/backend/masterApi/shared';
+import TaxRuleManagementPanel from './components/TaxRuleManagementPanel';
+import HsnMasterManagementPanel from './components/HsnMasterManagementPanel';
+import ProductTaxReviewQueuePanel from './components/ProductTaxReviewQueuePanel';
 
 type LeaderboardItem = {
   label: string;
@@ -81,8 +85,6 @@ type LedgerAccountSummary = {
   memos: number;
   entries: number;
 };
-
-const COMPLIANCE_CHALLANS_ROUTE = '/api/admin/compliance/challans';
 
 const toNumber = (value: unknown, fallback = 0): number =>
   typeof value === 'number' ? value : fallback;
@@ -201,7 +203,7 @@ const AdminReports = () => {
     setChallanLoading(true);
     setChallanError(null);
     try {
-      const response = await api.get(COMPLIANCE_CHALLANS_ROUTE);
+      const response = await api.get(API_ROUTES.admin.complianceChallans);
       setChallans(toChallans(response.data));
     } catch (requestError: unknown) {
       setChallanError(
@@ -307,7 +309,7 @@ const AdminReports = () => {
     setChallanError(null);
     setChallanSuccess(null);
     try {
-      await api.post(COMPLIANCE_CHALLANS_ROUTE, {
+      await api.post(API_ROUTES.admin.complianceChallans, {
         taxStream: challanForm.taxStream,
         filingPeriod: challanForm.filingPeriod,
         amount: Number(challanForm.amount || 0),
@@ -951,8 +953,19 @@ const AdminReports = () => {
           </Table>
         </TableContainer>
       </Paper>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <TaxRuleManagementPanel />
+        <HsnMasterManagementPanel />
+      </div>
+
+      <ProductTaxReviewQueuePanel />
     </div>
   );
 };
 
 export default AdminReports;
+
+
+
+

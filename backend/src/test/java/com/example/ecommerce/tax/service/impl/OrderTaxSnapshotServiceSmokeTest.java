@@ -9,6 +9,7 @@ import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.order.service.impl.OrderTaxSnapshotServiceImpl;
 import com.example.ecommerce.repository.OrderTaxSnapshotRepository;
 import com.example.ecommerce.tax.response.TaxRuleResolutionResponse;
+import com.example.ecommerce.tax.service.TaxComputationSupport;
 import com.example.ecommerce.tax.service.TaxRuleVersionService;
 import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -29,8 +30,9 @@ class OrderTaxSnapshotServiceSmokeTest {
     void freezeSnapshotCreatesImmutableAggregate() {
         OrderTaxSnapshotRepository repository = mock(OrderTaxSnapshotRepository.class);
         TaxRuleVersionService taxRuleVersionService = mock(TaxRuleVersionService.class);
+        TaxComputationSupport taxComputationSupport = new TaxComputationSupport(taxRuleVersionService);
         OrderTaxSnapshotServiceImpl service =
-                new OrderTaxSnapshotServiceImpl(repository, taxRuleVersionService, new ObjectMapper());
+                new OrderTaxSnapshotServiceImpl(repository, taxComputationSupport, new ObjectMapper());
 
         Seller seller = new Seller();
         seller.setGSTIN("07ABCDE1234F1Z5");
@@ -63,6 +65,7 @@ class OrderTaxSnapshotServiceSmokeTest {
         TaxRuleResolutionResponse gstRule = new TaxRuleResolutionResponse();
         gstRule.setRuleCode("APPAREL_GST_V2023_0401_HIGH");
         gstRule.setAppliedRatePercentage(12.0);
+        gstRule.setValueBasis("SELLING_PRICE_PER_PIECE");
 
         TaxRuleResolutionResponse tcsRule = new TaxRuleResolutionResponse();
         tcsRule.setRuleCode("TCS_IGST_V2024_0710");
@@ -91,8 +94,9 @@ class OrderTaxSnapshotServiceSmokeTest {
     void freezeSnapshotRejectsOverwriteAttempt() {
         OrderTaxSnapshotRepository repository = mock(OrderTaxSnapshotRepository.class);
         TaxRuleVersionService taxRuleVersionService = mock(TaxRuleVersionService.class);
+        TaxComputationSupport taxComputationSupport = new TaxComputationSupport(taxRuleVersionService);
         OrderTaxSnapshotServiceImpl service =
-                new OrderTaxSnapshotServiceImpl(repository, taxRuleVersionService, new ObjectMapper());
+                new OrderTaxSnapshotServiceImpl(repository, taxComputationSupport, new ObjectMapper());
 
         Order order = new Order();
         order.setId(77L);

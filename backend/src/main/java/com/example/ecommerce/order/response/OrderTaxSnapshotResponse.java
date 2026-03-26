@@ -2,6 +2,7 @@ package com.example.ecommerce.order.response;
 
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -23,5 +24,6 @@ public class OrderTaxSnapshotResponse {
     private String gstRuleVersion;
     private String tcsRuleVersion;
     private String snapshotSource;
+    private LocalDate effectiveTaxDate;
     private LocalDateTime frozenAt;
 }

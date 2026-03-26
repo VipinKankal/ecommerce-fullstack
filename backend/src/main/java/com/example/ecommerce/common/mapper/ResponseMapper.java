@@ -45,6 +45,17 @@ public final class ResponseMapper {
         response.setWarrantyDays(product.getWarrantyDays());
         response.setColor(product.getColor());
         response.setHsnCode(product.getHsnCode());
+        response.setUiCategoryKey(product.getUiCategoryKey());
+        response.setSubcategoryKey(product.getSubcategoryKey());
+        response.setGender(product.getGender());
+        response.setFabricType(product.getFabricType());
+        response.setConstructionType(product.getConstructionType());
+        response.setFiberFamily(product.getFiberFamily());
+        response.setHsnSelectionMode(product.getHsnSelectionMode());
+        response.setSuggestedHsnCode(product.getSuggestedHsnCode());
+        response.setOverrideRequestedHsnCode(product.getOverrideRequestedHsnCode());
+        response.setHsnOverrideReason(product.getHsnOverrideReason());
+        response.setTaxReviewStatus(product.getTaxReviewStatus());
         response.setPricingMode(product.getPricingMode());
         response.setTaxClass(product.getTaxClass());
         response.setTaxRuleVersion(product.getTaxRuleVersion());
@@ -86,6 +97,10 @@ public final class ResponseMapper {
         response.setEmail(seller.getEmail());
         response.setDateOfBirth(seller.getDateOfBirth());
         response.setGSTIN(seller.getGSTIN());
+        response.setGstRegistrationType(seller.getGstRegistrationType());
+        response.setGstOnboardingPolicy(seller.getGstOnboardingPolicy());
+        response.setGstDeclarationAccepted(seller.getGstDeclarationAccepted());
+        response.setGstComplianceStatus(seller.getGstComplianceStatus());
         response.setEmailVerified(seller.getEmailVerified());
         response.setAccountStatus(seller.getAccountStatus());
         response.setRole(seller.getRole());
@@ -287,6 +302,7 @@ public final class ResponseMapper {
         response.setGstRuleVersion(snapshot.getGstRuleVersion());
         response.setTcsRuleVersion(snapshot.getTcsRuleVersion());
         response.setSnapshotSource(snapshot.getSnapshotSource());
+        response.setEffectiveTaxDate(snapshot.getEffectiveTaxDate());
         response.setFrozenAt(snapshot.getFrozenAt());
         return response;
     }

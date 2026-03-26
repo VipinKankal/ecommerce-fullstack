@@ -30,6 +30,9 @@ const steps = [
   'Store Info',
 ];
 
+const GSTIN_REGEX =
+  /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/;
+
 const buildTouchedState = <T,>(errors: FormikErrors<T>): FormikTouched<T> => {
   const touchedEntries = Object.entries(errors).map(([key, value]) => {
     if (!value || typeof value === 'string') {
@@ -67,14 +70,24 @@ const validationSchemas = [
     }),
   }),
   Yup.object({
-    gstin: Yup.string()
-      .trim()
-      .uppercase('GSTIN must be uppercase')
-      .matches(
-        /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/,
-        'Invalid GSTIN format',
-      )
+    gstRegistrationType: Yup.string()
+      .oneOf(['GST_REGISTERED', 'NON_GST_DECLARATION'])
       .required('Required'),
+    gstin: Yup.string().when('gstRegistrationType', {
+      is: 'GST_REGISTERED',
+      then: (schema) =>
+        schema
+          .trim()
+          .uppercase('GSTIN must be uppercase')
+          .matches(GSTIN_REGEX, 'Invalid GSTIN format')
+          .required('Required'),
+      otherwise: (schema) => schema.trim(),
+    }),
+    gstDeclarationAccepted: Yup.boolean().when('gstRegistrationType', {
+      is: 'NON_GST_DECLARATION',
+      then: (schema) => schema.oneOf([true], 'Declaration is required'),
+      otherwise: (schema) => schema.default(false),
+    }),
     businessDetails: Yup.object({
       businessName: Yup.string().required('Required'),
       businessType: Yup.string().required('Required'),
@@ -106,7 +119,7 @@ const validationSchemas = [
     kycDetails: Yup.object({
       panCardUrl: Yup.string().required('Required'),
       aadhaarCardUrl: Yup.string().required('Required'),
-      gstCertificateUrl: Yup.string().required('Required'),
+      gstCertificateUrl: Yup.string().nullable(),
     }),
   }),
   Yup.object({
@@ -138,6 +151,8 @@ const SellerAccountForm = ({ onRegisterSuccess }: SellerAccountFormProps) => {
       password: '',
       dateOfBirth: '',
       gstin: '',
+      gstRegistrationType: 'GST_REGISTERED',
+      gstDeclarationAccepted: false,
       pickupAddress: {
         name: '',
         mobile: '',
@@ -181,13 +196,21 @@ const SellerAccountForm = ({ onRegisterSuccess }: SellerAccountFormProps) => {
     validationSchema: validationSchemas[activeStep],
     onSubmit: async (values) => {
       dispatch(clearAuthError());
+      const isGstRegistered = values.gstRegistrationType === 'GST_REGISTERED';
+      const normalizedGstin = isGstRegistered
+        ? values.gstin.trim().toUpperCase()
+        : undefined;
       const finalData = {
         sellerName: values.sellerName,
         mobileNumber: values.mobile,
         email: values.email,
         password: values.password,
         dateOfBirth: values.dateOfBirth || null,
-        GSTIN: values.gstin.trim().toUpperCase(),
+        GSTIN: normalizedGstin,
+        gstRegistrationType: values.gstRegistrationType,
+        gstDeclarationAccepted: isGstRegistered
+          ? false
+          : values.gstDeclarationAccepted,
         pickupAddress: {
           name: values.pickupAddress.name,
           mobileNumber: values.pickupAddress.mobile || values.mobile,
@@ -202,7 +225,7 @@ const SellerAccountForm = ({ onRegisterSuccess }: SellerAccountFormProps) => {
         businessDetails: {
           businessName: values.businessDetails.businessName,
           businessType: values.businessDetails.businessType,
-          gstNumber: values.gstin.trim().toUpperCase(),
+          gstNumber: normalizedGstin,
           panNumber: values.businessDetails.panNumber,
         },
         bankDetails: {
@@ -214,7 +237,9 @@ const SellerAccountForm = ({ onRegisterSuccess }: SellerAccountFormProps) => {
         kycDetails: {
           panCardUrl: values.kycDetails.panCardUrl,
           aadhaarCardUrl: values.kycDetails.aadhaarCardUrl,
-          gstCertificateUrl: values.kycDetails.gstCertificateUrl,
+          gstCertificateUrl: isGstRegistered
+            ? values.kycDetails.gstCertificateUrl
+            : undefined,
         },
         storeDetails: {
           storeName: values.storeDetails.storeName,

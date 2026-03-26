@@ -14,6 +14,10 @@ public class SellerResponse {
     private String email;
     private LocalDate dateOfBirth;
     private String GSTIN;
+    private String gstRegistrationType;
+    private String gstOnboardingPolicy;
+    private Boolean gstDeclarationAccepted;
+    private String gstComplianceStatus;
     private Boolean emailVerified;
     private AccountStatus accountStatus;
     private UserRole role;

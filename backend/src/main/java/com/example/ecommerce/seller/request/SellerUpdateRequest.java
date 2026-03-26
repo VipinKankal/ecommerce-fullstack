@@ -17,6 +17,8 @@ public class SellerUpdateRequest {
     private String email;
     private LocalDate dateOfBirth;
     private String GSTIN;
+    private String gstRegistrationType;
+    private Boolean gstDeclarationAccepted;
 
     @Valid
     private BusinessDetails businessDetails;

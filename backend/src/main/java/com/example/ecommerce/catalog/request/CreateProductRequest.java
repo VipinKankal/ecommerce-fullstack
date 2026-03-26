@@ -23,6 +23,17 @@ public class CreateProductRequest {
     private int quantity;
     private String color;
     private String hsnCode;
+    private String uiCategoryKey;
+    private String subcategoryKey;
+    private String gender;
+    private String fabricType;
+    private String constructionType;
+    private String fiberFamily;
+    private String hsnSelectionMode;
+    private String suggestedHsnCode;
+    private String overrideRequestedHsnCode;
+    private String hsnOverrideReason;
+    private String taxReviewStatus;
     private String pricingMode;
     private String taxClass;
     private String taxRuleVersion;

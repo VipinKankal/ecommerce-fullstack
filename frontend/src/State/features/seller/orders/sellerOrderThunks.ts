@@ -17,10 +17,39 @@ export type SellerOrderStatus =
   | 'EXCHANGE_SHIPPED'
   | 'CANCELLED';
 
+export interface SellerOrderTaxSnapshot {
+  id?: number;
+  orderType?: string;
+  supplierGstin?: string;
+  sellerStateCode?: string;
+  posStateCode?: string;
+  supplyType?: string;
+  totalTaxableValue?: number;
+  totalGstAmount?: number;
+  totalAmountCharged?: number;
+  totalAmountWithTax?: number;
+  totalCommissionAmount?: number;
+  totalCommissionGstAmount?: number;
+  tcsRatePercentage?: number;
+  tcsAmount?: number;
+  gstRuleVersion?: string;
+  tcsRuleVersion?: string;
+  snapshotSource?: string;
+  effectiveTaxDate?: string;
+  frozenAt?: string;
+}
+
 export interface SellerOrderItem {
   id?: number;
+  size?: string;
+  quantity?: number;
+  mrpPrice?: number;
+  sellingPrice?: number;
   product?: {
     title?: string;
+    description?: string;
+    color?: string;
+    images?: string[];
   };
 }
 
@@ -50,6 +79,7 @@ export interface SellerOrder {
     fullName?: string;
   };
   orderItems?: SellerOrderItem[];
+  orderTaxSnapshot?: SellerOrderTaxSnapshot | null;
 }
 
 export const fetchSellerOrders = createAsyncThunk<SellerOrder[], void>(

@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   CircularProgress,
@@ -22,10 +23,12 @@ const UploadField = ({
   formik,
   field,
   label,
+  optional,
 }: {
   formik: SellerAccountFormik;
   field: 'panCardUrl' | 'aadhaarCardUrl' | 'gstCertificateUrl';
   label: string;
+  optional?: boolean;
 }) => {
   const value = formik.values.kycDetails?.[field];
   const fileName = formik.values.kycDetails?.[`${field}Name`];
@@ -90,7 +93,9 @@ const UploadField = ({
         >
           {value
             ? `Selected: ${fileName || 'Image uploaded successfully'}`
-            : 'Accepted: JPG, PNG, JPEG'}
+            : optional
+              ? 'Optional for non-GST declaration sellers'
+              : 'Accepted: JPG, PNG, JPEG'}
         </Typography>
         {isImage && (
           <Stack spacing={1.5}>
@@ -123,17 +128,37 @@ const UploadField = ({
   );
 };
 
-const BecomeSellerFormStep5 = ({ formik }: { formik: SellerAccountFormik }) => (
-  <Box className="grid grid-cols-1 gap-4">
-    <h2 className="text-xl font-bold">Identity Verification</h2>
-    <UploadField formik={formik} field="panCardUrl" label="PAN Card" />
-    <UploadField formik={formik} field="aadhaarCardUrl" label="Aadhaar Card" />
-    <UploadField
-      formik={formik}
-      field="gstCertificateUrl"
-      label="GST Certificate"
-    />
-  </Box>
-);
+const BecomeSellerFormStep5 = ({ formik }: { formik: SellerAccountFormik }) => {
+  const requiresGstCertificate =
+    formik.values.gstRegistrationType === 'GST_REGISTERED';
+
+  return (
+    <Box className="grid grid-cols-1 gap-4">
+      <h2 className="text-xl font-bold">Identity Verification</h2>
+      <UploadField formik={formik} field="panCardUrl" label="PAN Card" />
+      <UploadField formik={formik} field="aadhaarCardUrl" label="Aadhaar Card" />
+      {requiresGstCertificate ? (
+        <UploadField
+          formik={formik}
+          field="gstCertificateUrl"
+          label="GST Certificate"
+        />
+      ) : (
+        <>
+          <Alert severity="info">
+            GST certificate upload is optional here because this seller selected
+            the non-GST declaration flow.
+          </Alert>
+          <UploadField
+            formik={formik}
+            field="gstCertificateUrl"
+            label="GST Certificate (optional)"
+            optional
+          />
+        </>
+      )}
+    </Box>
+  );
+};
 
 export default BecomeSellerFormStep5;

@@ -396,6 +396,7 @@ const OrderDetails = () => {
         orderId={order.id}
         customerStatus={customerStatus}
         item={item}
+        orderTaxSnapshot={order.orderTaxSnapshot}
       />
 
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
@@ -546,3 +547,4 @@ const OrderDetails = () => {
 };
 
 export default OrderDetails;
+

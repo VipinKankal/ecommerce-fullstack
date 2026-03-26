@@ -57,6 +57,16 @@ const toOrderSummary = (payload: unknown): OrderSummaryResponse | null => {
       typeof record.estimatedDeliveryDate === 'string'
         ? record.estimatedDeliveryDate
         : undefined,
+    appliedGstRuleVersion:
+      typeof record.appliedGstRuleVersion === 'string'
+        ? record.appliedGstRuleVersion
+        : undefined,
+    effectiveRuleDate:
+      typeof record.effectiveRuleDate === 'string'
+        ? record.effectiveRuleDate
+        : undefined,
+    valueBasis:
+      typeof record.valueBasis === 'string' ? record.valueBasis : undefined,
     priceBreakdown:
       rawPriceBreakdown || rawTaxBreakdown
         ? {
@@ -316,11 +326,17 @@ const CheckoutPage = () => {
       try {
         await dispatch(
           orderSummary({
-            recipientName: shippingDetails.name.trim(),
-            mobileNumber: shippingDetails.mobileNumber.trim(),
-            fullAddress: shippingDetails.address.trim(),
-            pinCode: shippingDetails.pinCode.trim(),
-            deliveryInstructions: shippingDetails.locality.trim(),
+            shippingAddress: {
+              name: shippingDetails.name.trim(),
+              mobileNumber: shippingDetails.mobileNumber.trim(),
+              street: shippingDetails.street.trim() || shippingDetails.address.trim(),
+              address: shippingDetails.address.trim(),
+              locality: shippingDetails.locality.trim(),
+              city: shippingDetails.city.trim(),
+              state: shippingDetails.state.trim(),
+              pinCode: shippingDetails.pinCode.trim(),
+              country: 'India',
+            },
           }),
         ).unwrap();
       } catch {}
@@ -474,3 +490,4 @@ const CheckoutPage = () => {
 };
 
 export default CheckoutPage;
+
