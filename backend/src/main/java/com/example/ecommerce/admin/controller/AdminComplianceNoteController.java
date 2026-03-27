@@ -3,6 +3,8 @@ package com.example.ecommerce.admin.controller;
 import com.example.ecommerce.admin.request.CreateComplianceSellerNoteRequest;
 import com.example.ecommerce.admin.request.UpdateComplianceSellerNoteRequest;
 import com.example.ecommerce.admin.response.ComplianceSellerNoteAdminResponse;
+import com.example.ecommerce.admin.response.ComplianceSellerNoteAnalyticsResponse;
+import com.example.ecommerce.admin.response.ComplianceSellerNoteImpactResponse;
 import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
 import com.example.ecommerce.common.configuration.AuthenticatedPrincipalService;
 import com.example.ecommerce.modal.ComplianceSellerNote;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +57,30 @@ public class AdminComplianceNoteController {
     @GetMapping("/{id}")
     public ResponseEntity<ComplianceSellerNoteAdminResponse> getNote(@PathVariable Long id) {
         return ResponseEntity.ok(toResponse(complianceSellerNoteService.getForAdmin(id)));
+    }
+
+    @GetMapping("/{id}/impact")
+    public ResponseEntity<ComplianceSellerNoteImpactResponse> getNoteImpact(@PathVariable Long id) {
+        return ResponseEntity.ok(toImpactResponse(complianceSellerNoteService.buildNoteImpactSummary(id)));
+    }
+
+    @GetMapping("/analytics")
+    public ResponseEntity<ComplianceSellerNoteAnalyticsResponse> getAnalytics(
+            @RequestParam(required = false) String noteType,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
+            @RequestParam(required = false) Integer minImpactedSellers
+    ) {
+        return ResponseEntity.ok(
+                toAnalyticsResponse(
+                        complianceSellerNoteService.buildAnalyticsSummary(
+                                noteType,
+                                fromDate,
+                                toDate,
+                                minImpactedSellers
+                        )
+                )
+        );
     }
 
     @GetMapping("/{id}/attachments/{attachmentId}/download")
@@ -109,6 +137,7 @@ public class AdminComplianceNoteController {
     }
 
     private ComplianceSellerNoteAdminResponse toResponse(ComplianceSellerNote note) {
+        Map<String, Object> impactSummary = complianceSellerNoteService.buildNoteImpactSummary(note.getId());
         ComplianceSellerNoteAdminResponse response = new ComplianceSellerNoteAdminResponse();
         response.setId(note.getId());
         response.setTitle(note.getTitle());
@@ -124,12 +153,41 @@ public class AdminComplianceNoteController {
         response.setPinned(note.isPinned());
         response.setSourceMode(note.getSourceMode());
         response.setAttachments(buildAdminAttachmentResponse(note));
+        response.setImpactedProductCount(asLong(impactSummary.get("impactedProductCount")));
+        response.setImpactedProducts(asMapList(impactSummary.get("impactedProducts")));
+        response.setAcknowledgedCount(asLong(impactSummary.get("acknowledgedCount")));
+        response.setAcknowledgementRatePercentage(asDouble(impactSummary.get("acknowledgementRatePercentage")));
         response.setCreatedBy(note.getCreatedBy());
         response.setUpdatedBy(note.getUpdatedBy());
         response.setPublishedAt(note.getPublishedAt());
         response.setArchivedAt(note.getArchivedAt());
         response.setCreatedAt(note.getCreatedAt());
         response.setUpdatedAt(note.getUpdatedAt());
+        return response;
+    }
+
+    private ComplianceSellerNoteImpactResponse toImpactResponse(Map<String, Object> payload) {
+        ComplianceSellerNoteImpactResponse response = new ComplianceSellerNoteImpactResponse();
+        response.setAffectedCategory(asString(payload.get("affectedCategory")));
+        response.setImpactedProductCount(asLong(payload.get("impactedProductCount")));
+        response.setCoverageScope(asString(payload.get("coverageScope")));
+        response.setImpactedProducts(asMapList(payload.get("impactedProducts")));
+        return response;
+    }
+
+    private ComplianceSellerNoteAnalyticsResponse toAnalyticsResponse(Map<String, Object> payload) {
+        ComplianceSellerNoteAnalyticsResponse response = new ComplianceSellerNoteAnalyticsResponse();
+        response.setTotalNotes(asLong(payload.get("totalNotes")));
+        response.setDraftCount(asLong(payload.get("draftCount")));
+        response.setPublishedCount(asLong(payload.get("publishedCount")));
+        response.setArchivedCount(asLong(payload.get("archivedCount")));
+        response.setHighPriorityCount(asLong(payload.get("highPriorityCount")));
+        response.setSellerCount(asLong(payload.get("sellerCount")));
+        response.setReadRatePercentage(asDouble(payload.get("readRatePercentage")));
+        response.setAcknowledgementRatePercentage(asDouble(payload.get("acknowledgementRatePercentage")));
+        response.setByType(asStringLongMap(payload.get("byType")));
+        response.setByPriority(asStringLongMap(payload.get("byPriority")));
+        response.setImpactTopNotes(asMapList(payload.get("impactTopNotes")));
         return response;
     }
 
@@ -159,5 +217,58 @@ public class AdminComplianceNoteController {
                     return payload;
                 })
                 .toList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> asMapList(Object value) {
+        if (value instanceof List<?> list) {
+            return list.stream()
+                    .filter(item -> item instanceof Map<?, ?>)
+                    .map(item -> (Map<String, Object>) item)
+                    .toList();
+        }
+        return List.of();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Long> asStringLongMap(Object value) {
+        if (!(value instanceof Map<?, ?> map)) {
+            return Map.of();
+        }
+        LinkedHashMap<String, Long> result = new LinkedHashMap<>();
+        map.forEach((key, item) -> result.put(String.valueOf(key), asLong(item)));
+        return result;
+    }
+
+    private String asString(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private Long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
+    }
+
+    private Double asDouble(Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        if (value == null) {
+            return 0.0;
+        }
+        try {
+            return Double.parseDouble(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return 0.0;
+        }
     }
 }

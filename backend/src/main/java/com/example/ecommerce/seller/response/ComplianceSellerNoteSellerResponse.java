@@ -23,6 +23,9 @@ public class ComplianceSellerNoteSellerResponse {
     private boolean pinned;
     private String sourceMode;
     private boolean read;
+    private boolean acknowledged;
+    private LocalDateTime acknowledgedAt;
+    private Long impactedProductCount;
     private List<Map<String, Object>> attachments;
     private LocalDateTime publishedAt;
     private LocalDateTime archivedAt;

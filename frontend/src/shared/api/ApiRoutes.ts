@@ -67,6 +67,8 @@ export const API_ROUTES = {
     complianceNotes: {
       base: '/api/admin/compliance/notes',
       byId: (id: number | string) => `/api/admin/compliance/notes/${id}`,
+      impact: (id: number | string) => `/api/admin/compliance/notes/${id}/impact`,
+      analytics: '/api/admin/compliance/notes/analytics',
       publish: (id: number | string) =>
         `/api/admin/compliance/notes/${id}/publish`,
       archive: (id: number | string) =>
@@ -274,7 +276,12 @@ export const API_ROUTES = {
     read: (id: number | string) => `/api/seller/compliance/notes/${id}/read`,
     unread: (id: number | string) =>
       `/api/seller/compliance/notes/${id}/unread`,
+    acknowledge: (id: number | string) =>
+      `/api/seller/compliance/notes/${id}/acknowledge`,
+    unacknowledge: (id: number | string) =>
+      `/api/seller/compliance/notes/${id}/unacknowledge`,
     unreadCount: '/api/seller/compliance/notes/unread-count',
+    acknowledgedCount: '/api/seller/compliance/notes/acknowledged-count',
     attachmentDownload: (id: number | string, attachmentId: string) =>
       `/api/seller/compliance/notes/${id}/attachments/${attachmentId}/download`,
   },

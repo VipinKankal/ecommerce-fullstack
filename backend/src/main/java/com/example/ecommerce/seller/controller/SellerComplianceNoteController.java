@@ -46,9 +46,17 @@ public class SellerComplianceNoteController {
                 seller.getId(),
                 notes.stream().map(ComplianceSellerNote::getId).toList()
         );
+        Map<Long, Boolean> acknowledgedMap = complianceSellerNoteService.resolveAcknowledgedState(
+                seller.getId(),
+                notes.stream().map(ComplianceSellerNote::getId).toList()
+        );
         return ResponseEntity.ok(
                 notes.stream()
-                        .map(note -> toResponse(note, readMap.getOrDefault(note.getId(), false)))
+                        .map(note -> toResponse(
+                                note,
+                                readMap.getOrDefault(note.getId(), false),
+                                acknowledgedMap.getOrDefault(note.getId(), false)
+                        ))
                         .toList()
         );
     }
@@ -64,7 +72,11 @@ public class SellerComplianceNoteController {
                 seller.getId(),
                 List.of(note.getId())
         ).getOrDefault(note.getId(), false);
-        return ResponseEntity.ok(toResponse(note, read));
+        boolean acknowledged = complianceSellerNoteService.resolveAcknowledgedState(
+                seller.getId(),
+                List.of(note.getId())
+        ).getOrDefault(note.getId(), false);
+        return ResponseEntity.ok(toResponse(note, read, acknowledged));
     }
 
     @GetMapping("/{id}/attachments/{attachmentId}/download")
@@ -108,6 +120,26 @@ public class SellerComplianceNoteController {
         return ResponseEntity.ok(Map.of("read", false, "noteId", id));
     }
 
+    @PatchMapping("/{id}/acknowledge")
+    public ResponseEntity<Map<String, Object>> markAcknowledged(
+            @RequestHeader(value = "Authorization", required = false) String jwt,
+            @PathVariable Long id
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        complianceSellerNoteService.markAcknowledged(seller.getId(), id);
+        return ResponseEntity.ok(Map.of("acknowledged", true, "noteId", id));
+    }
+
+    @PatchMapping("/{id}/unacknowledge")
+    public ResponseEntity<Map<String, Object>> markUnacknowledged(
+            @RequestHeader(value = "Authorization", required = false) String jwt,
+            @PathVariable Long id
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        complianceSellerNoteService.markUnacknowledged(seller.getId(), id);
+        return ResponseEntity.ok(Map.of("acknowledged", false, "noteId", id));
+    }
+
     @GetMapping("/unread-count")
     public ResponseEntity<Map<String, Object>> getUnreadCount(
             @RequestHeader(value = "Authorization", required = false) String jwt
@@ -117,7 +149,21 @@ public class SellerComplianceNoteController {
         return ResponseEntity.ok(Map.of("unreadCount", unreadCount));
     }
 
-    private ComplianceSellerNoteSellerResponse toResponse(ComplianceSellerNote note, boolean read) {
+    @GetMapping("/acknowledged-count")
+    public ResponseEntity<Map<String, Object>> getAcknowledgedCount(
+            @RequestHeader(value = "Authorization", required = false) String jwt
+    ) throws Exception {
+        Seller seller = sellerService.getSellerProfile(jwt);
+        long acknowledgedCount = complianceSellerNoteService.countAcknowledged(seller.getId());
+        return ResponseEntity.ok(Map.of("acknowledgedCount", acknowledgedCount));
+    }
+
+    private ComplianceSellerNoteSellerResponse toResponse(
+            ComplianceSellerNote note,
+            boolean read,
+            boolean acknowledged
+    ) {
+        Map<String, Object> impactSummary = complianceSellerNoteService.buildNoteImpactSummary(note.getId());
         ComplianceSellerNoteSellerResponse response = new ComplianceSellerNoteSellerResponse();
         response.setId(note.getId());
         response.setTitle(note.getTitle());
@@ -133,6 +179,9 @@ public class SellerComplianceNoteController {
         response.setPinned(note.isPinned());
         response.setSourceMode(note.getSourceMode());
         response.setRead(read);
+        response.setAcknowledged(acknowledged);
+        response.setAcknowledgedAt(null);
+        response.setImpactedProductCount(asLong(impactSummary.get("impactedProductCount")));
         response.setAttachments(buildSellerAttachmentResponse(note));
         response.setPublishedAt(note.getPublishedAt());
         response.setArchivedAt(note.getArchivedAt());
@@ -159,5 +208,19 @@ public class SellerComplianceNoteController {
                     return payload;
                 })
                 .toList();
+    }
+
+    private Long asLong(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value == null) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return 0L;
+        }
     }
 }

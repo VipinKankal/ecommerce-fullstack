@@ -8,20 +8,18 @@ import MarkEmailUnreadRoundedIcon from '@mui/icons-material/MarkEmailUnreadRound
 import { Link, useParams } from 'react-router-dom';
 import {
   ComplianceNote,
-  getComplianceNoteById,
-  isSellerComplianceNoteRead,
+  acknowledgeSellerComplianceNote,
+  fetchSellerComplianceNoteById,
   markSellerComplianceNoteRead,
   markSellerComplianceNoteUnread,
   subscribeComplianceNotes,
+  unacknowledgeSellerComplianceNote,
 } from 'app/complianceNotes';
-import { getSellerComplianceIdentity } from 'app/complianceNotes/sellerIdentity';
-import { useAppSelector } from 'app/store/Store';
 
 const SellerComplianceNoteDetailPage = () => {
   const { noteId } = useParams();
-  const sellerProfile = useAppSelector((state) => state.sellerAuth.profile);
-  const sellerId = getSellerComplianceIdentity(sellerProfile);
   const [note, setNote] = useState<ComplianceNote | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const refresh = () => {
@@ -29,7 +27,18 @@ const SellerComplianceNoteDetailPage = () => {
         setNote(null);
         return;
       }
-      setNote(getComplianceNoteById(noteId));
+      fetchSellerComplianceNoteById(noteId)
+        .then((value) => {
+          setNote(value);
+          setError(null);
+        })
+        .catch((requestError: unknown) => {
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : 'Failed to load note detail',
+          );
+        });
     };
 
     refresh();
@@ -38,14 +47,12 @@ const SellerComplianceNoteDetailPage = () => {
 
   useEffect(() => {
     if (note?.id) {
-      markSellerComplianceNoteRead(sellerId, note.id);
+      void markSellerComplianceNoteRead(note.id);
     }
-  }, [note?.id, sellerId]);
+  }, [note?.id]);
 
-  const isRead = useMemo(() => {
-    if (!note?.id) return false;
-    return isSellerComplianceNoteRead(sellerId, note.id);
-  }, [note?.id, sellerId]);
+  const isRead = useMemo(() => Boolean(note?.read), [note?.read]);
+  const isAcknowledged = useMemo(() => Boolean(note?.acknowledged), [note?.acknowledged]);
 
   if (!note) {
     return (
@@ -98,6 +105,7 @@ const SellerComplianceNoteDetailPage = () => {
       </div>
 
       <Paper sx={{ p: 3, borderRadius: '24px', border: '1px solid #eef2f7', boxShadow: 'none' }}>
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <Typography variant="caption" color="text.secondary">
@@ -129,6 +137,14 @@ const SellerComplianceNoteDetailPage = () => {
             </Typography>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {note.businessEmail}
+            </Typography>
+          </div>
+          <div>
+            <Typography variant="caption" color="text.secondary">
+              Product Impact
+            </Typography>
+            <Typography variant="body2" sx={{ fontWeight: 700 }}>
+              {note.impactedProductCount ?? 0} products
             </Typography>
           </div>
         </div>
@@ -180,7 +196,7 @@ const SellerComplianceNoteDetailPage = () => {
                 </div>
                 <Button
                   component="a"
-                  href={attachment.url}
+                  href={attachment.downloadUrl || attachment.url}
                   target="_blank"
                   rel="noreferrer"
                   size="small"
@@ -200,7 +216,7 @@ const SellerComplianceNoteDetailPage = () => {
           <Button
             variant="outlined"
             startIcon={<MarkEmailUnreadRoundedIcon />}
-            onClick={() => note.id && markSellerComplianceNoteUnread(sellerId, note.id)}
+            onClick={() => note.id && void markSellerComplianceNoteUnread(note.id)}
           >
             Mark Unread
           </Button>
@@ -208,11 +224,23 @@ const SellerComplianceNoteDetailPage = () => {
           <Button
             variant="contained"
             startIcon={<MarkEmailReadRoundedIcon />}
-            onClick={() => note.id && markSellerComplianceNoteRead(sellerId, note.id)}
+            onClick={() => note.id && void markSellerComplianceNoteRead(note.id)}
           >
             Mark Read
           </Button>
         )}
+        <Button
+          variant="outlined"
+          color={isAcknowledged ? 'warning' : 'info'}
+          onClick={() =>
+            note.id &&
+            void (isAcknowledged
+              ? unacknowledgeSellerComplianceNote(note.id)
+              : acknowledgeSellerComplianceNote(note.id))
+          }
+        >
+          {isAcknowledged ? 'Remove Acknowledgment' : 'Acknowledge Update'}
+        </Button>
       </div>
     </div>
   );

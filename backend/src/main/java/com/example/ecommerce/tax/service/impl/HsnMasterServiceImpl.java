@@ -1,6 +1,7 @@
 package com.example.ecommerce.tax.service.impl;
 
 import com.example.ecommerce.modal.HsnMasterRule;
+import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
 import com.example.ecommerce.repository.HsnMasterRuleRepository;
 import com.example.ecommerce.tax.request.CreateHsnMasterRuleRequest;
 import com.example.ecommerce.tax.request.UpdateHsnMasterRuleRequest;
@@ -24,6 +25,7 @@ public class HsnMasterServiceImpl implements HsnMasterService {
     );
 
     private final HsnMasterRuleRepository hsnMasterRuleRepository;
+    private final ComplianceSellerNoteService complianceSellerNoteService;
 
     @Override
     @Transactional
@@ -37,7 +39,9 @@ public class HsnMasterServiceImpl implements HsnMasterService {
         rule.setRuleCode(normalizedRuleCode);
         applyCreateOrUpdate(rule, request);
         rule.setPublished(false);
-        return hsnMasterRuleRepository.save(rule);
+        HsnMasterRule savedRule = hsnMasterRuleRepository.save(rule);
+        triggerAutoDraft("HSN_RULE_CREATED", savedRule);
+        return savedRule;
     }
 
     @Override
@@ -87,7 +91,9 @@ public class HsnMasterServiceImpl implements HsnMasterService {
         }
 
         validateDateRange(rule.getEffectiveFrom(), rule.getEffectiveTo());
-        return hsnMasterRuleRepository.save(rule);
+        HsnMasterRule savedRule = hsnMasterRuleRepository.save(rule);
+        triggerAutoDraft("HSN_RULE_UPDATED", savedRule);
+        return savedRule;
     }
 
     @Override
@@ -99,7 +105,9 @@ public class HsnMasterServiceImpl implements HsnMasterService {
             throw new IllegalArgumentException("Only CA-approved HSN master rules can be published");
         }
         rule.setPublished(true);
-        return hsnMasterRuleRepository.save(rule);
+        HsnMasterRule savedRule = hsnMasterRuleRepository.save(rule);
+        triggerAutoDraft("HSN_RULE_PUBLISHED", savedRule);
+        return savedRule;
     }
 
     @Override
@@ -284,5 +292,35 @@ public class HsnMasterServiceImpl implements HsnMasterService {
         }
         String trimmed = value.trim();
         return trimmed.isBlank() ? null : trimmed;
+    }
+
+    private void triggerAutoDraft(String eventType, HsnMasterRule rule) {
+        try {
+            java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("noteType", "HSN");
+            payload.put("priority", "HIGH");
+            payload.put("title", "%s: %s".formatted(eventType.replace('_', ' '), rule.getRuleCode()));
+            payload.put("summary", "Backend HSN event captured for %s.".formatted(rule.getDisplayLabel()));
+            payload.put("fullNote", "Rule Code: %s\nCategory: %s\nHSN: %s\nTax Class: %s\nEffective From: %s\n\nReview and publish seller-facing wording.".formatted(
+                    rule.getRuleCode(),
+                    rule.getUiCategoryKey(),
+                    rule.getHsnCode(),
+                    rule.getTaxClass(),
+                    rule.getEffectiveFrom()
+            ));
+            payload.put("affectedCategory", rule.getUiCategoryKey());
+            payload.put("actionRequired", "Review HSN mapping impact and publish seller advisory.");
+            payload.put("businessEmail", "compliance@yourbusiness.com");
+            if (rule.getEffectiveFrom() != null) {
+                payload.put("effectiveDate", rule.getEffectiveFrom().toString());
+            }
+            complianceSellerNoteService.createAutoDraftFromEvent(
+                    eventType,
+                    payload,
+                    "system_hsn_event"
+            );
+        } catch (Exception ignored) {
+            // Auto-draft must not block HSN rule workflows.
+        }
     }
 }

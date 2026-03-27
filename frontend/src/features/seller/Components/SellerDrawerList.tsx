@@ -19,6 +19,8 @@ import {
   Autorenew,
   CompareArrowsOutlined,
   CompareArrows,
+  CampaignOutlined,
+  Campaign,
 } from '@mui/icons-material';
 import { useAppDispatch } from 'State/features/store/Store';
 import { useNavigate } from 'react-router-dom';
@@ -61,6 +63,12 @@ const menu = [
     path: '/seller/exchanges',
     icon: <AutorenewOutlined />,
     activeIcon: <Autorenew />,
+  },
+  {
+    name: 'Compliance Notes',
+    path: '/seller/notes',
+    icon: <CampaignOutlined />,
+    activeIcon: <Campaign />,
   },
   {
     name: 'Add Product',

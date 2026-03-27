@@ -4,6 +4,7 @@ import com.example.ecommerce.admin.request.CreateComplianceSellerNoteRequest;
 import com.example.ecommerce.admin.request.UpdateComplianceSellerNoteRequest;
 import com.example.ecommerce.modal.ComplianceSellerNote;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -30,9 +31,32 @@ public interface ComplianceSellerNoteService {
 
     void markUnread(Long sellerId, Long noteId);
 
+    void markAcknowledged(Long sellerId, Long noteId);
+
+    void markUnacknowledged(Long sellerId, Long noteId);
+
     long countUnread(Long sellerId);
 
+    long countAcknowledged(Long sellerId);
+
     Map<Long, Boolean> resolveReadState(Long sellerId, List<Long> noteIds);
+
+    Map<Long, Boolean> resolveAcknowledgedState(Long sellerId, List<Long> noteIds);
+
+    Map<String, Object> buildNoteImpactSummary(Long noteId);
+
+    Map<String, Object> buildAnalyticsSummary(
+            String noteType,
+            LocalDate fromDate,
+            LocalDate toDate,
+            Integer minImpactedSellers
+    );
+
+    ComplianceSellerNote createAutoDraftFromEvent(
+            String eventType,
+            Map<String, Object> eventPayload,
+            String actorEmail
+    );
 
     List<Map<String, Object>> readAttachments(ComplianceSellerNote note);
 

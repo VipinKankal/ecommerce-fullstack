@@ -84,6 +84,8 @@ class OrderTaxSnapshotServiceSmokeTest {
 
         assertEquals(500L, snapshot.getId());
         assertEquals("INTER_STATE", snapshot.getSupplyType());
+        assertEquals("SELLER", snapshot.getInvoiceOwner());
+        assertEquals("SELLER", snapshot.getLiabilityOwner());
         assertEquals(1000.0, snapshot.getTotalTaxableValue());
         assertEquals(120.0, snapshot.getTotalGstAmount());
         assertEquals(5.0, snapshot.getTcsAmount());

@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -73,7 +73,7 @@ class SellerProductTaxPreviewServiceImplTest {
 
         when(hsnMasterService.resolveSuggestion(any(), any(), any(), any(), any())).thenReturn(hsnRule);
         when(taxComputationSupport.resolveGstRule(any(), any(), any(), any(), any())).thenReturn(null);
-        when(taxComputationSupport.computeAmounts(anyString(), anyDouble(), anyDouble()))
+        when(taxComputationSupport.computeAmounts(nullable(String.class), anyDouble(), anyDouble()))
                 .thenReturn(new TaxComputationSupport.TaxAmounts(1200.0, 0.0, 1200.0));
         when(taxComputationSupport.resolveTcsRule(any(), any(), any())).thenReturn(null);
         when(taxComputationSupport.roundCurrency(anyDouble())).thenAnswer(invocation -> invocation.getArgument(0));

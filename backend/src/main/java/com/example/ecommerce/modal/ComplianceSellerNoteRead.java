@@ -50,6 +50,15 @@ public class ComplianceSellerNoteRead {
     @Column(name = "unread_at")
     private LocalDateTime unreadAt;
 
+    @Column(name = "acknowledged", nullable = false)
+    private boolean acknowledged;
+
+    @Column(name = "acknowledged_at")
+    private LocalDateTime acknowledgedAt;
+
+    @Column(name = "unacknowledged_at")
+    private LocalDateTime unacknowledgedAt;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

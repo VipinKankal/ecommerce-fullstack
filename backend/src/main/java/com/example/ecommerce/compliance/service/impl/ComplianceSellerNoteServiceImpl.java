@@ -5,13 +5,14 @@ import com.example.ecommerce.admin.request.UpdateComplianceSellerNoteRequest;
 import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
 import com.example.ecommerce.modal.ComplianceSellerNote;
 import com.example.ecommerce.modal.ComplianceSellerNoteRead;
+import com.example.ecommerce.modal.Product;
 import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.repository.ComplianceSellerNoteReadRepository;
 import com.example.ecommerce.repository.ComplianceSellerNoteRepository;
+import com.example.ecommerce.repository.ProductRepository;
 import com.example.ecommerce.repository.SellerRepository;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -56,6 +59,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     private final ComplianceSellerNoteRepository complianceSellerNoteRepository;
     private final ComplianceSellerNoteReadRepository complianceSellerNoteReadRepository;
     private final SellerRepository sellerRepository;
+    private final ProductRepository productRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${app.compliance.attachments.allowed-hosts:res.cloudinary.com,*.cloudinary.com}")
@@ -208,13 +212,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Override
     @Transactional
     public void markRead(Long sellerId, Long noteId) {
-        ComplianceSellerNote note = getForSeller(noteId);
-        Seller seller = getSeller(sellerId);
-        ComplianceSellerNoteRead readEntry = complianceSellerNoteReadRepository
-                .findBySeller_IdAndNote_Id(seller.getId(), note.getId())
-                .orElseGet(ComplianceSellerNoteRead::new);
-        readEntry.setNote(note);
-        readEntry.setSeller(seller);
+        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
         readEntry.setRead(true);
         readEntry.setReadAt(LocalDateTime.now());
         readEntry.setUnreadAt(null);
@@ -224,15 +222,33 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Override
     @Transactional
     public void markUnread(Long sellerId, Long noteId) {
-        ComplianceSellerNote note = getForSeller(noteId);
-        Seller seller = getSeller(sellerId);
-        ComplianceSellerNoteRead readEntry = complianceSellerNoteReadRepository
-                .findBySeller_IdAndNote_Id(seller.getId(), note.getId())
-                .orElseGet(ComplianceSellerNoteRead::new);
-        readEntry.setNote(note);
-        readEntry.setSeller(seller);
+        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
         readEntry.setRead(false);
         readEntry.setUnreadAt(LocalDateTime.now());
+        complianceSellerNoteReadRepository.save(readEntry);
+    }
+
+    @Override
+    @Transactional
+    public void markAcknowledged(Long sellerId, Long noteId) {
+        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
+        if (!readEntry.isRead()) {
+            readEntry.setRead(true);
+            readEntry.setReadAt(LocalDateTime.now());
+            readEntry.setUnreadAt(null);
+        }
+        readEntry.setAcknowledged(true);
+        readEntry.setAcknowledgedAt(LocalDateTime.now());
+        readEntry.setUnacknowledgedAt(null);
+        complianceSellerNoteReadRepository.save(readEntry);
+    }
+
+    @Override
+    @Transactional
+    public void markUnacknowledged(Long sellerId, Long noteId) {
+        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
+        readEntry.setAcknowledged(false);
+        readEntry.setUnacknowledgedAt(LocalDateTime.now());
         complianceSellerNoteReadRepository.save(readEntry);
     }
 
@@ -256,6 +272,12 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
 
     @Override
     @Transactional(readOnly = true)
+    public long countAcknowledged(Long sellerId) {
+        return complianceSellerNoteReadRepository.countBySeller_IdAndAcknowledgedTrue(sellerId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Map<Long, Boolean> resolveReadState(Long sellerId, List<Long> noteIds) {
         if (noteIds == null || noteIds.isEmpty()) {
             return Map.of();
@@ -266,6 +288,203 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
         complianceSellerNoteReadRepository.findBySeller_IdAndNote_IdIn(sellerId, noteIds)
                 .forEach(entry -> result.put(entry.getNote().getId(), entry.isRead()));
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, Boolean> resolveAcknowledgedState(Long sellerId, List<Long> noteIds) {
+        if (noteIds == null || noteIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Boolean> result = noteIds.stream()
+                .collect(Collectors.toMap(id -> id, id -> false, (a, b) -> a, HashMap::new));
+        complianceSellerNoteReadRepository.findBySeller_IdAndNote_IdIn(sellerId, noteIds)
+                .forEach(entry -> result.put(entry.getNote().getId(), entry.isAcknowledged()));
+        return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> buildNoteImpactSummary(Long noteId) {
+        ComplianceSellerNote note = getForAdmin(noteId);
+        return buildImpactSummary(note);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, Object> buildAnalyticsSummary(
+            String noteType,
+            LocalDate fromDate,
+            LocalDate toDate,
+            Integer minImpactedSellers
+    ) {
+        String normalizedTypeCandidate = normalizeNullable(noteType);
+        if ("ALL".equals(normalizedTypeCandidate)) {
+            normalizedTypeCandidate = null;
+        }
+        final String normalizedType = normalizedTypeCandidate;
+        if (normalizedType != null) {
+            assertAllowed(normalizedType, ALLOWED_TYPES, "Unsupported note type");
+        }
+        if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+            throw new IllegalArgumentException("fromDate cannot be after toDate");
+        }
+        int minImpactedSellersSafe = minImpactedSellers == null ? 0 : Math.max(minImpactedSellers, 0);
+
+        List<ComplianceSellerNote> filteredNotes = complianceSellerNoteRepository.findAll().stream()
+                .filter(note -> normalizedType == null || normalizedType.equals(note.getNoteType()))
+                .filter(note -> isWithinAnalyticsPeriod(note, fromDate, toDate))
+                .toList();
+
+        List<ComplianceSellerNote> publishedNotes = filteredNotes.stream()
+                .filter(note -> "PUBLISHED".equals(note.getStatus()))
+                .toList();
+        List<Long> publishedNoteIds = publishedNotes.stream()
+                .map(ComplianceSellerNote::getId)
+                .filter(Objects::nonNull)
+                .toList();
+        List<ComplianceSellerNoteRead> readEntries = publishedNoteIds.isEmpty()
+                ? List.of()
+                : complianceSellerNoteReadRepository.findByNote_IdIn(publishedNoteIds);
+        Map<Long, Long> impactedSellersByNote = readEntries.stream()
+                .filter(entry -> entry.getNote() != null && entry.getSeller() != null)
+                .collect(Collectors.groupingBy(
+                        entry -> entry.getNote().getId(),
+                        Collectors.collectingAndThen(
+                                Collectors.mapping(entry -> entry.getSeller().getId(), Collectors.toSet()),
+                                sellerIds -> (long) sellerIds.size()
+                        )
+                ));
+
+        if (minImpactedSellersSafe > 0) {
+            Set<Long> allowedPublishedNoteIds = impactedSellersByNote.entrySet().stream()
+                    .filter(entry -> entry.getValue() >= minImpactedSellersSafe)
+                    .map(Map.Entry::getKey)
+                    .collect(Collectors.toSet());
+
+            publishedNotes = publishedNotes.stream()
+                    .filter(note -> allowedPublishedNoteIds.contains(note.getId()))
+                    .toList();
+            publishedNoteIds = publishedNotes.stream()
+                    .map(ComplianceSellerNote::getId)
+                    .filter(Objects::nonNull)
+                    .toList();
+            readEntries = publishedNoteIds.isEmpty()
+                    ? List.of()
+                    : complianceSellerNoteReadRepository.findByNote_IdIn(publishedNoteIds);
+            impactedSellersByNote = readEntries.stream()
+                    .filter(entry -> entry.getNote() != null && entry.getSeller() != null)
+                    .collect(Collectors.groupingBy(
+                            entry -> entry.getNote().getId(),
+                            Collectors.collectingAndThen(
+                                    Collectors.mapping(entry -> entry.getSeller().getId(), Collectors.toSet()),
+                                    sellerIds -> (long) sellerIds.size()
+                            )
+                    ));
+
+            Set<Long> allowedSet = allowedPublishedNoteIds;
+            filteredNotes = filteredNotes.stream()
+                    .filter(note -> !"PUBLISHED".equals(note.getStatus()) || allowedSet.contains(note.getId()))
+                    .toList();
+        }
+
+        long sellerCount = sellerRepository.count();
+        long denominator = sellerCount * publishedNotes.size();
+        long acknowledgedCount = readEntries.stream().filter(ComplianceSellerNoteRead::isAcknowledged).count();
+        long readCount = readEntries.stream().filter(ComplianceSellerNoteRead::isRead).count();
+        double acknowledgementRate = denominator <= 0
+                ? 0.0
+                : roundPercentage((acknowledgedCount * 100.0) / denominator);
+        double readRate = denominator <= 0
+                ? 0.0
+                : roundPercentage((readCount * 100.0) / denominator);
+
+        List<Product> products = productRepository.findAll();
+        final Map<Long, Long> impactedSellersByNoteFinal = impactedSellersByNote;
+        List<Map<String, Object>> impactTopNotes = publishedNotes.stream()
+                .sorted(noteComparator())
+                .limit(8)
+                .map(note -> {
+                    Map<String, Object> impact = buildImpactSummary(note, products);
+                    impact.put("noteId", note.getId());
+                    impact.put("title", note.getTitle());
+                    impact.put("noteType", note.getNoteType());
+                    impact.put("priority", note.getPriority());
+                    impact.put("impactedSellerCount", impactedSellersByNoteFinal.getOrDefault(note.getId(), 0L));
+                    return impact;
+                })
+                .toList();
+
+        Map<String, Long> byType = filteredNotes.stream()
+                .collect(Collectors.groupingBy(ComplianceSellerNote::getNoteType, Collectors.counting()));
+        Map<String, Long> byPriority = filteredNotes.stream()
+                .collect(Collectors.groupingBy(ComplianceSellerNote::getPriority, Collectors.counting()));
+
+        LinkedHashMap<String, Object> summary = new LinkedHashMap<>();
+        summary.put("totalNotes", filteredNotes.size());
+        summary.put("draftCount", filteredNotes.stream().filter(note -> "DRAFT".equals(note.getStatus())).count());
+        summary.put("publishedCount", publishedNotes.size());
+        summary.put("archivedCount", filteredNotes.stream().filter(note -> "ARCHIVED".equals(note.getStatus())).count());
+        summary.put("highPriorityCount", filteredNotes.stream()
+                .filter(note -> "HIGH".equals(note.getPriority()) || "CRITICAL".equals(note.getPriority()))
+                .count());
+        summary.put("sellerCount", sellerCount);
+        summary.put("readRatePercentage", readRate);
+        summary.put("acknowledgementRatePercentage", acknowledgementRate);
+        summary.put("byType", byType);
+        summary.put("byPriority", byPriority);
+        summary.put("impactTopNotes", impactTopNotes);
+        return summary;
+    }
+
+    @Override
+    @Transactional
+    public ComplianceSellerNote createAutoDraftFromEvent(
+            String eventType,
+            Map<String, Object> eventPayload,
+            String actorEmail
+    ) {
+        String normalizedEventType = trimToNull(eventType);
+        if (normalizedEventType == null) {
+            throw new IllegalArgumentException("Event type is required");
+        }
+
+        Map<String, Object> payload = eventPayload == null ? Map.of() : eventPayload;
+        String noteType = normalizeWithFallback(valueAsString(payload, "noteType"), "POLICY", ALLOWED_TYPES, "Unsupported note type");
+        String priority = normalizeWithFallback(valueAsString(payload, "priority"), "HIGH", ALLOWED_PRIORITIES, "Unsupported note priority");
+        String title = firstNonBlank(
+                valueAsString(payload, "title"),
+                "Auto Draft: " + normalizedEventType.replace('_', ' ')
+        );
+        String summary = firstNonBlank(
+                valueAsString(payload, "summary"),
+                "Compliance update captured from backend event: " + normalizedEventType
+        );
+        String fullNote = firstNonBlank(
+                valueAsString(payload, "fullNote"),
+                summary + "\n\nReview this draft before publish."
+        );
+        String businessEmail = firstNonBlank(valueAsString(payload, "businessEmail"), "compliance@yourbusiness.com");
+
+        ComplianceSellerNote note = new ComplianceSellerNote();
+        note.setTitle(trimRequired(title, "Title is required"));
+        note.setNoteType(noteType);
+        note.setPriority(priority);
+        note.setShortSummary(trimRequired(summary, "Short summary is required"));
+        note.setFullNote(trimRequired(fullNote, "Full note is required"));
+        note.setEffectiveDate(valueAsLocalDate(payload.get("effectiveDate")));
+        note.setActionRequired(trimToNull(valueAsString(payload, "actionRequired")));
+        note.setAffectedCategory(trimToNull(valueAsString(payload, "affectedCategory")));
+        note.setBusinessEmail(trimRequired(businessEmail, "Business email is required"));
+        note.setStatus("DRAFT");
+        note.setPinned(false);
+        note.setSourceMode("AUTO_DRAFT");
+        note.setAttachmentsJson(writeAttachments(List.of()));
+        note.setCreatedBy(trimToNull(actorEmail) == null ? "system_auto_draft" : trimToNull(actorEmail));
+        note.setUpdatedBy(note.getCreatedBy());
+        applyStatusTransition(note, "DRAFT", false);
+        return complianceSellerNoteRepository.save(note);
     }
 
     @Override
@@ -283,7 +502,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
                 return List.of();
             }
             return sanitizeAttachments(parsed, false);
-        } catch (JsonProcessingException ex) {
+        } catch (Exception ex) {
             return List.of();
         }
     }
@@ -322,9 +541,76 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
     }
 
+    private ComplianceSellerNoteRead getOrCreateReadEntry(Long sellerId, Long noteId) {
+        ComplianceSellerNote note = getForSeller(noteId);
+        Seller seller = getSeller(sellerId);
+        ComplianceSellerNoteRead readEntry = complianceSellerNoteReadRepository
+                .findBySeller_IdAndNote_Id(seller.getId(), note.getId())
+                .orElseGet(ComplianceSellerNoteRead::new);
+        readEntry.setNote(note);
+        readEntry.setSeller(seller);
+        return readEntry;
+    }
+
     private Seller getSeller(Long sellerId) {
         return sellerRepository.findById(sellerId)
                 .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
+    }
+
+    private Map<String, Object> buildImpactSummary(ComplianceSellerNote note) {
+        return buildImpactSummary(note, productRepository.findAll());
+    }
+
+    private Map<String, Object> buildImpactSummary(ComplianceSellerNote note, List<Product> products) {
+        String normalizedCategory = normalizeCategoryKey(note == null ? null : note.getAffectedCategory());
+        List<Product> impactedProducts = (products == null ? List.<Product>of() : products).stream()
+                .filter(product -> product != null && isProductImpacted(product, normalizedCategory))
+                .sorted(Comparator.comparing(Product::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .toList();
+        long acknowledgedCount = 0;
+        long readCount = 0;
+        long impactedSellerCount = 0;
+        long sellerCount = sellerRepository.count();
+        if (note != null && note.getId() != null) {
+            List<ComplianceSellerNoteRead> entries = complianceSellerNoteReadRepository.findByNote_IdIn(List.of(note.getId()));
+            acknowledgedCount = entries.stream().filter(ComplianceSellerNoteRead::isAcknowledged).count();
+            readCount = entries.stream().filter(ComplianceSellerNoteRead::isRead).count();
+            impactedSellerCount = entries.stream()
+                    .map(entry -> entry.getSeller() == null ? null : entry.getSeller().getId())
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .count();
+        }
+        double acknowledgementRate = sellerCount <= 0
+                ? 0.0
+                : roundPercentage((acknowledgedCount * 100.0) / sellerCount);
+        double readRate = sellerCount <= 0
+                ? 0.0
+                : roundPercentage((readCount * 100.0) / sellerCount);
+
+        List<Map<String, Object>> topProducts = impactedProducts.stream()
+                .limit(12)
+                .map(product -> {
+                    Map<String, Object> item = new LinkedHashMap<>();
+                    item.put("id", product.getId());
+                    item.put("title", product.getTitle());
+                    item.put("uiCategoryKey", product.getUiCategoryKey());
+                    item.put("subcategoryKey", product.getSubcategoryKey());
+                    item.put("active", product.isActive());
+                    return item;
+                })
+                .toList();
+
+        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
+        response.put("affectedCategory", note == null ? null : note.getAffectedCategory());
+        response.put("impactedProductCount", impactedProducts.size());
+        response.put("impactedProducts", topProducts);
+        response.put("coverageScope", normalizedCategory == null ? "GLOBAL_OR_UNSPECIFIED" : "CATEGORY_FILTERED");
+        response.put("acknowledgedCount", acknowledgedCount);
+        response.put("impactedSellerCount", impactedSellerCount);
+        response.put("acknowledgementRatePercentage", acknowledgementRate);
+        response.put("readRatePercentage", readRate);
+        return response;
     }
 
     private void applyCreatePayload(ComplianceSellerNote note, CreateComplianceSellerNoteRequest request) {
@@ -368,7 +654,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
                 ALLOWED_STATUSES,
                 "Unsupported note status"
         ));
-        note.setAttachmentsJson(writeAttachments(request.getAttachments()));
+        note.setAttachmentsJson(writeAttachments(resolveUpdatedAttachments(note, request.getAttachments())));
     }
 
     private void validateRequest(CreateComplianceSellerNoteRequest request) {
@@ -415,6 +701,40 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
                 || lower(note.getFullNote()).contains(normalizedQuery);
     }
 
+    private boolean isWithinAnalyticsPeriod(
+            ComplianceSellerNote note,
+            LocalDate fromDate,
+            LocalDate toDate
+    ) {
+        if (fromDate == null && toDate == null) {
+            return true;
+        }
+        LocalDate anchorDate = resolveAnalyticsAnchorDate(note);
+        if (anchorDate == null) {
+            return true;
+        }
+        if (fromDate != null && anchorDate.isBefore(fromDate)) {
+            return false;
+        }
+        return toDate == null || !anchorDate.isAfter(toDate);
+    }
+
+    private LocalDate resolveAnalyticsAnchorDate(ComplianceSellerNote note) {
+        if (note == null) {
+            return null;
+        }
+        if (note.getPublishedAt() != null) {
+            return note.getPublishedAt().toLocalDate();
+        }
+        if (note.getUpdatedAt() != null) {
+            return note.getUpdatedAt().toLocalDate();
+        }
+        if (note.getCreatedAt() != null) {
+            return note.getCreatedAt().toLocalDate();
+        }
+        return null;
+    }
+
     private Comparator<ComplianceSellerNote> noteComparator() {
         return Comparator
                 .comparing(ComplianceSellerNote::isPinned).reversed()
@@ -438,7 +758,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
         );
         try {
             return objectMapper.writeValueAsString(safeAttachments);
-        } catch (JsonProcessingException ex) {
+        } catch (Exception ex) {
             throw new IllegalArgumentException("Invalid attachments payload");
         }
     }
@@ -513,6 +833,100 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
 
     private String lower(String value) {
         return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private boolean isProductImpacted(Product product, String normalizedCategory) {
+        if (normalizedCategory == null) {
+            return true;
+        }
+        String uiCategory = normalizeCategoryKey(product.getUiCategoryKey());
+        String subCategory = normalizeCategoryKey(product.getSubcategoryKey());
+        String legacyCategory = normalizeCategoryKey(
+                product.getCategory() == null ? null : product.getCategory().getCategoryId()
+        );
+        return normalizedCategory.equals(uiCategory)
+                || normalizedCategory.equals(subCategory)
+                || normalizedCategory.equals(legacyCategory);
+    }
+
+    private String normalizeCategoryKey(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim().toLowerCase(Locale.ROOT);
+        return trimmed.isBlank() ? null : trimmed;
+    }
+
+    private String firstNonBlank(String first, String second) {
+        String one = trimToNull(first);
+        if (one != null) {
+            return one;
+        }
+        return trimToNull(second);
+    }
+
+    private String valueAsString(Map<String, Object> payload, String key) {
+        if (payload == null || key == null) {
+            return null;
+        }
+        Object value = payload.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private LocalDate valueAsLocalDate(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof LocalDate localDate) {
+            return localDate;
+        }
+        String raw = String.valueOf(value).trim();
+        if (raw.isBlank()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(raw);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    private List<Map<String, Object>> resolveUpdatedAttachments(
+            ComplianceSellerNote existingNote,
+            List<Map<String, Object>> incomingAttachments
+    ) {
+        if (incomingAttachments == null) {
+            return List.of();
+        }
+        Map<String, String> existingUrlsById = readAttachments(existingNote).stream()
+                .filter(item -> item.get("id") != null && item.get("url") != null)
+                .collect(Collectors.toMap(
+                        item -> String.valueOf(item.get("id")),
+                        item -> String.valueOf(item.get("url")),
+                        (first, second) -> first,
+                        LinkedHashMap::new
+                ));
+        List<Map<String, Object>> resolved = new ArrayList<>();
+        for (Map<String, Object> rawAttachment : incomingAttachments) {
+            if (rawAttachment == null) {
+                continue;
+            }
+            LinkedHashMap<String, Object> candidate = new LinkedHashMap<>(rawAttachment);
+            String id = candidate.get("id") == null ? null : String.valueOf(candidate.get("id"));
+            String rawUrl = candidate.get("url") == null ? null : String.valueOf(candidate.get("url"));
+            String normalizedUrl = trimToNull(rawUrl);
+            if (normalizedUrl == null || normalizedUrl.startsWith("/api/")) {
+                if (id != null && existingUrlsById.containsKey(id)) {
+                    candidate.put("url", existingUrlsById.get(id));
+                }
+            }
+            resolved.add(candidate);
+        }
+        return resolved;
+    }
+
+    private double roundPercentage(double value) {
+        return Math.round(value * 1000.0) / 1000.0;
     }
 
     private List<Map<String, Object>> sanitizeAttachments(

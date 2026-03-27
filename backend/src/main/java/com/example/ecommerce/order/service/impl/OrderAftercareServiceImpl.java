@@ -670,7 +670,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         response.put("pickupScheduledAt", request.getPickupScheduledAt());
         response.put("receivedAt", request.getReceivedAt());
         response.put("completedAt", request.getCompletedAt());
-        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildReturnTaxAdjustment(request));
+        response.put("taxAdjustment", safeReturnTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -709,7 +709,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         replacementOrder.put("proofUrl", request.getReplacementProofUrl());
         replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
         response.put("replacementOrder", replacementOrder);
-        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildExchangeTaxAdjustment(request));
+        response.put("taxAdjustment", safeExchangeTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -754,7 +754,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         refund.put("eligibleAfter", request.getRefundEligibleAfter());
         refund.put("status", request.getRefundStatus());
         response.put("refund", refund);
-        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildReturnTaxAdjustment(request));
+        response.put("taxAdjustment", safeReturnTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -846,7 +846,7 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
         replacementOrder.put("proofUrl", request.getReplacementProofUrl());
         replacementOrder.put("deliveredAt", request.getReplacementDeliveredAt());
         response.put("replacementOrder", replacementOrder);
-        response.put("taxAdjustment", orderAftercareTaxAdjustmentService.buildExchangeTaxAdjustment(request));
+        response.put("taxAdjustment", safeExchangeTaxAdjustment(request));
         response.put("history", toHistory(request));
         return response;
     }
@@ -863,6 +863,20 @@ public class OrderAftercareServiceImpl implements OrderAftercareService {
             item.put("createdAt", entry.getCreatedAt());
             return item;
         }).toList();
+    }
+
+    private Map<String, Object> safeReturnTaxAdjustment(OrderReturnExchangeRequest request) {
+        if (orderAftercareTaxAdjustmentService == null) {
+            return Map.of();
+        }
+        return orderAftercareTaxAdjustmentService.buildReturnTaxAdjustment(request);
+    }
+
+    private Map<String, Object> safeExchangeTaxAdjustment(OrderReturnExchangeRequest request) {
+        if (orderAftercareTaxAdjustmentService == null) {
+            return Map.of();
+        }
+        return orderAftercareTaxAdjustmentService.buildExchangeTaxAdjustment(request);
     }
 
     private String maskCustomerName(String value) {

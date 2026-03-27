@@ -37,5 +37,7 @@ Compliance notes persistence APIs for admin CRUD + publish/archive and seller re
 Attachment policy hardening with HTTPS-only + host allowlist validation and role-protected download redirect endpoints.
 - Implemented:
 Effective-date enforcement for seller product preview and order snapshot freeze (future-date guard + mandatory effective GST resolution).
-- Pending integration:
-Frontend API switch-over to backend endpoints and event-driven auto-draft generation from rule changes.
+- Implemented:
+Frontend API switch-over to backend endpoints and event-driven auto-draft generation from tax/HSN rule changes.
+- Implemented:
+Seller/admin notes navigation drawer entry wiring directly in feature drawer modules.

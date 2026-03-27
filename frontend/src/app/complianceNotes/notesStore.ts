@@ -1,146 +1,170 @@
+import { api } from 'shared/api/Api';
+import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'State/backend/masterApi/shared';
 import {
+  ComplianceAnalyticsFilters,
+  ComplianceAnalyticsSummary,
   ComplianceNote,
+  ComplianceNoteAttachment,
   ComplianceNoteDraftInput,
+  ComplianceNoteImpactSummary,
   ComplianceNoteStatus,
   SellerNotesTab,
 } from './types';
 
-const STORAGE_KEY = 'compliance_notes_store_v1';
 const CHANGE_EVENT = 'compliance-notes-updated';
 
-type ComplianceNotesStore = {
-  notes: ComplianceNote[];
-  sellerReadMap: Record<string, string[]>;
-};
+let adminNotesCache: ComplianceNote[] = [];
+let sellerNotesCache: ComplianceNote[] = [];
+let sellerUnreadCountCache = 0;
+let sellerAcknowledgedCountCache = 0;
 
-type SellerNotesFilter = {
-  sellerId: string;
-  tab: SellerNotesTab;
-  searchText?: string;
-  noteType?: string;
-};
-
-const emptyStore: ComplianceNotesStore = {
-  notes: [],
-  sellerReadMap: {},
-};
-
-const nowIso = () => new Date().toISOString();
-
-const createId = () =>
-  `cn_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-
-const canUseStorage = () =>
-  typeof globalThis !== 'undefined' && globalThis.localStorage !== undefined;
-
-const normalizeStatusDate = (
-  previous: ComplianceNote | undefined,
-  nextStatus: ComplianceNoteStatus,
-) => {
-  if (nextStatus === 'PUBLISHED') {
-    return {
-      publishedAt: previous?.publishedAt || nowIso(),
-      archivedAt: undefined,
-    };
-  }
-
-  if (nextStatus === 'ARCHIVED') {
-    return {
-      publishedAt: previous?.publishedAt,
-      archivedAt: nowIso(),
-    };
-  }
-
-  return {
-    publishedAt: previous?.publishedAt,
-    archivedAt: undefined,
-  };
-};
-
-const readStore = (): ComplianceNotesStore => {
-  if (!canUseStorage()) return emptyStore;
-  const raw = globalThis.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return emptyStore;
-
-  try {
-    const parsed = JSON.parse(raw) as Partial<ComplianceNotesStore>;
-    const notes = Array.isArray(parsed.notes) ? parsed.notes : [];
-    const sellerReadMap =
-      parsed.sellerReadMap && typeof parsed.sellerReadMap === 'object'
-        ? parsed.sellerReadMap
-        : {};
-    return { notes, sellerReadMap };
-  } catch {
-    return emptyStore;
-  }
-};
-
-const writeStore = (nextStore: ComplianceNotesStore) => {
-  if (!canUseStorage()) return;
-  globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextStore));
+const dispatchChange = () => {
   globalThis.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 };
+
+const normalizeAttachment = (raw: any): ComplianceNoteAttachment => ({
+  id: String(raw?.id || ''),
+  name: String(raw?.name || 'Attachment'),
+  uploadedAt: raw?.uploadedAt || undefined,
+  downloadUrl: raw?.downloadUrl || undefined,
+  url: raw?.url || undefined,
+});
+
+const normalizeNote = (raw: any): ComplianceNote => ({
+  id: Number(raw?.id || 0),
+  title: String(raw?.title || ''),
+  noteType: raw?.noteType || 'GENERAL',
+  priority: raw?.priority || 'MEDIUM',
+  shortSummary: String(raw?.shortSummary || ''),
+  fullNote: String(raw?.fullNote || ''),
+  effectiveDate: raw?.effectiveDate || undefined,
+  actionRequired: raw?.actionRequired || undefined,
+  affectedCategory: raw?.affectedCategory || undefined,
+  attachments: Array.isArray(raw?.attachments)
+    ? raw.attachments.map(normalizeAttachment)
+    : [],
+  businessEmail: String(raw?.businessEmail || ''),
+  status: raw?.status || 'DRAFT',
+  pinned: Boolean(raw?.pinned),
+  sourceMode: raw?.sourceMode || raw?.source || 'MANUAL',
+  read: raw?.read == null ? undefined : Boolean(raw.read),
+  acknowledged: raw?.acknowledged == null ? undefined : Boolean(raw.acknowledged),
+  acknowledgedAt: raw?.acknowledgedAt || undefined,
+  impactedProductCount:
+    raw?.impactedProductCount == null ? undefined : Number(raw.impactedProductCount),
+  impactedProducts: Array.isArray(raw?.impactedProducts) ? raw.impactedProducts : undefined,
+  acknowledgedCount:
+    raw?.acknowledgedCount == null ? undefined : Number(raw.acknowledgedCount),
+  acknowledgementRatePercentage:
+    raw?.acknowledgementRatePercentage == null
+      ? undefined
+      : Number(raw.acknowledgementRatePercentage),
+  createdBy: raw?.createdBy || undefined,
+  updatedBy: raw?.updatedBy || undefined,
+  createdAt: raw?.createdAt || undefined,
+  updatedAt: raw?.updatedAt || undefined,
+  publishedAt: raw?.publishedAt || undefined,
+  archivedAt: raw?.archivedAt || undefined,
+});
 
 const sortNotes = (notes: ComplianceNote[]) =>
   [...notes].sort((a, b) => {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-    const dateA = new Date(
-      a.publishedAt || a.updatedAt || a.createdAt || 0,
-    ).getTime();
-    const dateB = new Date(
-      b.publishedAt || b.updatedAt || b.createdAt || 0,
-    ).getTime();
-    return dateB - dateA;
+    const timeA = new Date(a.publishedAt || a.updatedAt || a.createdAt || 0).getTime();
+    const timeB = new Date(b.publishedAt || b.updatedAt || b.createdAt || 0).getTime();
+    return timeB - timeA;
   });
 
-const isReadBySeller = (noteId: string, sellerId: string, store: ComplianceNotesStore) =>
-  (store.sellerReadMap[sellerId] || []).includes(noteId);
+const noteIdToNumber = (noteId: number | string) =>
+  typeof noteId === 'number' ? noteId : Number(noteId);
 
-export const listComplianceNotes = () => sortNotes(readStore().notes);
+const toPayload = (payload: ComplianceNoteDraftInput) => ({
+  title: payload.title,
+  noteType: payload.noteType,
+  priority: payload.priority,
+  shortSummary: payload.shortSummary,
+  fullNote: payload.fullNote,
+  effectiveDate: payload.effectiveDate || undefined,
+  actionRequired: payload.actionRequired || undefined,
+  affectedCategory: payload.affectedCategory || undefined,
+  businessEmail: payload.businessEmail,
+  status: payload.status,
+  pinned: Boolean(payload.pinned),
+  sourceMode: payload.sourceMode || 'MANUAL',
+  attachments: (payload.attachments || []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    url: item.url || item.downloadUrl,
+    uploadedAt: item.uploadedAt,
+  })),
+});
 
-export const countComplianceNotesByStatus = (status: ComplianceNoteStatus) =>
-  readStore().notes.filter((note) => note.status === status).length;
-
-export const upsertComplianceNote = (
-  payload: ComplianceNoteDraftInput,
-): ComplianceNote => {
-  const store = readStore();
-  const existing = payload.id
-    ? store.notes.find((note) => note.id === payload.id)
-    : undefined;
-  const statusDates = normalizeStatusDate(existing, payload.status);
-  const now = nowIso();
-
-  const nextNote: ComplianceNote = {
-    id: existing?.id || createId(),
-    title: payload.title.trim(),
-    noteType: payload.noteType,
-    priority: payload.priority,
-    shortSummary: payload.shortSummary.trim(),
-    fullNote: payload.fullNote.trim(),
-    effectiveDate: payload.effectiveDate || undefined,
-    actionRequired: payload.actionRequired?.trim() || undefined,
-    affectedCategory: payload.affectedCategory?.trim() || undefined,
-    attachments: payload.attachments || existing?.attachments || [],
-    businessEmail: payload.businessEmail.trim(),
-    status: payload.status,
-    pinned: Boolean(payload.pinned),
-    source: payload.source || existing?.source || 'MANUAL',
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-    publishedAt: statusDates.publishedAt,
-    archivedAt: statusDates.archivedAt,
-  };
-
-  const notes = existing
-    ? store.notes.map((note) => (note.id === existing.id ? nextNote : note))
-    : [...store.notes, nextNote];
-
-  writeStore({ ...store, notes });
-  return nextNote;
+export const subscribeComplianceNotes = (listener: () => void) => {
+  const wrapped = () => listener();
+  globalThis.addEventListener(CHANGE_EVENT, wrapped as EventListener);
+  return () =>
+    globalThis.removeEventListener(CHANGE_EVENT, wrapped as EventListener);
 };
 
-export const createAutoDraftComplianceNote = (payload: {
+export const listComplianceNotes = () => sortNotes(adminNotesCache);
+
+export const countComplianceNotesByStatus = (status: ComplianceNoteStatus) =>
+  adminNotesCache.filter((note) => note.status === status).length;
+
+export const getComplianceNoteById = (noteId: number | string) => {
+  const target = noteIdToNumber(noteId);
+  return (
+    adminNotesCache.find((note) => note.id === target) ||
+    sellerNotesCache.find((note) => note.id === target) ||
+    null
+  );
+};
+
+export const fetchAdminComplianceNotes = async (params?: {
+  status?: string;
+  noteType?: string;
+  query?: string;
+}) => {
+  const response = await api.get(API_ROUTES.admin.complianceNotes.base, {
+    params: {
+      status: params?.status,
+      noteType: params?.noteType,
+      q: params?.query,
+    },
+  });
+  adminNotesCache = sortNotes(
+    Array.isArray(response.data) ? response.data.map(normalizeNote) : [],
+  );
+  return adminNotesCache;
+};
+
+export const upsertComplianceNote = async (
+  payload: ComplianceNoteDraftInput,
+): Promise<ComplianceNote> => {
+  const requestPayload = toPayload(payload);
+  const response = payload.id
+    ? await api.put(API_ROUTES.admin.complianceNotes.byId(payload.id), requestPayload)
+    : await api.post(API_ROUTES.admin.complianceNotes.base, requestPayload);
+  const note = normalizeNote(response.data);
+  dispatchChange();
+  await fetchAdminComplianceNotes();
+  return note;
+};
+
+export const markComplianceNotePublished = async (noteId: number | string) => {
+  await api.patch(API_ROUTES.admin.complianceNotes.publish(noteIdToNumber(noteId)));
+  await fetchAdminComplianceNotes();
+  dispatchChange();
+};
+
+export const markComplianceNoteArchived = async (noteId: number | string) => {
+  await api.patch(API_ROUTES.admin.complianceNotes.archive(noteIdToNumber(noteId)));
+  await fetchAdminComplianceNotes();
+  dispatchChange();
+};
+
+export const createAutoDraftComplianceNote = async (payload: {
   title: string;
   noteType: ComplianceNote['noteType'];
   effectiveDate?: string;
@@ -161,110 +185,136 @@ export const createAutoDraftComplianceNote = (payload: {
     businessEmail: payload.businessEmail,
     status: 'DRAFT',
     pinned: false,
-    source: 'AUTO_DRAFT',
+    sourceMode: 'AUTO_DRAFT',
   });
 
-export const markComplianceNoteArchived = (noteId: string) => {
-  const store = readStore();
-  const target = store.notes.find((note) => note.id === noteId);
-  if (!target) return;
-  upsertComplianceNote({
-    ...target,
-    status: 'ARCHIVED',
+export const listSellerComplianceNotes = async (params: {
+  sellerId?: string;
+  tab: SellerNotesTab;
+  searchText?: string;
+  noteType?: string;
+}) => {
+  const tab = params.tab.toUpperCase();
+  const response = await api.get(API_ROUTES.sellerComplianceNotes.base, {
+    params: {
+      tab,
+      noteType: params.noteType || undefined,
+      q: params.searchText || undefined,
+    },
   });
-};
-
-export const markComplianceNotePublished = (noteId: string) => {
-  const store = readStore();
-  const target = store.notes.find((note) => note.id === noteId);
-  if (!target) return;
-  upsertComplianceNote({
-    ...target,
-    status: 'PUBLISHED',
-  });
-};
-
-export const getComplianceNoteById = (noteId: string) =>
-  readStore().notes.find((note) => note.id === noteId) || null;
-
-export const listSellerComplianceNotes = ({
-  sellerId,
-  tab,
-  searchText,
-  noteType,
-}: SellerNotesFilter): ComplianceNote[] => {
-  const store = readStore();
-  const query = (searchText || '').trim().toLowerCase();
-  const typeFilter = noteType || 'ALL';
-
-  const matchingStatus = (note: ComplianceNote) => {
-    const read = isReadBySeller(note.id, sellerId, store);
-    if (tab === 'archived') return note.status === 'ARCHIVED';
-    if (tab === 'unread') return note.status === 'PUBLISHED' && !read;
-    return note.status === 'PUBLISHED';
-  };
-
-  return sortNotes(
-    store.notes.filter((note) => {
-      if (!matchingStatus(note)) return false;
-      if (typeFilter !== 'ALL' && note.noteType !== typeFilter) return false;
-      if (!query) return true;
-
-      return (
-        note.title.toLowerCase().includes(query) ||
-        note.shortSummary.toLowerCase().includes(query) ||
-        note.fullNote.toLowerCase().includes(query)
-      );
-    }),
+  sellerNotesCache = sortNotes(
+    Array.isArray(response.data) ? response.data.map(normalizeNote) : [],
   );
+  return sellerNotesCache;
 };
 
-export const getSellerComplianceUnreadCount = (sellerId: string) => {
-  const store = readStore();
-  return store.notes.filter(
-    (note) =>
-      note.status === 'PUBLISHED' && !isReadBySeller(note.id, sellerId, store),
-  ).length;
+export const fetchSellerComplianceNoteById = async (noteId: number | string) => {
+  const response = await api.get(API_ROUTES.sellerComplianceNotes.byId(noteIdToNumber(noteId)));
+  const note = normalizeNote(response.data);
+  const existingIndex = sellerNotesCache.findIndex((item) => item.id === note.id);
+  if (existingIndex >= 0) {
+    sellerNotesCache[existingIndex] = note;
+  } else {
+    sellerNotesCache = [note, ...sellerNotesCache];
+  }
+  return note;
 };
 
-export const markSellerComplianceNoteRead = (sellerId: string, noteId: string) => {
-  const store = readStore();
-  const readList = store.sellerReadMap[sellerId] || [];
-  if (readList.includes(noteId)) return;
-
-  writeStore({
-    ...store,
-    sellerReadMap: {
-      ...store.sellerReadMap,
-      [sellerId]: [...readList, noteId],
-    },
-  });
+export const markSellerComplianceNoteRead = async (noteId: number | string) => {
+  await api.patch(API_ROUTES.sellerComplianceNotes.read(noteIdToNumber(noteId)));
+  dispatchChange();
 };
 
-export const markSellerComplianceNoteUnread = (
-  sellerId: string,
-  noteId: string,
-) => {
-  const store = readStore();
-  const readList = store.sellerReadMap[sellerId] || [];
-  if (!readList.includes(noteId)) return;
-
-  writeStore({
-    ...store,
-    sellerReadMap: {
-      ...store.sellerReadMap,
-      [sellerId]: readList.filter((id) => id !== noteId),
-    },
-  });
+export const markSellerComplianceNoteUnread = async (noteId: number | string) => {
+  await api.patch(API_ROUTES.sellerComplianceNotes.unread(noteIdToNumber(noteId)));
+  dispatchChange();
 };
 
-export const isSellerComplianceNoteRead = (sellerId: string, noteId: string) =>
-  isReadBySeller(noteId, sellerId, readStore());
-
-export const subscribeComplianceNotes = (listener: () => void) => {
-  const wrapped = () => listener();
-  globalThis.addEventListener(CHANGE_EVENT, wrapped as EventListener);
-  return () =>
-    globalThis.removeEventListener(CHANGE_EVENT, wrapped as EventListener);
+export const acknowledgeSellerComplianceNote = async (noteId: number | string) => {
+  await api.patch(API_ROUTES.sellerComplianceNotes.acknowledge(noteIdToNumber(noteId)));
+  dispatchChange();
 };
 
+export const unacknowledgeSellerComplianceNote = async (noteId: number | string) => {
+  await api.patch(API_ROUTES.sellerComplianceNotes.unacknowledge(noteIdToNumber(noteId)));
+  dispatchChange();
+};
+
+export const fetchSellerComplianceUnreadCount = async () => {
+  try {
+    const response = await api.get(API_ROUTES.sellerComplianceNotes.unreadCount);
+    sellerUnreadCountCache = Number(response.data?.unreadCount || 0);
+    return sellerUnreadCountCache;
+  } catch (error: unknown) {
+    throw new Error(getErrorMessage(error, 'Failed to load unread notes count'));
+  }
+};
+
+export const getSellerComplianceUnreadCount = () => sellerUnreadCountCache;
+
+export const fetchSellerComplianceAcknowledgedCount = async () => {
+  try {
+    const response = await api.get(API_ROUTES.sellerComplianceNotes.acknowledgedCount);
+    sellerAcknowledgedCountCache = Number(response.data?.acknowledgedCount || 0);
+    return sellerAcknowledgedCountCache;
+  } catch (error: unknown) {
+    throw new Error(
+      getErrorMessage(error, 'Failed to load acknowledged notes count'),
+    );
+  }
+};
+
+export const getSellerComplianceAcknowledgedCount = () =>
+  sellerAcknowledgedCountCache;
+
+export const fetchComplianceNoteImpact = async (
+  noteId: number | string,
+): Promise<ComplianceNoteImpactSummary> => {
+  const response = await api.get(
+    API_ROUTES.admin.complianceNotes.impact(noteIdToNumber(noteId)),
+  );
+  return {
+    affectedCategory: response.data?.affectedCategory || undefined,
+    impactedProductCount: Number(response.data?.impactedProductCount || 0),
+    coverageScope: response.data?.coverageScope || undefined,
+    impactedProducts: Array.isArray(response.data?.impactedProducts)
+      ? response.data.impactedProducts
+      : [],
+  };
+};
+
+export const fetchComplianceAnalytics = async (
+  filters?: ComplianceAnalyticsFilters,
+): Promise<ComplianceAnalyticsSummary> => {
+    const response = await api.get(API_ROUTES.admin.complianceNotes.analytics, {
+      params: {
+        noteType:
+          filters?.noteType && filters.noteType !== 'ALL'
+            ? filters.noteType
+            : undefined,
+        fromDate: filters?.fromDate || undefined,
+        toDate: filters?.toDate || undefined,
+        minImpactedSellers:
+          filters?.minImpactedSellers != null
+            ? Math.max(0, filters.minImpactedSellers)
+            : undefined,
+      },
+    });
+    return {
+      totalNotes: Number(response.data?.totalNotes || 0),
+      draftCount: Number(response.data?.draftCount || 0),
+      publishedCount: Number(response.data?.publishedCount || 0),
+      archivedCount: Number(response.data?.archivedCount || 0),
+      highPriorityCount: Number(response.data?.highPriorityCount || 0),
+      sellerCount: Number(response.data?.sellerCount || 0),
+      readRatePercentage: Number(response.data?.readRatePercentage || 0),
+      acknowledgementRatePercentage: Number(
+        response.data?.acknowledgementRatePercentage || 0,
+      ),
+      byType: response.data?.byType || {},
+      byPriority: response.data?.byPriority || {},
+      impactTopNotes: Array.isArray(response.data?.impactTopNotes)
+        ? response.data.impactTopNotes
+        : [],
+    };
+  };

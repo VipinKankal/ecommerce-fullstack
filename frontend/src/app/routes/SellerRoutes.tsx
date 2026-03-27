@@ -7,8 +7,8 @@ import Transaction from '../../features/seller/Pages/Transactions/Transaction';
 import Payment from '../../features/seller/Pages/Transactions/Payment';
 import Profile from '../../features/seller/Pages/Account/Profile';
 import SellerDashboardHome from '../../features/seller/Pages/SellerDashboard/SellerDashboardHome';
-import SellerReturnRequests from '../../features/seller/Pages/Aftercare/SellerReturnRequests';
-import SellerExchangeRequests from '../../features/seller/Pages/Aftercare/SellerExchangeRequests';
+import SellerReturnAdjustmentsPage from '../pages/seller/SellerReturnAdjustmentsPage';
+import SellerExchangeAdjustmentsPage from '../pages/seller/SellerExchangeAdjustmentsPage';
 import SellerTransfers from '../../features/seller/Pages/Transfers/SellerTransfers';
 import SellerComplianceNotesPage from '../pages/seller/SellerComplianceNotesPage';
 import SellerComplianceNoteDetailPage from '../pages/seller/SellerComplianceNoteDetailPage';
@@ -21,8 +21,8 @@ const SellerRoutes = () => {
       <Route path="/add-product" element={<AddProducts />} />
       <Route path="/orders" element={<Order />} />
       <Route path="/transfers" element={<SellerTransfers />} />
-      <Route path="/returns" element={<SellerReturnRequests />} />
-      <Route path="/exchanges" element={<SellerExchangeRequests />} />
+      <Route path="/returns" element={<SellerReturnAdjustmentsPage />} />
+      <Route path="/exchanges" element={<SellerExchangeAdjustmentsPage />} />
       <Route path="/payments" element={<Payment />} />
       <Route path="/transactions" element={<Transaction />} />
       <Route path="/account" element={<Profile />} />

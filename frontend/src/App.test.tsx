@@ -33,10 +33,9 @@ jest.mock('./features/customer/pages/Account/Account', () => () => (
 jest.mock('./features/customer/pages/Account/Wishlist', () => () => (
   <div>wishlist</div>
 ));
-jest.mock(
-  './features/seller/Pages/SellerDashboard/SellerDashboard',
-  () => () => <div>seller dashboard</div>,
-);
+jest.mock('./features/seller/Pages/SellerDashboard/SellerDashboard', () => () => (
+  <div>seller dashboard</div>
+));
 jest.mock('./features/customer/pages/BecomeSeller/BecomeSeller', () => () => (
   <div>become seller</div>
 ));

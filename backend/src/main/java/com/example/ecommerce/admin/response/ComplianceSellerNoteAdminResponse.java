@@ -23,6 +23,10 @@ public class ComplianceSellerNoteAdminResponse {
     private boolean pinned;
     private String sourceMode;
     private List<Map<String, Object>> attachments;
+    private Long impactedProductCount;
+    private List<Map<String, Object>> impactedProducts;
+    private Long acknowledgedCount;
+    private Double acknowledgementRatePercentage;
     private String createdBy;
     private String updatedBy;
     private LocalDateTime publishedAt;

@@ -1,6 +1,7 @@
 package com.example.ecommerce.tax.service.impl;
 
 import com.example.ecommerce.modal.TaxRuleVersion;
+import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
 import com.example.ecommerce.repository.TaxRuleVersionRepository;
 import com.example.ecommerce.tax.request.CreateTaxRuleVersionRequest;
 import com.example.ecommerce.tax.request.ResolveTaxRuleRequest;
@@ -34,6 +35,7 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
     );
 
     private final TaxRuleVersionRepository taxRuleVersionRepository;
+    private final ComplianceSellerNoteService complianceSellerNoteService;
 
     @Value("${app.tax.production-approved-only:true}")
     private boolean productionApprovedOnly;
@@ -72,7 +74,15 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         rule.setSignedMemoReference(trimToNull(request.getSignedMemoReference()));
         rule.setPublished(false);
 
-        return toVersionResponse(taxRuleVersionRepository.save(rule));
+        TaxRuleVersion savedRule = taxRuleVersionRepository.save(rule);
+        triggerAutoDraft(
+                "TAX_RULE_CREATED",
+                savedRule.getRuleType(),
+                savedRule.getRuleCode(),
+                savedRule.getEffectiveFrom(),
+                savedRule.getTaxClass()
+        );
+        return toVersionResponse(savedRule);
     }
 
     @Override
@@ -85,7 +95,15 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         }
 
         rule.setPublished(true);
-        return toVersionResponse(taxRuleVersionRepository.save(rule));
+        TaxRuleVersion savedRule = taxRuleVersionRepository.save(rule);
+        triggerAutoDraft(
+                "TAX_RULE_PUBLISHED",
+                savedRule.getRuleType(),
+                savedRule.getRuleCode(),
+                savedRule.getEffectiveFrom(),
+                savedRule.getTaxClass()
+        );
+        return toVersionResponse(savedRule);
     }
 
     @Override
@@ -400,5 +418,42 @@ public class TaxRuleVersionServiceImpl implements TaxRuleVersionService {
         response.setApprovedBy(rule.getApprovedBy());
         response.setSignedMemoReference(rule.getSignedMemoReference());
         return response;
+    }
+
+    private void triggerAutoDraft(
+            String eventType,
+            String ruleType,
+            String ruleCode,
+            LocalDate effectiveDate,
+            String taxClass
+    ) {
+        try {
+            java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
+            payload.put("noteType", "TCS".equalsIgnoreCase(ruleType) ? "TCS" : "GST");
+            payload.put("priority", "HIGH");
+            payload.put("title", "%s: %s".formatted(eventType.replace('_', ' '), ruleCode));
+            payload.put("summary", "Backend tax-rule event captured for %s (%s).".formatted(ruleType, ruleCode));
+            payload.put("fullNote", "Rule Code: %s\nRule Type: %s\nTax Class: %s\nEffective From: %s\n\nReview and publish seller-facing wording.".formatted(
+                    ruleCode,
+                    ruleType,
+                    taxClass == null ? "ANY" : taxClass,
+                    effectiveDate == null ? "-" : effectiveDate
+            ));
+            payload.put("actionRequired", "Review impacted product tax mapping and publish seller note.");
+            payload.put("businessEmail", "compliance@yourbusiness.com");
+            if (effectiveDate != null) {
+                payload.put("effectiveDate", effectiveDate.toString());
+            }
+            if (taxClass != null && !taxClass.isBlank()) {
+                payload.put("affectedCategory", taxClass);
+            }
+            complianceSellerNoteService.createAutoDraftFromEvent(
+                    eventType,
+                    payload,
+                    "system_tax_event"
+            );
+        } catch (Exception ignored) {
+            // Auto-draft must not block tax rule create/publish.
+        }
     }
 }

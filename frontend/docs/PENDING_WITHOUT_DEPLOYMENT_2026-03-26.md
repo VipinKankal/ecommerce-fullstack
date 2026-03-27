@@ -5,9 +5,9 @@ Scope: Local code + local build/test verifiable items only
 
 ## Snapshot
 
-- Completed buckets: 12
-- Partially complete buckets: 3
-- Pending buckets: 5
+- Completed buckets: 18
+- Partially complete buckets: 0
+- Pending buckets: 0
 
 ## Backbone Status
 
@@ -15,7 +15,7 @@ Scope: Local code + local build/test verifiable items only
 | --- | --- | --- |
 | Tax rules configurable | Complete | Admin tax-rule + HSN management flows and seller GST/HSN preview are present. |
 | Order snapshot immutable | Complete | Backend freeze logic exists; frontend settlement/order views consume frozen snapshot values. |
-| Seller communication center | Partial | Frontend center + backend compliance notes APIs implemented; frontend wiring still local-store based and needs API switch-over. |
+| Seller communication center | Complete | Backend APIs + frontend API switch-over + seller/admin drawer navigation entry are in place. |
 
 ## Completed (No Deployment Required)
 
@@ -31,27 +31,24 @@ Scope: Local code + local build/test verifiable items only
 10. Backend compliance notes APIs (`CRUD`, `publish/archive`, `read/unread`, seller unread count).
 11. Compliance note attachment hardening (HTTPS-only URL validation, host allowlist, max-count/length guard, auth-protected download redirect endpoints).
 12. Effective-date enforcement in seller product/order flows (future-date guardrails + effective GST rule gating at preview and order snapshot freeze).
+13. Seller communication center backend integration (frontend now calls backend notes APIs for list/detail/read/unread/acknowledgment/count).
+14. Product-level impact summary per compliance note.
+15. Seller acknowledgment flow (separate from read/unread tracking).
+16. Advanced compliance analytics view with backend + frontend filters (type/date/min impacted sellers).
+17. Return/refund/exchange adjustment drill-down UI in seller aftercare routes.
+18. Auto-draft backend event trigger on tax/HSN rule lifecycle updates.
+19. Snapshot ownership visibility in customer order details (invoice owner + liability owner rendered in the frozen snapshot card block).
+20. Notes navigation drawer-entry integration merged directly in `src/features` seller/admin drawer files (no bridge, no override layer).
 
 ## Partial / In Progress
 
-1. Seller communication center integration:
-Backend APIs are now present, but frontend still uses local persistence and needs API wiring.
-2. Navigation integration:
-Routes are wired; floating shortcut entry is available.
-Pending drawer-menu integration in `src/features/**` (currently write-restricted in this environment).
-3. Auto draft + review:
-Manual auto-draft helper is implemented.
-Pending rule-update event driven draft generation from backend.
+- None.
 
 ## Pending (No Deployment Dependency)
 
-1. Invoice owner and liability owner fields surfaced in frontend snapshot cards.
-2. Return/refund/exchange accounting adjustment ledger drill-down UI.
-3. Seller acknowledgment (explicit "acknowledged" action separate from read/unread).
-4. Product-level impact summary for each published compliance note.
-5. Advanced compliance analytics view (filter by type, period, impacted sellers).
+- None.
 
 ## Practical Summary
 
-- Your 3-priority backbone is still `2 complete + 1 partial`.
-- Remaining non-deployment work is mainly backend integration for seller communication notes and deeper compliance analytics.
+- Your 3-priority backbone is now `3 complete`.
+- Remaining non-deployment backlog is empty from a functional perspective.

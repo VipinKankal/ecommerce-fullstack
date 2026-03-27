@@ -27,9 +27,12 @@ import java.util.Objects;
 public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
 
     private static final String ORDER_TYPE_MARKETPLACE = "MARKETPLACE";
+    private static final String ORDER_TYPE_OWN_BRAND = "OWN_BRAND";
     private static final String SNAPSHOT_SOURCE = "ORDER_CREATE_FREEZE_V1";
     private static final String DEFAULT_PRICING_MODE = "INCLUSIVE";
     private static final String DEFAULT_TAX_CLASS = "APPAREL_STANDARD";
+    private static final String OWNER_SELLER = "SELLER";
+    private static final String OWNER_ADMIN = "ADMIN";
 
     private final OrderTaxSnapshotRepository orderTaxSnapshotRepository;
     private final TaxComputationSupport taxComputationSupport;
@@ -52,6 +55,9 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         }
 
         LocalDate effectiveDate = resolveEffectiveDate(order);
+        String orderType = ORDER_TYPE_MARKETPLACE;
+        String invoiceOwner = resolveInvoiceOwner(orderType);
+        String liabilityOwner = resolveLiabilityOwner(orderType);
         String supplierGstin = resolveSupplierGstin(items);
         String sellerStateCode = taxComputationSupport.resolveSellerStateCode(supplierGstin);
         String posStateCode = taxComputationSupport.resolvePosStateCode(
@@ -88,7 +94,9 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
 
         LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
         payload.put("snapshotSource", SNAPSHOT_SOURCE);
-        payload.put("orderType", ORDER_TYPE_MARKETPLACE);
+        payload.put("orderType", orderType);
+        payload.put("invoiceOwner", invoiceOwner);
+        payload.put("liabilityOwner", liabilityOwner);
         payload.put("supplierGstin", supplierGstin);
         payload.put("sellerStateCode", sellerStateCode);
         payload.put("posStateCode", posStateCode);
@@ -110,7 +118,7 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
 
         OrderTaxSnapshot snapshot = new OrderTaxSnapshot();
         snapshot.setOrder(order);
-        snapshot.setOrderType(ORDER_TYPE_MARKETPLACE);
+        snapshot.setOrderType(orderType);
         snapshot.setSupplierGstin(supplierGstin);
         snapshot.setSellerStateCode(sellerStateCode);
         snapshot.setPosStateCode(posStateCode);
@@ -126,6 +134,8 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         snapshot.setGstRuleVersion(gstRuleVersion);
         snapshot.setTcsRuleVersion(tcsRuleVersion);
         snapshot.setSnapshotSource(SNAPSHOT_SOURCE);
+        snapshot.setInvoiceOwner(invoiceOwner);
+        snapshot.setLiabilityOwner(liabilityOwner);
         snapshot.setEffectiveTaxDate(effectiveDate);
         snapshot.setSnapshotPayload(writePayload(payload));
         snapshot.setFrozenAt(LocalDateTime.now());
@@ -314,6 +324,20 @@ public class OrderTaxSnapshotServiceImpl implements OrderTaxSnapshotService {
         }
         String trimmed = value.trim();
         return trimmed.isBlank() ? null : trimmed.toUpperCase();
+    }
+
+    private String resolveInvoiceOwner(String orderType) {
+        if (ORDER_TYPE_OWN_BRAND.equalsIgnoreCase(orderType)) {
+            return OWNER_ADMIN;
+        }
+        return OWNER_SELLER;
+    }
+
+    private String resolveLiabilityOwner(String orderType) {
+        if (ORDER_TYPE_OWN_BRAND.equalsIgnoreCase(orderType)) {
+            return OWNER_ADMIN;
+        }
+        return OWNER_SELLER;
     }
 
     private record LineSnapshot(

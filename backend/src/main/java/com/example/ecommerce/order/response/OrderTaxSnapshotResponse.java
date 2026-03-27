@@ -24,6 +24,8 @@ public class OrderTaxSnapshotResponse {
     private String gstRuleVersion;
     private String tcsRuleVersion;
     private String snapshotSource;
+    private String invoiceOwner;
+    private String liabilityOwner;
     private LocalDate effectiveTaxDate;
     private LocalDateTime frozenAt;
 }

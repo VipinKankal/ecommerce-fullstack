@@ -39,6 +39,10 @@ import {
   Autorenew,
   FactCheckOutlined,
   FactCheck,
+  CampaignOutlined,
+  Campaign,
+  BarChartOutlined,
+  BarChart,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch } from 'app/store/Store';
@@ -110,6 +114,18 @@ const menu = [
     path: '/admin/audit-logs',
     icon: <FactCheckOutlined />,
     activeIcon: <FactCheck />,
+  },
+  {
+    name: 'Compliance Notes',
+    path: '/admin/compliance-notes',
+    icon: <CampaignOutlined />,
+    activeIcon: <Campaign />,
+  },
+  {
+    name: 'Compliance Analytics',
+    path: '/admin/compliance-analytics',
+    icon: <BarChartOutlined />,
+    activeIcon: <BarChart />,
   },
   {
     name: 'Reports',

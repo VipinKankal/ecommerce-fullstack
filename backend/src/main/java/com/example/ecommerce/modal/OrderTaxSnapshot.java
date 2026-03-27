@@ -78,6 +78,12 @@ public class OrderTaxSnapshot {
     @Column(name = "snapshot_source", length = 64)
     private String snapshotSource;
 
+    @Column(name = "invoice_owner", length = 32)
+    private String invoiceOwner;
+
+    @Column(name = "liability_owner", length = 32)
+    private String liabilityOwner;
+
     @Column(name = "effective_tax_date")
     private LocalDate effectiveTaxDate;
 

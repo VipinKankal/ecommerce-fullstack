@@ -52,6 +52,8 @@ export type OrderTaxSnapshotLite = {
   gstRuleVersion?: string;
   tcsRuleVersion?: string;
   snapshotSource?: string;
+  invoiceOwner?: string;
+  liabilityOwner?: string;
   effectiveTaxDate?: string;
   frozenAt?: string;
 };
@@ -185,3 +187,4 @@ export const resolveCustomerStatus = (order: OrderLite | null) => {
   }
   return rawOrderStatus;
 };
+

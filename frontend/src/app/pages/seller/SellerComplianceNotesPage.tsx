@@ -18,10 +18,12 @@ import { Link } from 'react-router-dom';
 import {
   ComplianceNote,
   SellerNotesTab,
-  getSellerComplianceUnreadCount,
-  isSellerComplianceNoteRead,
+  acknowledgeSellerComplianceNote,
+  fetchSellerComplianceAcknowledgedCount,
+  fetchSellerComplianceUnreadCount,
   listSellerComplianceNotes,
   markSellerComplianceNoteRead,
+  unacknowledgeSellerComplianceNote,
   subscribeComplianceNotes,
 } from 'app/complianceNotes';
 import { getSellerComplianceIdentity } from 'app/complianceNotes/sellerIdentity';
@@ -46,21 +48,34 @@ const SellerComplianceNotesPage = () => {
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [notes, setNotes] = useState<ComplianceNote[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [acknowledgedCount, setAcknowledgedCount] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const refresh = () => {
-      setNotes(
-        listSellerComplianceNotes({
+    const refresh = async () => {
+      try {
+        const nextNotes = await listSellerComplianceNotes({
           sellerId,
           tab,
           searchText,
           noteType: typeFilter,
-        }),
-      );
-      setUnreadCount(getSellerComplianceUnreadCount(sellerId));
+        });
+        const unread = await fetchSellerComplianceUnreadCount();
+        const acknowledged = await fetchSellerComplianceAcknowledgedCount();
+        setNotes(nextNotes);
+        setUnreadCount(unread);
+        setAcknowledgedCount(acknowledged);
+        setError(null);
+      } catch (requestError: unknown) {
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Failed to load seller notes',
+        );
+      }
     };
 
-    refresh();
+    void refresh();
     return subscribeComplianceNotes(refresh);
   }, [searchText, sellerId, tab, typeFilter]);
 
@@ -70,8 +85,26 @@ const SellerComplianceNotesPage = () => {
     return 'Latest Seller Notes';
   }, [tab]);
 
-  const markRead = (noteId: string) => {
-    markSellerComplianceNoteRead(sellerId, noteId);
+  const markRead = async (noteId: number) => {
+    await markSellerComplianceNoteRead(noteId);
+    setUnreadCount(await fetchSellerComplianceUnreadCount());
+  };
+
+  const toggleAcknowledged = async (note: ComplianceNote) => {
+    if (note.acknowledged) {
+      await unacknowledgeSellerComplianceNote(note.id);
+    } else {
+      await acknowledgeSellerComplianceNote(note.id);
+    }
+    const nextNotes = await listSellerComplianceNotes({
+      sellerId,
+      tab,
+      searchText,
+      noteType: typeFilter,
+    });
+    setNotes(nextNotes);
+    setAcknowledgedCount(await fetchSellerComplianceAcknowledgedCount());
+    setUnreadCount(await fetchSellerComplianceUnreadCount());
   };
 
   return (
@@ -98,6 +131,12 @@ const SellerComplianceNotesPage = () => {
             />
             <Chip
               icon={<DraftsRoundedIcon />}
+              label={`${acknowledgedCount} acknowledged`}
+              color="info"
+              variant="outlined"
+            />
+            <Chip
+              icon={<DraftsRoundedIcon />}
               label={`${notes.length} in view`}
               variant="outlined"
               sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
@@ -105,6 +144,8 @@ const SellerComplianceNotesPage = () => {
           </div>
         </div>
       </div>
+
+      {error && <Alert severity="error">{error}</Alert>}
 
       <Paper sx={{ p: 3, borderRadius: '24px', boxShadow: 'none', border: '1px solid #eef2f7' }}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -149,7 +190,7 @@ const SellerComplianceNotesPage = () => {
             <Alert severity="info">No notes available for this view.</Alert>
           ) : (
             notes.map((note) => {
-              const read = isSellerComplianceNoteRead(sellerId, note.id);
+              const read = Boolean(note.read);
               return (
                 <div
                   key={note.id}
@@ -182,6 +223,11 @@ const SellerComplianceNotesPage = () => {
                         color={read ? 'success' : 'warning'}
                         label={read ? 'READ' : 'UNREAD'}
                       />
+                      <Chip
+                        size="small"
+                        color={note.acknowledged ? 'info' : 'default'}
+                        label={note.acknowledged ? 'ACKNOWLEDGED' : 'NOT ACK'}
+                      />
                       {note.attachments.length > 0 && (
                         <Chip
                           size="small"
@@ -211,7 +257,7 @@ const SellerComplianceNotesPage = () => {
                       to={`/seller/notes/${note.id}`}
                       variant="outlined"
                       endIcon={<OpenInNewRoundedIcon />}
-                      onClick={() => markRead(note.id)}
+                      onClick={() => void markRead(note.id)}
                     >
                       Open Detail
                     </Button>
@@ -219,11 +265,18 @@ const SellerComplianceNotesPage = () => {
                       <Button
                         variant="outlined"
                         color="success"
-                        onClick={() => markRead(note.id)}
+                        onClick={() => void markRead(note.id)}
                       >
                         Mark Read
                       </Button>
                     )}
+                    <Button
+                      variant="outlined"
+                      color={note.acknowledged ? 'warning' : 'info'}
+                      onClick={() => void toggleAcknowledged(note)}
+                    >
+                      {note.acknowledged ? 'Remove Ack' : 'Acknowledge'}
+                    </Button>
                   </div>
                 </div>
               );

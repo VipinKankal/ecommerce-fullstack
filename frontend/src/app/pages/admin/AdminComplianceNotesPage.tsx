@@ -18,14 +18,19 @@ import PublishRoundedIcon from '@mui/icons-material/PublishRounded';
 import ArchiveRoundedIcon from '@mui/icons-material/ArchiveRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import BarChartRoundedIcon from '@mui/icons-material/BarChartRounded';
+import { Link } from 'react-router-dom';
 import {
   ComplianceNote,
   ComplianceNoteAttachment,
+  ComplianceNoteImpactSummary,
   ComplianceNotePriority,
+  ComplianceNoteSource,
   ComplianceNoteStatus,
   ComplianceNoteType,
-  countComplianceNotesByStatus,
   createAutoDraftComplianceNote,
+  fetchAdminComplianceNotes,
+  fetchComplianceNoteImpact,
   listComplianceNotes,
   markComplianceNoteArchived,
   markComplianceNotePublished,
@@ -54,7 +59,7 @@ const PRIORITIES: ComplianceNotePriority[] = [
 const STATUSES: ComplianceNoteStatus[] = ['DRAFT', 'PUBLISHED', 'ARCHIVED'];
 
 type AdminNoteForm = {
-  id?: string;
+  id?: number;
   title: string;
   noteType: ComplianceNoteType;
   priority: ComplianceNotePriority;
@@ -103,6 +108,7 @@ const fromNote = (note: ComplianceNote): AdminNoteForm => ({
 const AdminComplianceNotesPage = () => {
   const [notes, setNotes] = useState<ComplianceNote[]>(() => listComplianceNotes());
   const [form, setForm] = useState<AdminNoteForm>(initialForm);
+  const [impactSummary, setImpactSummary] = useState<ComplianceNoteImpactSummary | null>(null);
   const [searchText, setSearchText] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -113,16 +119,27 @@ const AdminComplianceNotesPage = () => {
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
-    const refresh = () => setNotes(listComplianceNotes());
-    refresh();
+    const refresh = async () => {
+      try {
+        await fetchAdminComplianceNotes();
+        setNotes(listComplianceNotes());
+      } catch (error: unknown) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : 'Failed to load compliance notes from backend.',
+        );
+      }
+    };
+    void refresh();
     return subscribeComplianceNotes(refresh);
   }, []);
 
   const counts = useMemo(
     () => ({
-      drafts: countComplianceNotesByStatus('DRAFT'),
-      published: countComplianceNotesByStatus('PUBLISHED'),
-      archived: countComplianceNotesByStatus('ARCHIVED'),
+      drafts: notes.filter((note) => note.status === 'DRAFT').length,
+      published: notes.filter((note) => note.status === 'PUBLISHED').length,
+      archived: notes.filter((note) => note.status === 'ARCHIVED').length,
       highPriority: notes.filter(
         (note) =>
           note.status !== 'ARCHIVED' &&
@@ -148,14 +165,20 @@ const AdminComplianceNotesPage = () => {
 
   const resetForm = () => {
     setForm(initialForm);
+    setImpactSummary(null);
     setManualAttachmentName('');
     setManualAttachmentUrl('');
   };
 
-  const loadForEdit = (note: ComplianceNote) => {
+  const loadForEdit = async (note: ComplianceNote) => {
     setForm(fromNote(note));
     setError(null);
     setSuccess(`Loaded "${note.title}" for edit.`);
+    try {
+      setImpactSummary(await fetchComplianceNoteImpact(note.id));
+    } catch {
+      setImpactSummary(null);
+    }
   };
 
   const validate = () => {
@@ -166,57 +189,93 @@ const AdminComplianceNotesPage = () => {
     return null;
   };
 
-  const saveForm = (targetStatus: ComplianceNoteStatus) => {
+  const saveForm = async (targetStatus: ComplianceNoteStatus) => {
     const validationError = validate();
     if (validationError) {
       setError(validationError);
       return;
     }
 
-    const saved = upsertComplianceNote({
-      ...form,
-      status: targetStatus,
-      pinned: form.pinned,
-      effectiveDate: form.effectiveDate || undefined,
-      actionRequired: form.actionRequired || undefined,
-      affectedCategory: form.affectedCategory || undefined,
-      attachments: form.attachments,
-    });
-
-    setForm(fromNote(saved));
-    setError(null);
-    setSuccess(
-      targetStatus === 'PUBLISHED'
-        ? 'Note published for sellers.'
-        : targetStatus === 'ARCHIVED'
-          ? 'Note archived successfully.'
-          : 'Draft saved successfully.',
-    );
+    try {
+      const saved = await upsertComplianceNote({
+        ...form,
+        status: targetStatus,
+        pinned: form.pinned,
+        effectiveDate: form.effectiveDate || undefined,
+        actionRequired: form.actionRequired || undefined,
+        affectedCategory: form.affectedCategory || undefined,
+        attachments: form.attachments,
+        sourceMode: 'MANUAL' as ComplianceNoteSource,
+      });
+      setForm(fromNote(saved));
+      setImpactSummary(await fetchComplianceNoteImpact(saved.id));
+      setError(null);
+      setSuccess(
+        targetStatus === 'PUBLISHED'
+          ? 'Note published for sellers.'
+          : targetStatus === 'ARCHIVED'
+            ? 'Note archived successfully.'
+            : 'Draft saved successfully.',
+      );
+    } catch (saveError: unknown) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : 'Failed to save compliance note.',
+      );
+    }
   };
 
-  const handleArchiveFromList = (noteId: string) => {
-    markComplianceNoteArchived(noteId);
-    setSuccess('Note archived successfully.');
+  const handleArchiveFromList = async (noteId: number) => {
+    try {
+      await markComplianceNoteArchived(noteId);
+      setNotes(listComplianceNotes());
+      setSuccess('Note archived successfully.');
+    } catch (archiveError: unknown) {
+      setError(
+        archiveError instanceof Error
+          ? archiveError.message
+          : 'Failed to archive note.',
+      );
+    }
   };
 
-  const handlePublishFromList = (noteId: string) => {
-    markComplianceNotePublished(noteId);
-    setSuccess('Draft promoted to published.');
+  const handlePublishFromList = async (noteId: number) => {
+    try {
+      await markComplianceNotePublished(noteId);
+      setNotes(listComplianceNotes());
+      setSuccess('Draft promoted to published.');
+    } catch (publishError: unknown) {
+      setError(
+        publishError instanceof Error
+          ? publishError.message
+          : 'Failed to publish note.',
+      );
+    }
   };
 
-  const handleAutoDraft = () => {
-    createAutoDraftComplianceNote({
-      title: 'GST Rule Revision - Seller Action Required',
-      noteType: 'GST',
-      summary:
-        'A new GST interpretation has been approved by CA review and will apply to future orders only.',
-      effectiveDate: new Date().toISOString().slice(0, 10),
-      affectedCategory: 'Apparel',
-      actionRequired:
-        'Verify product category mapping and check HSN override requests before publish.',
-      businessEmail: form.businessEmail.trim() || 'compliance@yourbusiness.com',
-    });
-    setSuccess('Auto draft generated. Review and publish when ready.');
+  const handleAutoDraft = async () => {
+    try {
+      await createAutoDraftComplianceNote({
+        title: 'GST Rule Revision - Seller Action Required',
+        noteType: 'GST',
+        summary:
+          'A new GST interpretation has been approved by CA review and will apply to future orders only.',
+        effectiveDate: new Date().toISOString().slice(0, 10),
+        affectedCategory: 'apparel',
+        actionRequired:
+          'Verify product category mapping and check HSN override requests before publish.',
+        businessEmail: form.businessEmail.trim() || 'compliance@yourbusiness.com',
+      });
+      setNotes(listComplianceNotes());
+      setSuccess('Auto draft generated. Review and publish when ready.');
+    } catch (draftError: unknown) {
+      setError(
+        draftError instanceof Error
+          ? draftError.message
+          : 'Failed to create auto draft.',
+      );
+    }
   };
 
   const handleCloudinaryUpload = async (
@@ -314,6 +373,15 @@ const AdminComplianceNotesPage = () => {
               Auto Draft
             </Button>
             <Button
+              component={Link}
+              to="/admin/compliance-analytics"
+              variant="outlined"
+              startIcon={<BarChartRoundedIcon />}
+              sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}
+            >
+              Analytics
+            </Button>
+            <Button
               variant="contained"
               startIcon={<AddCircleOutlineRoundedIcon />}
               onClick={resetForm}
@@ -398,6 +466,9 @@ const AdminComplianceNotesPage = () => {
                     <div>
                       <p className="text-sm font-bold text-slate-900">{note.title}</p>
                       <p className="mt-1 text-xs text-slate-500">{note.shortSummary}</p>
+                      <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                        Impacted products: {note.impactedProductCount ?? 0}
+                      </p>
                     </div>
                     <div className="flex flex-wrap gap-1">
                       <Chip size="small" label={note.noteType} variant="outlined" />
@@ -650,7 +721,7 @@ const AdminComplianceNotesPage = () => {
                     className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 p-2"
                   >
                     <a
-                      href={attachment.url}
+                      href={attachment.downloadUrl || attachment.url}
                       target="_blank"
                       rel="noreferrer"
                       className="truncate text-sm font-medium text-blue-700"
@@ -667,6 +738,30 @@ const AdminComplianceNotesPage = () => {
                     </Button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {impactSummary && (
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
+                  Product Impact Summary
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Coverage: {impactSummary.coverageScope || '-'} | Impacted:{' '}
+                  {impactSummary.impactedProductCount}
+                </Typography>
+                {impactSummary.impactedProducts.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {impactSummary.impactedProducts.slice(0, 5).map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
+                      >
+                        #{item.id} {item.title || 'Product'}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

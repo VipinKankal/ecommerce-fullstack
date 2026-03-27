@@ -302,6 +302,8 @@ public final class ResponseMapper {
         response.setGstRuleVersion(snapshot.getGstRuleVersion());
         response.setTcsRuleVersion(snapshot.getTcsRuleVersion());
         response.setSnapshotSource(snapshot.getSnapshotSource());
+        response.setInvoiceOwner(snapshot.getInvoiceOwner());
+        response.setLiabilityOwner(snapshot.getLiabilityOwner());
         response.setEffectiveTaxDate(snapshot.getEffectiveTaxDate());
         response.setFrozenAt(snapshot.getFrozenAt());
         return response;

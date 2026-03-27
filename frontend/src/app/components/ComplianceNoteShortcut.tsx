@@ -5,6 +5,8 @@ import CampaignRoundedIcon from '@mui/icons-material/CampaignRounded';
 import { Link, useLocation } from 'react-router-dom';
 import {
   countComplianceNotesByStatus,
+  fetchAdminComplianceNotes,
+  fetchSellerComplianceUnreadCount,
   getSellerComplianceUnreadCount,
   subscribeComplianceNotes,
 } from 'app/complianceNotes';
@@ -19,11 +21,21 @@ const ComplianceNoteShortcut = () => {
   const [draftCount, setDraftCount] = useState(0);
 
   useEffect(() => {
-    const refresh = () => {
-      setSellerUnreadCount(getSellerComplianceUnreadCount(sellerId));
+    const refresh = async () => {
+      try {
+        await fetchAdminComplianceNotes();
+      } catch {
+        // ignore when seller role is active
+      }
+      try {
+        await fetchSellerComplianceUnreadCount();
+      } catch {
+        // ignore when admin role is active
+      }
+      setSellerUnreadCount(getSellerComplianceUnreadCount());
       setDraftCount(countComplianceNotesByStatus('DRAFT'));
     };
-    refresh();
+    void refresh();
     return subscribeComplianceNotes(refresh);
   }, [sellerId]);
 

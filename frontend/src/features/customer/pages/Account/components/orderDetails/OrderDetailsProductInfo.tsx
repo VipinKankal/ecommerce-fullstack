@@ -96,6 +96,14 @@ const OrderDetailsProductInfo = ({
             {orderTaxSnapshot.snapshotSource || '-'}
           </div>
           <div>
+            <strong>Invoice Owner:</strong>{' '}
+            {orderTaxSnapshot.invoiceOwner || '-'}
+          </div>
+          <div>
+            <strong>Liability Owner:</strong>{' '}
+            {orderTaxSnapshot.liabilityOwner || '-'}
+          </div>
+          <div>
             <strong>Frozen At:</strong> {orderTaxSnapshot.frozenAt || '-'}
           </div>
           <div>

@@ -1,6 +1,7 @@
 package com.example.ecommerce.tax.service.impl;
 
 import com.example.ecommerce.modal.TaxRuleVersion;
+import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
 import com.example.ecommerce.repository.TaxRuleVersionRepository;
 import com.example.ecommerce.tax.request.CreateTaxRuleVersionRequest;
 import com.example.ecommerce.tax.request.ResolveTaxRuleRequest;
@@ -27,6 +28,9 @@ class TaxRuleVersionServiceImplTest {
 
     @Mock
     private TaxRuleVersionRepository taxRuleVersionRepository;
+
+    @Mock
+    private ComplianceSellerNoteService complianceSellerNoteService;
 
     @InjectMocks
     private TaxRuleVersionServiceImpl taxRuleVersionService;
