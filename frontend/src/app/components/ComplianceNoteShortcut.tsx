@@ -20,30 +20,41 @@ const ComplianceNoteShortcut = () => {
   const [sellerUnreadCount, setSellerUnreadCount] = useState(0);
   const [draftCount, setDraftCount] = useState(0);
 
-  useEffect(() => {
-    const refresh = async () => {
-      try {
-        await fetchAdminComplianceNotes();
-      } catch {
-        // ignore when seller role is active
-      }
-      try {
-        await fetchSellerComplianceUnreadCount();
-      } catch {
-        // ignore when admin role is active
-      }
-      setSellerUnreadCount(getSellerComplianceUnreadCount());
-      setDraftCount(countComplianceNotesByStatus('DRAFT'));
-    };
-    void refresh();
-    return subscribeComplianceNotes(refresh);
-  }, [sellerId]);
-
   const mode = useMemo(() => {
+    if (location.pathname === '/admin/login') return 'none';
     if (location.pathname.startsWith('/seller')) return 'seller';
     if (location.pathname.startsWith('/admin')) return 'admin';
     return 'none';
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (mode === 'none') {
+      setSellerUnreadCount(0);
+      setDraftCount(0);
+      return;
+    }
+
+    const refresh = async () => {
+      if (mode === 'admin') {
+        try {
+          await fetchAdminComplianceNotes();
+        } catch {
+          // Ignore auth errors on admin routes; auth flow handles redirect.
+        }
+        setDraftCount(countComplianceNotesByStatus('DRAFT'));
+        return;
+      }
+
+      try {
+        await fetchSellerComplianceUnreadCount();
+      } catch {
+        // Ignore auth errors on seller routes; auth flow handles redirect.
+      }
+      setSellerUnreadCount(getSellerComplianceUnreadCount());
+    };
+    void refresh();
+    return subscribeComplianceNotes(refresh);
+  }, [mode, sellerId]);
 
   if (mode === 'none') return null;
 

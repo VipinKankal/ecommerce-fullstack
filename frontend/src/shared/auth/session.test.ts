@@ -27,6 +27,30 @@ describe('auth session helpers', () => {
     expect(getPendingAuthNotice()).toBeNull();
   });
 
+  it('scopes notices and redirects to the matching login role', () => {
+    setPostLoginRedirect(
+      '/seller/dashboard',
+      'Your seller session expired. Please log in again.',
+      'seller',
+    );
+
+    window.history.replaceState({}, '', '/admin/login');
+    expect(getPendingAuthNotice()).toBeNull();
+    expect(consumePostLoginRedirect('/admin/dashboard')).toEqual({
+      notice: null,
+      redirectPath: '/admin/dashboard',
+    });
+
+    window.history.replaceState({}, '', '/become-seller?login=1');
+    expect(getPendingAuthNotice()).toBe(
+      'Your seller session expired. Please log in again.',
+    );
+    expect(consumePostLoginRedirect('/seller/dashboard')).toEqual({
+      notice: 'Your seller session expired. Please log in again.',
+      redirectPath: '/seller/dashboard',
+    });
+  });
+
   it('returns role-specific login and landing paths', () => {
     expect(getLoginPathForRole('customer')).toBe('/login');
     expect(getLoginPathForRole('seller')).toBe('/become-seller?login=1');

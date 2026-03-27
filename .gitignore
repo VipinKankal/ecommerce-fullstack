@@ -36,6 +36,7 @@ Thumbs.db
 
 # Backend
 /backend/target/
+/backend/.m2home/
 /backend/build/
 /backend/.idea/
 /backend/.vscode/

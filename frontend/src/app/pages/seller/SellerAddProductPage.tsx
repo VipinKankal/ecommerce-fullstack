@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useFormik } from 'formik';
 import { Alert, Box, CircularProgress, Paper, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import { createProduct } from 'State/features/seller/products/thunks';
-import { useNavigate } from 'react-router-dom';
-import { uploadToCloudinary } from 'shared/utils/uploadToCloudinary';
 import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { uploadToCloudinary } from 'shared/utils/uploadToCloudinary';
 import {
   AddProductFormValues,
   emptyVariant,
@@ -15,16 +15,12 @@ import {
   resolveUiCategoryKey,
   SellerProductTaxPreview,
   VariantRow,
-} from './addProductConfig';
-import { addProductValidationSchema } from './addProductValidation';
-import AddProductFormBody from './components/AddProductFormBody';
+} from 'features/seller/products/pages/addProductConfig';
+import { addProductValidationSchema } from 'features/seller/products/pages/addProductValidation';
+import AddProductFormBody from 'app/overrides/seller/AddProductFormBody';
 
-const canRequestTaxPreview = (values: AddProductFormValues) =>
-  Boolean(
-    resolveUiCategoryKey(values) &&
-      values.constructionType &&
-      Number(values.sellingPrice || 0) > 0,
-  );
+const canResolveAdminTaxPreview = (values: AddProductFormValues) =>
+  Boolean(resolveUiCategoryKey(values) && values.constructionType);
 
 const buildTaxPreviewPayload = (values: AddProductFormValues) => ({
   uiCategoryKey: resolveUiCategoryKey(values),
@@ -33,18 +29,18 @@ const buildTaxPreviewPayload = (values: AddProductFormValues) => ({
   fabricType: values.fabricType || undefined,
   constructionType: values.constructionType,
   fiberFamily: values.fiberFamily || undefined,
-  hsnSelectionMode: values.hsnSelectionMode,
-  overrideRequestedHsnCode: values.overrideRequestedHsnCode.trim() || undefined,
-  hsnOverrideReason: values.hsnOverrideReason.trim() || undefined,
+  hsnSelectionMode: 'AUTO',
+  overrideRequestedHsnCode: undefined,
+  hsnOverrideReason: undefined,
   pricingMode: values.pricingMode,
   taxClass: values.taxClass.trim() || undefined,
   taxRuleVersion: values.taxRuleVersion.trim() || undefined,
-  sellingPricePerPiece: Number(values.sellingPrice || 0),
+  sellingPricePerPiece: Number(values.sellingPrice || values.mrpPrice || 1),
   costPrice: Number(values.costPrice || 0),
   platformCommission: Number(values.platformCommission || 0),
 });
 
-const AddProducts = () => {
+const SellerAddProductPage = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -64,9 +60,9 @@ const AddProducts = () => {
     onSubmit: async (values) => {
       setSubmitError(null);
 
-      if (canRequestTaxPreview(values) && !taxPreview) {
+      if (canResolveAdminTaxPreview(values) && !taxPreview) {
         setSubmitError(
-          'Tax preview is still loading. Please wait for GST / HSN resolution before publishing.',
+          'HSN preview is still loading. Please wait for GST / HSN resolution before publishing.',
         );
         return;
       }
@@ -116,12 +112,11 @@ const AddProducts = () => {
         fabricType: values.fabricType.trim() || undefined,
         constructionType: values.constructionType,
         fiberFamily: values.fiberFamily.trim() || undefined,
-        hsnSelectionMode: values.hsnSelectionMode,
+        hsnSelectionMode: 'AUTO',
         suggestedHsnCode:
           taxPreview?.suggestedHsnCode || values.suggestedHsnCode || undefined,
-        overrideRequestedHsnCode:
-          values.overrideRequestedHsnCode.trim() || undefined,
-        hsnOverrideReason: values.hsnOverrideReason.trim() || undefined,
+        overrideRequestedHsnCode: undefined,
+        hsnOverrideReason: undefined,
         taxReviewStatus:
           taxPreview?.reviewStatus || values.taxReviewStatus || undefined,
         description: values.description.trim(),
@@ -144,7 +139,6 @@ const AddProducts = () => {
         modelNumber: values.modelNumber.trim() || undefined,
         hsnCode:
           taxPreview?.resolvedHsnCode ||
-          values.overrideRequestedHsnCode.trim() ||
           values.hsnCode.trim() ||
           undefined,
         manufacturerPartNumber:
@@ -210,64 +204,95 @@ const AddProducts = () => {
     },
   });
 
+  const {
+    category,
+    category2,
+    category3,
+    gender,
+    fabricType,
+    constructionType,
+    fiberFamily,
+    pricingMode,
+    taxClass,
+    taxRuleVersion,
+    sellingPrice,
+    costPrice,
+    platformCommission,
+    taxPercentage,
+  } = formik.values;
+  const { setFieldValue } = formik;
+
   const taxPreviewPayload = useMemo(
     () => buildTaxPreviewPayload(formik.values),
-    [formik.values],
+    [
+      category,
+      category2,
+      category3,
+      gender,
+      fabricType,
+      constructionType,
+      fiberFamily,
+      pricingMode,
+      taxClass,
+      taxRuleVersion,
+      sellingPrice,
+      costPrice,
+      platformCommission,
+    ],
   );
 
   useEffect(() => {
-    let cancelled = false;
+    const currentValues = formik.values;
 
-    if (!canRequestTaxPreview(formik.values)) {
+    if (!canResolveAdminTaxPreview(currentValues)) {
       setTaxPreview(null);
       setTaxPreviewError(null);
-      formik.setFieldValue('hsnCode', '', false);
-      formik.setFieldValue('suggestedHsnCode', '', false);
-      formik.setFieldValue('taxReviewStatus', 'NOT_REQUIRED', false);
-      return () => {
-        cancelled = true;
-      };
+      setFieldValue('hsnCode', '', false);
+      setFieldValue('suggestedHsnCode', '', false);
+      setFieldValue('taxReviewStatus', 'NOT_REQUIRED', false);
+      return;
     }
 
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setTaxPreviewLoading(true);
       setTaxPreviewError(null);
+
       try {
         const response = await api.post(
           API_ROUTES.sellers.taxPreview,
           taxPreviewPayload,
         );
-        if (cancelled) {
+        if (cancelled) return;
+
+        const preview = (response.data || null) as SellerProductTaxPreview | null;
+        if (!preview) {
+          setTaxPreview(null);
+          setTaxPreviewError('Admin tax preview returned empty result.');
           return;
         }
-        const preview = (response.data || null) as SellerProductTaxPreview | null;
-        setTaxPreview(preview);
-        formik.setFieldValue('hsnCode', preview?.resolvedHsnCode || '', false);
-        formik.setFieldValue(
-          'suggestedHsnCode',
-          preview?.suggestedHsnCode || '',
-          false,
-        );
-        formik.setFieldValue(
-          'taxClass',
-          preview?.taxClass || formik.values.taxClass,
-          false,
-        );
-        formik.setFieldValue(
-          'taxRuleVersion',
-          preview?.gstRuleCode || formik.values.taxRuleVersion,
-          false,
-        );
-        formik.setFieldValue(
-          'taxPercentage',
-          preview?.gstRatePreview != null
+
+        const nextSuggestedHsn = preview.suggestedHsnCode || '';
+        const nextResolvedHsn = preview.resolvedHsnCode || nextSuggestedHsn;
+        const nextTaxClass = preview.taxClass || taxClass || '';
+        const nextTaxPercentage =
+          preview.gstRatePreview != null
             ? String(preview.gstRatePreview)
-            : formik.values.taxPercentage,
+            : taxPercentage;
+
+        setTaxPreview(preview);
+        setFieldValue('hsnCode', nextResolvedHsn, false);
+        setFieldValue('suggestedHsnCode', nextSuggestedHsn, false);
+        setFieldValue('taxClass', nextTaxClass, false);
+        setFieldValue(
+          'taxRuleVersion',
+          preview.gstRuleCode || taxRuleVersion,
           false,
         );
-        formik.setFieldValue(
+        setFieldValue('taxPercentage', nextTaxPercentage, false);
+        setFieldValue(
           'taxReviewStatus',
-          preview?.reviewStatus || 'NOT_REQUIRED',
+          preview.reviewStatus || 'NOT_REQUIRED',
           false,
         );
       } catch (previewError: unknown) {
@@ -279,7 +304,6 @@ const AddProducts = () => {
               ? (
                   previewError as {
                     response?: { data?: { message?: string } | string };
-                    message?: string;
                   }
                 ).response?.data
               : null;
@@ -288,7 +312,7 @@ const AddProducts = () => {
               ? message
               : typeof message === 'object' && message?.message
                 ? message.message
-                : 'Unable to resolve GST / HSN preview right now.';
+                : 'Unable to resolve admin tax preview right now.';
           setTaxPreview(null);
           setTaxPreviewError(resolvedMessage);
         }
@@ -303,7 +327,23 @@ const AddProducts = () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [formik, taxPreviewPayload]);
+  }, [
+    category,
+    category2,
+    category3,
+    gender,
+    fabricType,
+    constructionType,
+    fiberFamily,
+    pricingMode,
+    taxClass,
+    taxRuleVersion,
+    sellingPrice,
+    costPrice,
+    platformCommission,
+    setFieldValue,
+    taxPreviewPayload,
+  ]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -376,4 +416,4 @@ const AddProducts = () => {
   );
 };
 
-export default AddProducts;
+export default SellerAddProductPage;

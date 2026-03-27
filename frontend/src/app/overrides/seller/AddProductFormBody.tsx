@@ -27,12 +27,11 @@ import {
   FABRIC_OPTIONS,
   FIBER_FAMILY_OPTIONS,
   GENDER_OPTIONS,
-  HSN_SELECTION_MODE_OPTIONS,
   PRODUCT_DESCRIPTION_MAX_LENGTH,
   resolveSelectedCategoryLabel,
   SellerProductTaxPreview,
   VariantRow,
-} from '../addProductConfig';
+} from 'features/seller/products/pages/addProductConfig';
 
 type AddProductFormBodyProps = {
   formik: FormikProps<AddProductFormValues>;
@@ -490,71 +489,18 @@ const AddProductFormBody = ({
       </Grid>
       <Grid size={{ xs: 12, md: 4 }}>
         <TextField
-          select
-          fullWidth
-          label="HSN Selection Mode"
-          {...formik.getFieldProps('hsnSelectionMode')}
-          helperText="Manual override creates an admin review queue item."
-          onChange={(event) => {
-            const nextMode = event.target.value;
-            formik.setFieldValue('hsnSelectionMode', nextMode);
-            if (nextMode === 'AUTO') {
-              formik.setFieldValue('overrideRequestedHsnCode', '');
-              formik.setFieldValue('hsnOverrideReason', '');
-            }
-          }}
-        >
-          {HSN_SELECTION_MODE_OPTIONS.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </TextField>
-      </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
-        <TextField
-          fullWidth
-          label="Override HSN Request"
-          {...formik.getFieldProps('overrideRequestedHsnCode')}
-          disabled={formik.values.hsnSelectionMode !== 'MANUAL'}
-          error={
-            formik.touched.overrideRequestedHsnCode &&
-            !!formik.errors.overrideRequestedHsnCode
-          }
-          helperText={
-            (formik.touched.overrideRequestedHsnCode &&
-              formik.errors.overrideRequestedHsnCode) ||
-            '4 to 8 digit code, only if seller wants manual review'
-          }
-        />
-      </Grid>
-      <Grid size={{ xs: 12, md: 4 }}>
-        <TextField
           fullWidth
           label="Resolved HSN"
           value={taxPreview?.resolvedHsnCode || formik.values.hsnCode || ''}
           InputProps={{ readOnly: true }}
-          helperText="Final HSN used for preview and product save"
+          helperText="Admin rule engine decides this after category/classification selection"
         />
       </Grid>
-      <Grid size={{ xs: 12 }}>
-        <TextField
-          fullWidth
-          multiline
-          minRows={2}
-          label="Override Reason"
-          {...formik.getFieldProps('hsnOverrideReason')}
-          disabled={formik.values.hsnSelectionMode !== 'MANUAL'}
-          error={
-            formik.touched.hsnOverrideReason &&
-            !!formik.errors.hsnOverrideReason
-          }
-          helperText={
-            (formik.touched.hsnOverrideReason &&
-              formik.errors.hsnOverrideReason) ||
-            'Mandatory when manual HSN override is requested'
-          }
-        />
+      <Grid size={{ xs: 12, md: 8 }}>
+        <Alert severity="info">
+          HSN and GST are auto-resolved from admin-configured rules only. Manual
+          seller override is disabled.
+        </Alert>
       </Grid>
       <Grid size={{ xs: 12 }}>
         <Paper

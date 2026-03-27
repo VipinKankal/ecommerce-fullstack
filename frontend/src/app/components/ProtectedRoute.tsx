@@ -17,6 +17,7 @@ type ProtectedRouteProps = {
 
 const loadingCopyByRole: Record<AuthRole, string> = {
   admin: 'Checking admin session...',
+  courier: 'Checking courier session...',
   customer: 'Restoring your session...',
   seller: 'Checking seller session...',
 };
@@ -44,6 +45,7 @@ const ProtectedRoute = ({
     setPostLoginRedirect(
       getCurrentAppPath(),
       'Please log in to continue with your session.',
+      requiredRole,
     );
 
     return (

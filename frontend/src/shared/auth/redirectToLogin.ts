@@ -11,6 +11,6 @@ export const redirectToLogin = (
   role: AuthRole,
   notice: string,
 ) => {
-  setPostLoginRedirect(getCurrentAppPath(), notice);
+  setPostLoginRedirect(getCurrentAppPath(), notice, role);
   navigate(getLoginPathForRole(role));
 };

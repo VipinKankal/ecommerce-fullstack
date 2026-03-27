@@ -72,7 +72,28 @@ function App() {
     () => getRequiredRoleForPath(location.pathname),
     [location.pathname],
   );
-  const bootstrapRole = authRole || requiredRole;
+  const shouldSkipAuthBootstrap = useMemo(
+    () =>
+      location.pathname === '/login' ||
+      location.pathname === '/admin/login' ||
+      location.pathname === '/courier/login' ||
+      location.pathname === '/become-seller',
+    [location.pathname],
+  );
+  const bootstrapRole = useMemo(() => {
+    if (shouldSkipAuthBootstrap) return null;
+    if (
+      requiredRole === 'customer' ||
+      requiredRole === 'seller' ||
+      requiredRole === 'admin'
+    ) {
+      return requiredRole;
+    }
+    if (authRole === 'customer' || authRole === 'seller' || authRole === 'admin') {
+      return authRole;
+    }
+    return null;
+  }, [authRole, requiredRole, shouldSkipAuthBootstrap]);
   const hasBootstrapProfile =
     (bootstrapRole === 'customer' && Boolean(customer)) ||
     (bootstrapRole === 'seller' && Boolean(seller)) ||
@@ -108,12 +129,18 @@ function App() {
         return 'Your admin session expired. Please log in again.';
       }
 
+      if (role === 'courier') {
+        return 'Your courier session expired. Please log in again.';
+      }
+
       return 'Your session expired. Please log in again to continue.';
     };
 
     registerUnauthorizedHandler(({ path }) => {
       const fallbackRole = path.includes('/api/admin')
         ? 'admin'
+        : path.includes('/api/courier')
+          ? 'courier'
         : path.includes('/api/seller') || path.includes('/sellers/')
           ? 'seller'
           : 'customer';
@@ -123,6 +150,7 @@ function App() {
       setPostLoginRedirect(
         getCurrentAppPath(),
         getUnauthorizedMessage(targetRole, path),
+        targetRole,
       );
       navigate(getLoginPathForRole(targetRole), { replace: true });
     });
