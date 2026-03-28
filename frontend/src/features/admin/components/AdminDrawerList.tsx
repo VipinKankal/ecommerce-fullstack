@@ -37,8 +37,6 @@ import {
   LocalShipping,
   AutorenewOutlined,
   Autorenew,
-  FactCheckOutlined,
-  FactCheck,
   CampaignOutlined,
   Campaign,
   BarChartOutlined,
@@ -108,12 +106,6 @@ const menu = [
     path: '/admin/exchange-requests',
     icon: <AutorenewOutlined />,
     activeIcon: <Autorenew />,
-  },
-  {
-    name: 'Audit Logs',
-    path: '/admin/audit-logs',
-    icon: <FactCheckOutlined />,
-    activeIcon: <FactCheck />,
   },
   {
     name: 'Compliance Notes',

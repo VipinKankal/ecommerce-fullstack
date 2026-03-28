@@ -26,6 +26,14 @@ interface UserProfile {
   accountStatus?: string;
   role: string;
   addresses?: Address[];
+  activeDeviceCount?: number;
+  loginHistory?: Array<{
+    device?: string;
+    ipAddress?: string;
+    loginAt?: string;
+    logoutAt?: string;
+    active?: boolean;
+  }>;
 }
 
 interface AuthState {

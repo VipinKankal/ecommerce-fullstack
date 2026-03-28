@@ -58,15 +58,24 @@ public class JwtProvider {
     }
 
     public String generateToken(Authentication authentication) {
+        return generateToken(authentication, null);
+    }
 
+    public String generateToken(Authentication authentication, String sessionId) {
         Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
         String roles = populationsAuthorities(authorities);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(new Date().getTime() + jwtExpirationMs))
                 .claim("email", authentication.getName())
-                .claim("authorities", roles)
+                .claim("authorities", roles);
+
+        if (sessionId != null && !sessionId.isBlank()) {
+            builder.claim("sid", sessionId);
+        }
+
+        return builder
                 .signWith(key)
                 .compact();
 

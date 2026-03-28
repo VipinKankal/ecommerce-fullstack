@@ -12,6 +12,8 @@ import com.example.ecommerce.auth.request.RequestEmailChangeOtpRequest;
 import com.example.ecommerce.user.request.UpdateUserProfileRequest;
 import com.example.ecommerce.user.request.UserAddressRequest;
 import com.example.ecommerce.auth.request.VerifyEmailChangeOtpRequest;
+import com.example.ecommerce.auth.service.LoginSessionService;
+import com.example.ecommerce.common.response.LoginHistorySummaryResponse;
 import com.example.ecommerce.common.response.ApiResponse;
 import com.example.ecommerce.auth.response.AuthResponse;
 import com.example.ecommerce.user.response.UserAddressResponse;
@@ -43,6 +45,7 @@ public class UserController {
     private final UserRepository userRepository;
     private final JwtProvider jwtProvider;
     private final AuthCookieService authCookieService;
+    private final LoginSessionService loginSessionService;
 
     @GetMapping("/auth/users/profile")
     @Transactional(readOnly = true)
@@ -222,7 +225,7 @@ public class UserController {
                 null,
                 Collections.singletonList(new SimpleGrantedAuthority(user.getRole().name()))
         );
-        String refreshedJwt = jwtProvider.generateToken(authentication);
+        String refreshedJwt = jwtProvider.generateToken(authentication, loginSessionService.currentSessionId());
         authCookieService.writeAuthCookie(httpResponse, refreshedJwt);
 
         AuthResponse response = new AuthResponse();
@@ -242,6 +245,9 @@ public class UserController {
         response.setAccountStatus(
                 user.getAccountStatus() == null ? AccountStatus.ACTIVE : user.getAccountStatus()
         );
+        LoginHistorySummaryResponse loginHistory = loginSessionService.getLoginHistory(user.getEmail(), user.getRole());
+        response.setActiveDeviceCount(loginHistory.getActiveDeviceCount());
+        response.setLoginHistory(loginHistory.getLoginHistory());
 
         List<UserAddressResponse> addresses = user.getAddresses().stream().map(address -> {
             UserAddressResponse addressResponse = new UserAddressResponse();

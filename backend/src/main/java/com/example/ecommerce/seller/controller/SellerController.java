@@ -21,6 +21,8 @@ import com.example.ecommerce.auth.response.AuthResponse;
 import com.example.ecommerce.seller.response.SellerResponse;
 import com.example.ecommerce.auth.service.AuthService;
 import com.example.ecommerce.auth.service.EmailService;
+import com.example.ecommerce.auth.service.LoginSessionService;
+import com.example.ecommerce.common.response.LoginHistorySummaryResponse;
 import com.example.ecommerce.seller.service.SellerReportService;
 import com.example.ecommerce.seller.service.SellerService;
 import com.example.ecommerce.common.utils.OtpUtil;
@@ -54,6 +56,7 @@ public class SellerController {
     private final SellerRepository sellerRepository;
     private final JwtProvider jwtProvider;
     private final AuthCookieService authCookieService;
+    private final LoginSessionService loginSessionService;
 
     @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
@@ -115,7 +118,11 @@ public class SellerController {
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
         Seller seller = sellerService.getSellerProfile(jwt);
-        return new ResponseEntity<>(ResponseMapper.toSellerResponse(seller), HttpStatus.OK);
+        SellerResponse response = ResponseMapper.toSellerResponse(seller);
+        LoginHistorySummaryResponse loginHistory = loginSessionService.getLoginHistory(seller.getEmail(), seller.getRole());
+        response.setActiveDeviceCount(loginHistory.getActiveDeviceCount());
+        response.setLoginHistory(loginHistory.getLoginHistory());
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
@@ -229,7 +236,7 @@ public class SellerController {
                 null,
                 Collections.singletonList(new SimpleGrantedAuthority(seller.getRole().name()))
         );
-        String refreshedJwt = jwtProvider.generateToken(authentication);
+        String refreshedJwt = jwtProvider.generateToken(authentication, loginSessionService.currentSessionId());
         authCookieService.writeAuthCookie(httpResponse, refreshedJwt);
 
         AuthResponse response = new AuthResponse();

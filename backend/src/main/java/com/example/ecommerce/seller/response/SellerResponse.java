@@ -2,9 +2,12 @@ package com.example.ecommerce.seller.response;
 
 import com.example.ecommerce.common.domain.AccountStatus;
 import com.example.ecommerce.common.domain.UserRole;
+import com.example.ecommerce.common.response.LoginHistoryEntryResponse;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 public class SellerResponse {
@@ -21,6 +24,8 @@ public class SellerResponse {
     private Boolean emailVerified;
     private AccountStatus accountStatus;
     private UserRole role;
+    private Integer activeDeviceCount;
+    private List<LoginHistoryEntryResponse> loginHistory = new ArrayList<>();
     private BusinessDetailsPayload businessDetails;
     private BankDetailsPayload bankDetails;
     private KycDetailsPayload kycDetails;

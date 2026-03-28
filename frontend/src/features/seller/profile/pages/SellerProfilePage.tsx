@@ -136,6 +136,13 @@ const SellerProfilePage = () => {
     }
   };
 
+  const formatDateTime = (value?: string) => {
+    if (!value) return 'N/A';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+    return date.toLocaleString();
+  };
+
   if (loading && !profile) {
     return (
       <div className="flex justify-center py-16">
@@ -283,6 +290,62 @@ const SellerProfilePage = () => {
             After verifying a new email, you stay logged in and future seller
             logins use the updated email.
           </p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+            <p className="text-[11px] font-semibold uppercase text-blue-700">
+              Active Devices
+            </p>
+            <p className="mt-1 text-xl font-bold text-blue-900">
+              {profile?.activeDeviceCount ?? 0}
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <p className="text-[11px] font-semibold uppercase text-slate-600">
+              Latest Login
+            </p>
+            <p className="mt-1 text-sm font-semibold text-slate-800">
+              {formatDateTime(profile?.loginHistory?.[0]?.loginAt)}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+          <p className="text-[11px] font-semibold uppercase text-slate-600">
+            Recent Login Activity
+          </p>
+          {profile?.loginHistory && profile.loginHistory.length > 0 ? (
+            <div className="mt-2 space-y-2">
+              {profile.loginHistory.slice(0, 6).map((entry, index) => (
+                <div
+                  key={`${entry.loginAt || 'login'}-${index}`}
+                  className="flex flex-col gap-1 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-semibold text-gray-800">
+                      {entry.device || 'Unknown Device'}
+                    </p>
+                    <p className="text-gray-500">
+                      {entry.ipAddress || 'IP unavailable'}
+                    </p>
+                  </div>
+                  <div className="text-gray-600">
+                    <p>Login: {formatDateTime(entry.loginAt)}</p>
+                    <p>
+                      {entry.active
+                        ? 'Status: Active'
+                        : `Status: Logged out ${formatDateTime(entry.logoutAt)}`}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-gray-500">
+              No login history available yet.
+            </p>
+          )}
         </div>
 
         {!showEmailChangeForm ? (

@@ -14,6 +14,14 @@ type AdminProfileResponse = {
   role?: string;
   email?: string;
   mobileNumber?: string;
+  activeDeviceCount?: number;
+  loginHistory?: Array<{
+    device?: string;
+    ipAddress?: string;
+    loginAt?: string;
+    logoutAt?: string;
+    active?: boolean;
+  }>;
 };
 
 const toAdminProfile = (payload: unknown): AdminProfileResponse | null => {
@@ -28,7 +36,36 @@ const toAdminProfile = (payload: unknown): AdminProfileResponse | null => {
     email: typeof record.email === 'string' ? record.email : undefined,
     mobileNumber:
       typeof record.mobileNumber === 'string' ? record.mobileNumber : undefined,
+    activeDeviceCount:
+      typeof record.activeDeviceCount === 'number'
+        ? record.activeDeviceCount
+        : undefined,
+    loginHistory: Array.isArray(record.loginHistory)
+      ? record.loginHistory
+          .filter((entry) => entry && typeof entry === 'object')
+          .map((entry) => {
+            const item = entry as Record<string, unknown>;
+            return {
+              device:
+                typeof item.device === 'string' ? item.device : undefined,
+              ipAddress:
+                typeof item.ipAddress === 'string' ? item.ipAddress : undefined,
+              loginAt:
+                typeof item.loginAt === 'string' ? item.loginAt : undefined,
+              logoutAt:
+                typeof item.logoutAt === 'string' ? item.logoutAt : undefined,
+              active: typeof item.active === 'boolean' ? item.active : undefined,
+            };
+          })
+      : undefined,
   };
+};
+
+const formatDateTime = (value?: string) => {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleString();
 };
 
 const AdminAccount = () => {
@@ -110,6 +147,64 @@ const AdminAccount = () => {
             </Typography>
             <Typography variant="body1">{profile?.role || 'N/A'}</Typography>
           </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+            <Typography variant="overline" sx={{ fontWeight: 700 }}>
+              Active Devices
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+              {profile?.activeDeviceCount ?? 0}
+            </Typography>
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <Typography variant="overline" sx={{ fontWeight: 700 }}>
+              Latest Login
+            </Typography>
+            <Typography variant="body1" sx={{ fontWeight: 700 }}>
+              {formatDateTime(profile?.loginHistory?.[0]?.loginAt)}
+            </Typography>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+          <Typography variant="overline" sx={{ fontWeight: 700 }}>
+            Recent Login Activity
+          </Typography>
+          {profile?.loginHistory && profile.loginHistory.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {profile.loginHistory.slice(0, 6).map((entry, index) => (
+                <div
+                  key={`${entry.loginAt || 'login'}-${index}`}
+                  className="flex flex-col gap-1 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2 text-xs md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {entry.device || 'Unknown Device'}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {entry.ipAddress || 'IP unavailable'}
+                    </Typography>
+                  </div>
+                  <div>
+                    <Typography variant="caption" color="text.secondary">
+                      Login: {formatDateTime(entry.loginAt)}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary" display="block">
+                      {entry.active
+                        ? 'Status: Active'
+                        : `Status: Logged out ${formatDateTime(entry.logoutAt)}`}
+                    </Typography>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              No login history available yet.
+            </Typography>
+          )}
         </div>
       </Paper>
     </div>

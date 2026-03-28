@@ -67,6 +67,9 @@ export const adminLogout = createAsyncThunk(
     { rejectWithValue },
   ) => {
     try {
+      await publicApi.post('/api/auth/logout').catch(() => {
+        return null;
+      });
       setAuthToken(null);
       if (navigate) navigate('/admin/login');
       return true;

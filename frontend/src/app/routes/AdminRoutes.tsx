@@ -18,7 +18,6 @@ import AdminManualUpiPayments from '../../features/admin/Pages/Dashboard/AdminMa
 import AdminCourierManagement from '../../features/admin/Courier/AdminCourierManagement';
 import AdminReturnRequests from '../../features/admin/returns/AdminReturnRequests';
 import AdminExchangeRequests from '../../features/admin/exchanges/AdminExchangeRequests';
-import AdminAuditLogs from '../../features/admin/Pages/Dashboard/AdminAuditLogs';
 import AdminComplianceNotesPage from '../pages/admin/AdminComplianceNotesPage';
 import AdminComplianceAnalyticsPage from '../pages/admin/AdminComplianceAnalyticsPage';
 
@@ -36,7 +35,6 @@ const AdminRoutes = () => {
         <Route path="/manual-upi" element={<AdminManualUpiPayments />} />
         <Route path="/return-requests" element={<AdminReturnRequests />} />
         <Route path="/exchange-requests" element={<AdminExchangeRequests />} />
-        <Route path="/audit-logs" element={<AdminAuditLogs />} />
         <Route path="/compliance-notes" element={<AdminComplianceNotesPage />} />
         <Route path="/compliance-analytics" element={<AdminComplianceAnalyticsPage />} />
         <Route path="/couriers" element={<AdminCourierManagement />} />

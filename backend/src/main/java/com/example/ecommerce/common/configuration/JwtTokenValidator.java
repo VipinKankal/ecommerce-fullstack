@@ -16,6 +16,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 
 public class JwtTokenValidator extends OncePerRequestFilter {
     private final JwtProvider jwtProvider;
@@ -63,11 +64,15 @@ public class JwtTokenValidator extends OncePerRequestFilter {
                 Claims claims = jwtProvider.parseToken(rawToken);
                 String email = String.valueOf(claims.get("email"));
                 String authorities = String.valueOf(claims.get("authorities"));
+                String sessionId = claims.get("sid", String.class);
 
                 List<GrantedAuthority> auths =
                         AuthorityUtils.commaSeparatedStringToAuthorityList(authorities);
-                Authentication authentication =
+                UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(email, null, auths);
+                if (sessionId != null && !sessionId.isBlank()) {
+                    authentication.setDetails(Map.of("sessionId", sessionId));
+                }
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             } catch (Exception e) {
                 SecurityContextHolder.clearContext();

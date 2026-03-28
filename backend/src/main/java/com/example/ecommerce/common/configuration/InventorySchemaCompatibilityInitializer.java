@@ -29,7 +29,6 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         ensureRestockNotificationTables();
         ensureOrderReturnExchangeTables();
         ensureWarehouseTransferRequestTable();
-        ensureAuditLogTable();
     }
 
     private void ensureLegacyStatusColumnsCompatible() {
@@ -605,25 +604,6 @@ public class InventorySchemaCompatibilityInitializer implements ApplicationRunne
         ensureColumn("warehouse_transfer_requests", "transporter_name", "VARCHAR(255) NULL");
         ensureColumn("warehouse_transfer_requests", "invoice_number", "VARCHAR(255) NULL");
         ensureColumn("warehouse_transfer_requests", "challan_number", "VARCHAR(255) NULL");
-    }
-
-    private void ensureAuditLogTable() {
-        jdbcTemplate.execute(
-                "CREATE TABLE IF NOT EXISTS audit_log_entries (" +
-                        "id BIGINT NOT NULL AUTO_INCREMENT," +
-                        "method VARCHAR(16) NOT NULL," +
-                        "path VARCHAR(255) NOT NULL," +
-                        "status INT NOT NULL," +
-                        "actor VARCHAR(255) NOT NULL," +
-                        "ip_address VARCHAR(64) NULL," +
-                        "duration_ms BIGINT NOT NULL," +
-                        "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP," +
-                        "PRIMARY KEY (id)," +
-                        "INDEX idx_audit_log_entries_created_at (created_at)," +
-                        "INDEX idx_audit_log_entries_actor (actor)," +
-                        "INDEX idx_audit_log_entries_path (path)" +
-                        ")"
-        );
     }
 
     private boolean columnExists(String tableName, String columnName) {

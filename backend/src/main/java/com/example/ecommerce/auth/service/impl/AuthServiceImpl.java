@@ -16,6 +16,7 @@ import com.example.ecommerce.auth.response.AuthResponse;
 import com.example.ecommerce.auth.response.SignupRequest;
 import com.example.ecommerce.auth.service.AuthService;
 import com.example.ecommerce.auth.service.EmailService;
+import com.example.ecommerce.auth.service.LoginSessionService;
 import com.example.ecommerce.common.utils.OtpUtil;
 import com.example.ecommerce.common.exceptions.AuthException;
 import lombok.RequiredArgsConstructor;
@@ -53,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final CustomUserServiceImpl customUserService;
     private final SellerRepository sellerRepository;
+    private final LoginSessionService loginSessionService;
 
     private static final int OTP_EXPIRY_MINUTES = 10;
     private static final int MAX_OTP_ATTEMPTS = 5;
@@ -141,7 +143,8 @@ public class AuthServiceImpl implements AuthService {
 
         verificationCodeRepository.delete(verificationCode);
 
-        return jwtProvider.generateToken(authentication);
+        String sessionId = loginSessionService.openSession(authentication);
+        return jwtProvider.generateToken(authentication, sessionId);
     }
 
     @Override
@@ -154,7 +157,8 @@ public class AuthServiceImpl implements AuthService {
         Authentication authentication = authenticate(username, otp);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
-        String token = jwtProvider.generateToken(authentication);
+        String sessionId = loginSessionService.openSession(authentication);
+        String token = jwtProvider.generateToken(authentication, sessionId);
         AuthResponse authResponse = new AuthResponse();
         authResponse.setJwt(token);
         authResponse.setMessage("Login successful");

@@ -11,6 +11,7 @@ import com.example.ecommerce.admin.request.AdminLoginRequest;
 import com.example.ecommerce.admin.request.AdminSignupRequest;
 import com.example.ecommerce.auth.response.AuthResponse;
 import com.example.ecommerce.auth.service.AdminAuthService;
+import com.example.ecommerce.auth.service.LoginSessionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -30,6 +31,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private final SellerRepository sellerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final LoginSessionService loginSessionService;
 
     @Override
     public AuthResponse signup(AdminSignupRequest request) throws Exception {
@@ -93,7 +95,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     private AuthResponse buildResponse(Authentication authentication, String message) {
         AuthResponse response = new AuthResponse();
-        response.setJwt(jwtProvider.generateToken(authentication));
+        String sessionId = loginSessionService.openSession(authentication);
+        response.setJwt(jwtProvider.generateToken(authentication, sessionId));
         response.setMessage(message);
         response.setRole(UserRole.ROLE_ADMIN);
         return response;

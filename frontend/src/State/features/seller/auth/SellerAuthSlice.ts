@@ -62,6 +62,14 @@ interface SellerProfile {
     supportPhone?: string;
   };
   role?: string;
+  activeDeviceCount?: number;
+  loginHistory?: Array<{
+    device?: string;
+    ipAddress?: string;
+    loginAt?: string;
+    logoutAt?: string;
+    active?: boolean;
+  }>;
 }
 
 interface SellerAuthState {
