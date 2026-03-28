@@ -100,26 +100,4 @@ $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 - Frontend and backend each keep their own local config files inside their respective folders.
 - API and flow documentation already exists under `frontend/docs/` and `backend/docs/`.
 
-## Coupon Workstream Status (2026-03-23)
 
-Latest consolidated commit: `094e99f` (`main`)
-
-| ID | Workstream | Status |
-| --- | --- | --- |
-| 10 | Advanced user eligibility | Completed |
-| 16 | Best coupon suggestion / non-applicable messaging | Completed |
-| 18 | Idempotency / concurrency / reservation | Completed |
-| 20 | Payment failure + retry flow | Completed |
-| 21 | Cancel / return / refund policy | Completed |
-| 22 | Fraud control | Completed |
-| 23 | Cache layer (coupon fast-path + monitoring) | Completed |
-| 24 | Rule-based recommendation engine | Completed |
-| 25 | A/B testing | Completed |
-| 26 | Funnel analytics tracking | Completed |
-| 27 | Metrics dashboard (single coupon tab) | Completed |
-| 31 | Coupon unit tests | Completed |
-| 32 | Coupon integration tests | Completed |
-| 33 | Edge-case tests | Completed |
-| 34 | Monitoring / alerts | Completed |
-
-Pending for the above list: `0`
