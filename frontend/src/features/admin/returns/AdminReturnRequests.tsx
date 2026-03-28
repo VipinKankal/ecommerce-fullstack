@@ -20,6 +20,7 @@ import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { mapCourier } from 'features/courier/courierData';
 import { CourierProfile } from 'features/courier/courierTypes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type HistoryItem = { status?: string; note?: string; createdAt?: string };
 type RequestItem = {
@@ -69,24 +70,7 @@ const toDatetimeLocalValue = (value?: string | null) => {
         .slice(0, 16);
 };
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    typeof error.response === 'object' &&
-    error.response !== null &&
-    'data' in error.response &&
-    typeof error.response.data === 'object' &&
-    error.response.data !== null &&
-    'message' in error.response.data &&
-    typeof error.response.data.message === 'string'
-  ) {
-    return error.response.data.message;
-  }
 
-  return fallback;
-};
 
 const downloadCsv = (filename: string, rows: string[][]) => {
   const csv = rows

@@ -36,6 +36,7 @@ import { adminProductsList } from 'State/backend/MasterApiThunks';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
 import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type AdminVariantRow = {
   id?: number;
@@ -181,9 +182,7 @@ const toDateTimeLocalValue = (value?: string | null) => {
   return new Date(parsed.getTime() - offset).toISOString().slice(0, 16);
 };
 
-const getErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message || fallback;
+
 
 const variantLabel = (variant: AdminVariantRow) => {
   if (variant.size) return variant.size;

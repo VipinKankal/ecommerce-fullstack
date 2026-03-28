@@ -15,6 +15,7 @@ import {
   resolveEmailFlowMessage,
   validateProfileDetails,
 } from '../components/profileHelpers';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type UserDetailsMode = 'profile' | 'full';
 
@@ -65,8 +66,7 @@ const UserDetails = ({ mode = 'full' }: UserDetailsProps) => {
     }
   }, [dispatch, user]);
 
-  const getErrorMessage = (error: unknown, fallback: string) =>
-    resolveEmailFlowMessage(error, fallback).message;
+  
 
   const startEditing = () => {
     setFullName(user?.fullName || '');

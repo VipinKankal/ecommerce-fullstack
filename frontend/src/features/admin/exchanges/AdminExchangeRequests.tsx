@@ -21,6 +21,7 @@ import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { mapCourier } from 'features/courier/courierData';
 import { CourierProfile } from 'features/courier/courierTypes';
 import ExchangePriceSummary from 'features/customer/pages/Account/components/ExchangePriceSummary';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type ExchangeHistoryItem = {
   status?: string;
@@ -80,9 +81,7 @@ type DialogMode =
 const label = (value?: string | null) => (value || '-').replaceAll('_', ' ');
 const date = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : '-';
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message || fallback;
+
 const localDateTime = (value?: string | null) => {
   const base = value
     ? new Date(value)
@@ -145,7 +144,7 @@ const AdminExchangeRequests = () => {
       } else {
         setRequests([]);
         setError(
-          readErrorMessage(
+          getErrorMessage(
             requestResponse.reason,
             'Failed to load exchange requests',
           ),
@@ -163,7 +162,7 @@ const AdminExchangeRequests = () => {
         setCouriers([]);
       }
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to load exchange requests'));
+      setError(getErrorMessage(requestError, 'Failed to load exchange requests'));
     } finally {
       setLoading(false);
     }
@@ -319,7 +318,7 @@ const AdminExchangeRequests = () => {
       await loadPage();
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to update exchange request'),
+        getErrorMessage(requestError, 'Failed to update exchange request'),
       );
     } finally {
       setSubmitting(false);

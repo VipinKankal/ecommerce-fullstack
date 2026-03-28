@@ -34,12 +34,7 @@ import {
   updateCourierControlsApi,
   updateCourierSalaryApi,
 } from './adminCourierApi';
-
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message ||
-  (error as { message?: string })?.message ||
-  fallback;
+import { getErrorMessage } from 'shared/errors/apiError';
 
 export const useAdminCourierManagement = () => {
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
@@ -116,7 +111,7 @@ export const useAdminCourierManagement = () => {
       setCodCollections(workspaceData.codCollections);
       setPetrolClaims(workspaceData.petrolClaims);
     } catch (loadError: unknown) {
-      setError(readErrorMessage(loadError, 'Failed to load courier workspace'));
+      setError(getErrorMessage(loadError, 'Failed to load courier workspace'));
     } finally {
       setBusy(false);
     }
@@ -142,7 +137,7 @@ export const useAdminCourierManagement = () => {
       setSalaryConfig(emptySalaryForm);
       await loadWorkspace();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to create courier'));
+      setError(getErrorMessage(requestError, 'Failed to create courier'));
     }
   };
 
@@ -154,7 +149,7 @@ export const useAdminCourierManagement = () => {
       await loadWorkspace();
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to update salary config'),
+        getErrorMessage(requestError, 'Failed to update salary config'),
       );
     }
   };
@@ -171,7 +166,7 @@ export const useAdminCourierManagement = () => {
       await loadWorkspace();
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to update courier controls'),
+        getErrorMessage(requestError, 'Failed to update courier controls'),
       );
     }
   };
@@ -185,7 +180,7 @@ export const useAdminCourierManagement = () => {
       await loadWorkspace();
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to assign dispatch batch'),
+        getErrorMessage(requestError, 'Failed to assign dispatch batch'),
       );
     }
   };
@@ -199,7 +194,7 @@ export const useAdminCourierManagement = () => {
       await reviewCodSettlementApi(id, status);
       await loadWorkspace();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to review COD deposit'));
+      setError(getErrorMessage(requestError, 'Failed to review COD deposit'));
     }
   };
 
@@ -212,7 +207,7 @@ export const useAdminCourierManagement = () => {
       await reviewPetrolClaimApi(id, status, petrolNotes[String(id)] || '');
       await loadWorkspace();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to review petrol claim'));
+      setError(getErrorMessage(requestError, 'Failed to review petrol claim'));
     }
   };
 
@@ -226,7 +221,7 @@ export const useAdminCourierManagement = () => {
       setTrackingOpen(true);
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to load delivery history'),
+        getErrorMessage(requestError, 'Failed to load delivery history'),
       );
     }
   };
@@ -246,7 +241,7 @@ export const useAdminCourierManagement = () => {
       setEarnings(mappedEarnings);
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to fetch monthly earnings'),
+        getErrorMessage(requestError, 'Failed to fetch monthly earnings'),
       );
     }
   };
@@ -259,7 +254,7 @@ export const useAdminCourierManagement = () => {
         setEarnings(await fetchCourierEarningsApi(selectedCourierId, month));
       }
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to run payroll'));
+      setError(getErrorMessage(requestError, 'Failed to run payroll'));
     }
   };
 
@@ -270,7 +265,7 @@ export const useAdminCourierManagement = () => {
       await lockPayrollApi(selectedCourierId, month);
       await handleFetchEarnings();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to lock payroll'));
+      setError(getErrorMessage(requestError, 'Failed to lock payroll'));
     }
   };
 
@@ -281,7 +276,7 @@ export const useAdminCourierManagement = () => {
       await markPayoutApi(selectedCourierId, month);
       await handleFetchEarnings();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to mark payout'));
+      setError(getErrorMessage(requestError, 'Failed to mark payout'));
     }
   };
 

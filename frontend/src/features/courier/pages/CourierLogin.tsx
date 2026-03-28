@@ -3,25 +3,7 @@ import { Alert, Button, Paper, TextField, Typography } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { publicApi, setAuthToken } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    typeof error.response === 'object' &&
-    error.response !== null &&
-    'data' in error.response &&
-    typeof error.response.data === 'object' &&
-    error.response.data !== null &&
-    'message' in error.response.data &&
-    typeof error.response.data.message === 'string'
-  ) {
-    return error.response.data.message;
-  }
-
-  return fallback;
-};
+import { getErrorMessage } from 'shared/errors/apiError';
 
 const CourierLogin = () => {
   const navigate = useNavigate();

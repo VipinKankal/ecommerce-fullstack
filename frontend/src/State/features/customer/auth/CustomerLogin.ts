@@ -2,30 +2,7 @@ import { createAsyncThunk } from '@reduxjs/toolkit';
 import { api, publicApi, setAuthToken } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
 import { Address } from 'shared/types/user.types';
-
-const readErrorMessage = (error: unknown, fallback: string) => {
-  const safeError = error as {
-    response?: {
-      data?:
-        | {
-            message?: string;
-            error?: { code?: string; details?: unknown } | string;
-          }
-        | string;
-    };
-    message?: string;
-  };
-  const serverData = safeError.response?.data;
-  if (typeof serverData === 'string') {
-    return serverData || fallback;
-  }
-  return (
-    serverData?.message ||
-    (typeof serverData?.error === 'string' ? serverData.error : undefined) ||
-    safeError.message ||
-    fallback
-  );
-};
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type UserProfile = {
   id: number;
@@ -56,7 +33,7 @@ export const sendOtp = createAsyncThunk(
 
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Failed to send OTP'));
+      return rejectWithValue(getErrorMessage(error, 'Failed to send OTP'));
     }
   },
 );
@@ -78,7 +55,7 @@ export const signinCustomer = createAsyncThunk(
       }
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Login failed'));
+      return rejectWithValue(getErrorMessage(error, 'Login failed'));
     }
   },
 );
@@ -93,7 +70,7 @@ export const register = createAsyncThunk(
       const response = await publicApi.post(API_ROUTES.auth.signup, userData);
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Registration failed'));
+      return rejectWithValue(getErrorMessage(error, 'Registration failed'));
     }
   },
 );
@@ -105,7 +82,7 @@ export const getUserProfile = createAsyncThunk<UserProfile, string | void>(
       const response = await api.get(API_ROUTES.user.profile);
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Profile load failed'));
+      return rejectWithValue(getErrorMessage(error, 'Profile load failed'));
     }
   },
 );
@@ -120,7 +97,7 @@ export const updateUserProfile = createAsyncThunk(
       const response = await api.put(API_ROUTES.user.profile, payload);
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Profile update failed'));
+      return rejectWithValue(getErrorMessage(error, 'Profile update failed'));
     }
   },
 );
@@ -132,7 +109,7 @@ export const addUserAddress = createAsyncThunk(
       const response = await api.post(API_ROUTES.user.addresses, payload);
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Address add failed'));
+      return rejectWithValue(getErrorMessage(error, 'Address add failed'));
     }
   },
 );
@@ -150,7 +127,7 @@ export const updateUserAddress = createAsyncThunk(
       );
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Address update failed'));
+      return rejectWithValue(getErrorMessage(error, 'Address update failed'));
     }
   },
 );
@@ -162,7 +139,7 @@ export const deleteUserAddress = createAsyncThunk(
       const response = await api.delete(API_ROUTES.user.addressById(addressId));
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Address delete failed'));
+      return rejectWithValue(getErrorMessage(error, 'Address delete failed'));
     }
   },
 );
@@ -177,7 +154,7 @@ export const requestEmailChangeOtp = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to request email change OTP'),
+        getErrorMessage(error, 'Failed to request email change OTP'),
       );
     }
   },
@@ -197,7 +174,7 @@ export const verifyEmailChangeOtp = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to verify email change OTP'),
+        getErrorMessage(error, 'Failed to verify email change OTP'),
       );
     }
   },
@@ -211,7 +188,7 @@ export const deactivateAccount = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to deactivate account'),
+        getErrorMessage(error, 'Failed to deactivate account'),
       );
     }
   },

@@ -7,6 +7,7 @@ import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.Date;
@@ -23,6 +25,7 @@ import java.util.Set;
 @Service
 public class JwtProvider {
     private static final Logger log = LoggerFactory.getLogger(JwtProvider.class);
+    private final Environment environment;
 
     @Value("${app.jwt.secret}")
     private String jwtSecret;
@@ -32,10 +35,20 @@ public class JwtProvider {
 
     private SecretKey key;
 
+    public JwtProvider(Environment environment) {
+        this.environment = environment;
+    }
+
     @PostConstruct
     void init() {
         String effectiveSecret = jwtSecret;
+        boolean prodProfile = Arrays.stream(environment.getActiveProfiles())
+                .anyMatch(profile -> "prod".equalsIgnoreCase(profile));
+
         if (effectiveSecret == null || effectiveSecret.trim().isEmpty()) {
+            if (prodProfile) {
+                throw new IllegalStateException("JWT secret is required in prod profile. Set JWT_SECRET_KEY.");
+            }
             byte[] randomBytes = new byte[64];
             new SecureRandom().nextBytes(randomBytes);
             effectiveSecret = Base64.getEncoder().encodeToString(randomBytes);

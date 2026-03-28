@@ -17,8 +17,8 @@ import com.example.ecommerce.auth.response.SignupRequest;
 import com.example.ecommerce.auth.service.AuthService;
 import com.example.ecommerce.auth.service.EmailService;
 import com.example.ecommerce.common.utils.OtpUtil;
+import com.example.ecommerce.common.exceptions.AuthException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -81,12 +81,12 @@ public class AuthServiceImpl implements AuthService {
         if (resolvedRole == UserRole.ROLE_SELLER) {
             Seller seller = sellerRepository.findByEmail(email);
             if (seller == null) {
-                throw new IllegalArgumentException(SELLER_NOT_REGISTERED_MESSAGE);
+                throw AuthException.sellerNotRegistered(email, SELLER_NOT_REGISTERED_MESSAGE);
             }
         } else if (loginStyleRequest) {
             User user = userRepository.findByEmail(email).orElse(null);
             if (user == null) {
-                throw new IllegalArgumentException(CUSTOMER_NOT_REGISTERED_MESSAGE);
+                throw AuthException.customerNotRegistered(email, CUSTOMER_NOT_REGISTERED_MESSAGE);
             }
         }
 
@@ -176,7 +176,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (userDetails==null) {
-            throw new BadCredentialsException("invalid username");
+            throw AuthException.invalidCredentials();
         }
         VerificationCode verificationCode = verificationCodeRepository.findTopByEmailOrderByCreatedAtDesc(username);
         validateAndTrackOtp(verificationCode, otp);
@@ -196,32 +196,32 @@ public class AuthServiceImpl implements AuthService {
     private void validateAndTrackOtp(VerificationCode verificationCode, String otp) throws Exception {
         String normalizedOtp = otp == null ? null : otp.trim();
         if (verificationCode == null) {
-            throw new Exception("Invalid OTP");
+            throw AuthException.invalidOtp();
         }
 
         if (Boolean.TRUE.equals(verificationCode.getConsumed())) {
-            throw new Exception("OTP already used");
+            throw AuthException.otpAlreadyUsed();
         }
 
         if (verificationCode.getExpiresAt() == null || LocalDateTime.now().isAfter(verificationCode.getExpiresAt())) {
-            throw new Exception("OTP expired");
+            throw AuthException.otpExpired();
         }
 
         Integer attempts = verificationCode.getAttempts() == null ? 0 : verificationCode.getAttempts();
         if (attempts >= MAX_OTP_ATTEMPTS) {
-            throw new Exception("Maximum OTP attempts exceeded");
+            throw AuthException.otpAttemptLimitExceeded();
         }
 
         if (normalizedOtp == null || normalizedOtp.length() != 6 || !normalizedOtp.chars().allMatch(Character::isDigit)) {
             verificationCode.setAttempts(attempts + 1);
             verificationCodeRepository.save(verificationCode);
-            throw new Exception("Invalid OTP");
+            throw AuthException.invalidOtp();
         }
 
         if (!verificationCode.getOtp().equals(normalizedOtp)) {
             verificationCode.setAttempts(attempts + 1);
             verificationCodeRepository.save(verificationCode);
-            throw new Exception("Invalid OTP");
+            throw AuthException.invalidOtp();
         }
     }
 
@@ -240,7 +240,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (window.count >= maxRequests) {
-            throw new Exception(message);
+            throw AuthException.otpRateLimitExceeded(message);
         }
 
         window.count++;

@@ -21,6 +21,9 @@ public class StartupSecurityValidator {
     @Value("${spring.mail.password:}")
     private String mailPassword;
 
+    @Value("${app.auth.cookie.secure:false}")
+    private boolean authCookieSecure;
+
     public StartupSecurityValidator(Environment environment) {
         this.environment = environment;
     }
@@ -39,6 +42,10 @@ public class StartupSecurityValidator {
 
         if (isBlank(mailUsername) || isBlank(mailPassword)) {
             throw new IllegalStateException("MAIL_USERNAME and MAIL_PASSWORD are required in prod profile.");
+        }
+
+        if (!authCookieSecure) {
+            throw new IllegalStateException("app.auth.cookie.secure must be true in prod profile.");
         }
     }
 

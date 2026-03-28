@@ -8,6 +8,7 @@ import {
   CourierReversePickupFormState,
   CourierToastState,
 } from './courierDashboardTypes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type CreateReversePickupHandlersParams = {
   selectedReverseTask: CourierAssignmentItem | null;
@@ -30,11 +31,7 @@ type CreateReversePickupHandlersParams = {
 const getReverseTaskId = (task: CourierAssignmentItem) =>
   task.reverseTaskId ?? task.returnId ?? task.id;
 
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message ||
-  (error as { message?: string })?.message ||
-  fallback;
+
 
 export const createReversePickupHandlers = ({
   selectedReverseTask,
@@ -133,7 +130,7 @@ export const createReversePickupHandlers = ({
       });
       await loadWorkspace();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, params.fallbackErrorMessage));
+      setError(getErrorMessage(requestError, params.fallbackErrorMessage));
     } finally {
       setSubmittingReversePickup(false);
     }
@@ -172,7 +169,7 @@ export const createReversePickupHandlers = ({
         proofPhotoUrl: url || '',
       }));
     } catch (uploadError: unknown) {
-      setError(readErrorMessage(uploadError, 'Failed to upload pickup proof'));
+      setError(getErrorMessage(uploadError, 'Failed to upload pickup proof'));
     } finally {
       setUploadingReverseProof(false);
     }
@@ -254,7 +251,7 @@ export const createReversePickupHandlers = ({
       await loadWorkspace();
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(
+        getErrorMessage(
           requestError,
           'Failed to update reverse pickup status',
         ),

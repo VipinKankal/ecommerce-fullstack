@@ -46,7 +46,36 @@ module.exports = [
       ...reactPlugin.configs.recommended.rules,
       ...reactHooksPlugin.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
-      'react/prop-types': 'off'
+      'react/prop-types': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "VariableDeclarator[id.name='getErrorMessage']",
+          message:
+            'Use shared/errors/apiError getErrorMessage parser instead of local helper declarations.'
+        },
+        {
+          selector: "VariableDeclarator[id.name='readErrorMessage']",
+          message:
+            'Use shared/errors/apiError getErrorMessage parser instead of local helper declarations.'
+        },
+        {
+          selector: "FunctionDeclaration[id.name='getErrorMessage']",
+          message:
+            'Use shared/errors/apiError getErrorMessage parser instead of local helper declarations.'
+        },
+        {
+          selector: "FunctionDeclaration[id.name='readErrorMessage']",
+          message:
+            'Use shared/errors/apiError getErrorMessage parser instead of local helper declarations.'
+        }
+      ]
+    }
+  },
+  {
+    files: ['src/shared/errors/apiError.ts'],
+    rules: {
+      'no-restricted-syntax': 'off'
     }
   }
 ];

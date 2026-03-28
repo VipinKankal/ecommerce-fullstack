@@ -67,13 +67,25 @@ Deployment docs:
 1. Swagger UI: `/swagger-ui.html` (only if `SWAGGER_ENABLED=true`)
 2. OpenAPI JSON: `/v3/api-docs` (only if `SWAGGER_ENABLED=true`)
 3. Flyway migrations location: `src/main/resources/db/migration`
-4. New migrations added:
+4. Clean DB bootstrap baseline migration:
+   - `B30__baseline_schema_snapshot.sql`
+   - Purpose: clean MySQL database can migrate safely without relying on legacy pre-existing tables.
+5. Baseline parity seed migration:
+   - `V31__seed_baseline_reference_data.sql`
+   - Purpose: ensures baseline installs get required reference data and sequence defaults from legacy migrations.
+6. Clean DB verification command:
+   - `./mvnw -Dflyway.url=jdbc:mysql://127.0.0.1:3306/ecommerce -Dflyway.user=root -Dflyway.password=root org.flywaydb:flyway-maven-plugin:11.14.1:migrate`
+7. New migrations added:
    - `V2__add_core_indexes.sql`
    - `V3__enforce_unique_emails.sql`
-5. `V3` creates unique indexes only when no duplicate emails are present.
-6. Duplicate check queries:
+8. `V3` creates unique indexes only when no duplicate emails are present.
+9. Duplicate check queries:
    - Seller: `SELECT email, COUNT(*) c FROM seller GROUP BY email HAVING c > 1;`
    - User: `SELECT email, COUNT(*) c FROM user GROUP BY email HAVING c > 1;`
+10. If a migration is marked failed in local schema history, run repair before retry:
+    - `./mvnw -Dflyway.url=jdbc:mysql://127.0.0.1:3306/ecommerce -Dflyway.user=<db_user> -Dflyway.password=<db_password> org.flywaydb:flyway-maven-plugin:11.14.1:repair`
+11. If you already applied `V10`, `V17`, or `V22` before pulling latest SQL compatibility updates, run one-time repair to refresh checksums:
+    - `./mvnw -Dflyway.url=jdbc:mysql://127.0.0.1:3306/ecommerce -Dflyway.user=<db_user> -Dflyway.password=<db_password> org.flywaydb:flyway-maven-plugin:11.14.1:repair`
 
 ## Mandatory Before Production
 
@@ -82,6 +94,7 @@ Deployment docs:
    - `JWT_SECRET_KEY` (64+ chars, non-default)
    - `MAIL_USERNAME`
    - `MAIL_PASSWORD`
+   - `APP_AUTH_COOKIE_SECURE=true`
 3. Run duplicate-email SQL runbook:
    - `docs/deployment/sql/01_check_duplicate_emails.sql`
    - `docs/deployment/sql/02_cleanup_duplicate_emails.sql` (if duplicates exist)

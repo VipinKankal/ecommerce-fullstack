@@ -1,12 +1,106 @@
-ALTER TABLE orders
-    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(64) NULL,
-    ADD COLUMN IF NOT EXISTS payment_type VARCHAR(64) NULL,
-    ADD COLUMN IF NOT EXISTS provider VARCHAR(64) NULL;
+SET @migration_schema := DATABASE();
 
-ALTER TABLE payment_order
-    ADD COLUMN IF NOT EXISTS payment_type VARCHAR(64) NULL,
-    ADD COLUMN IF NOT EXISTS provider VARCHAR(64) NULL,
-    ADD COLUMN IF NOT EXISTS merchant_transaction_id VARCHAR(128) NULL;
+SET @ddl := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @migration_schema
+              AND TABLE_NAME = 'orders'
+              AND COLUMN_NAME = 'payment_method'
+        ),
+        'SELECT 1',
+        'ALTER TABLE orders ADD COLUMN payment_method VARCHAR(64) NULL'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @migration_schema
+              AND TABLE_NAME = 'orders'
+              AND COLUMN_NAME = 'payment_type'
+        ),
+        'SELECT 1',
+        'ALTER TABLE orders ADD COLUMN payment_type VARCHAR(64) NULL'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @migration_schema
+              AND TABLE_NAME = 'orders'
+              AND COLUMN_NAME = 'provider'
+        ),
+        'SELECT 1',
+        'ALTER TABLE orders ADD COLUMN provider VARCHAR(64) NULL'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @migration_schema
+              AND TABLE_NAME = 'payment_order'
+              AND COLUMN_NAME = 'payment_type'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payment_order ADD COLUMN payment_type VARCHAR(64) NULL'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @migration_schema
+              AND TABLE_NAME = 'payment_order'
+              AND COLUMN_NAME = 'provider'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payment_order ADD COLUMN provider VARCHAR(64) NULL'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl := (
+    SELECT IF(
+        EXISTS(
+            SELECT 1
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = @migration_schema
+              AND TABLE_NAME = 'payment_order'
+              AND COLUMN_NAME = 'merchant_transaction_id'
+        ),
+        'SELECT 1',
+        'ALTER TABLE payment_order ADD COLUMN merchant_transaction_id VARCHAR(128) NULL'
+    )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 UPDATE payment_order
 SET payment_method = CASE CAST(payment_method AS CHAR)

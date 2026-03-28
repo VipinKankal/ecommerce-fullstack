@@ -30,12 +30,9 @@ import {
   CourierToastState,
 } from './courierDashboardTypes';
 import { loadCourierWorkspaceData } from './courierDashboardWorkspace';
+import { getErrorMessage } from 'shared/errors/apiError';
 
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message ||
-  (error as { message?: string })?.message ||
-  fallback;
+
 
 export const useCourierDashboard = () => {
   const [activeTab, setActiveTab] = useState<CourierTab>('deliveries');
@@ -180,7 +177,7 @@ export const useCourierDashboard = () => {
       setPetrolClaims(workspaceData.petrolClaims);
     } catch (workspaceError: unknown) {
       setError(
-        readErrorMessage(workspaceError, 'Failed to load courier workspace'),
+        getErrorMessage(workspaceError, 'Failed to load courier workspace'),
       );
     } finally {
       setLoading(false);

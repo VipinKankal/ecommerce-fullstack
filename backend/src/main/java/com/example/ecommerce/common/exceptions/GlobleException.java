@@ -58,33 +58,31 @@ public class GlobleException {
         return description.startsWith("uri=") ? description.substring(4) : description;
     }
 
-    private ResponseEntity<ApiEnvelope<Void>> buildClassifiedResponse(String message, WebRequest request) {
-        ErrorClassification classification = classifyMessage(message);
+    private LinkedHashMap<String, Object> detailsWithReason(
+            WebRequest request,
+            String reasonCode,
+            Map<String, Object> extraDetails
+    ) {
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>(baseDetails(request));
+        if (reasonCode != null && !reasonCode.isBlank()) {
+            details.put("reasonCode", reasonCode);
+        }
+        if (extraDetails != null && !extraDetails.isEmpty()) {
+            details.putAll(extraDetails);
+        }
+        return details;
+    }
+
+    @ExceptionHandler(DomainException.class)
+    public ResponseEntity<ApiEnvelope<Void>> domainExceptionHandler(
+            DomainException ex,
+            WebRequest request
+    ) {
         return buildErrorResponse(
-                classification.status(),
-                classification.resolveMessage(message),
-                classification.code(),
-                baseDetails(request)
-        );
-    }
-
-    @ExceptionHandler(SellerException.class)
-    public ResponseEntity<ApiEnvelope<Void>> sellerExceptionHandler(SellerException ex, WebRequest request) {
-        return buildClassifiedResponse(ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(ProductException.class)
-    public ResponseEntity<ApiEnvelope<Void>> productExceptionHandler(ProductException ex, WebRequest request) {
-        return buildClassifiedResponse(ex.getMessage(), request);
-    }
-
-    @ExceptionHandler(UserNotFoundException.class)
-    public ResponseEntity<ApiEnvelope<Void>> userNotFoundExceptionHandler(UserNotFoundException ex, WebRequest request) {
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
+                ex.getStatus(),
                 ex.getMessage(),
-                ApiErrorCode.RESOURCE_NOT_FOUND,
-                request
+                ex.getErrorCode(),
+                detailsWithReason(request, ex.getReasonCode(), ex.getDetails())
         );
     }
 
@@ -127,7 +125,7 @@ public class GlobleException {
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     ProductConstraints.DESCRIPTION_MAX_MESSAGE,
                     ApiErrorCode.VALIDATION_ERROR,
-                    request
+                    detailsWithReason(request, "PRODUCT_DESCRIPTION_TOO_LONG", Map.of())
             );
         }
 
@@ -139,7 +137,7 @@ public class GlobleException {
                     HttpStatus.CONFLICT,
                     "Resource already exists.",
                     ApiErrorCode.DUPLICATE_RESOURCE,
-                    request
+                    detailsWithReason(request, "DB_UNIQUE_CONSTRAINT", Map.of())
             );
         }
 
@@ -147,7 +145,7 @@ public class GlobleException {
                 HttpStatus.UNPROCESSABLE_ENTITY,
                 "Request violates database constraints.",
                 ApiErrorCode.VALIDATION_ERROR,
-                request
+                detailsWithReason(request, "DB_CONSTRAINT_VIOLATION", Map.of())
         );
     }
 
@@ -156,7 +154,12 @@ public class GlobleException {
             IllegalArgumentException ex,
             WebRequest request
     ) {
-        return buildClassifiedResponse(ex.getMessage(), request);
+        return buildErrorResponse(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                ex.getMessage(),
+                ApiErrorCode.VALIDATION_ERROR,
+                detailsWithReason(request, "VALIDATION_FAILED", Map.of())
+        );
     }
 
     @ExceptionHandler(CouponOperationException.class)
@@ -164,16 +167,11 @@ public class GlobleException {
             CouponOperationException ex,
             WebRequest request
     ) {
-        LinkedHashMap<String, Object> details = new LinkedHashMap<>(baseDetails(request));
-        details.put("reasonCode", ex.getReasonCode());
-        if (ex.getDetails() != null && !ex.getDetails().isEmpty()) {
-            details.putAll(ex.getDetails());
-        }
         return buildErrorResponse(
                 ex.getStatus(),
                 ex.getMessage(),
                 ex.getErrorCode(),
-                details
+                detailsWithReason(request, ex.getReasonCode(), ex.getDetails())
         );
     }
 
@@ -213,7 +211,7 @@ public class GlobleException {
                     HttpStatus.UNAUTHORIZED,
                     ex.getMessage(),
                     ApiErrorCode.INVALID_CREDENTIALS,
-                    request
+                    detailsWithReason(request, "INVALID_CREDENTIALS", Map.of())
             );
         }
 
@@ -221,7 +219,7 @@ public class GlobleException {
                 HttpStatus.UNAUTHORIZED,
                 ex.getMessage(),
                 ApiErrorCode.AUTH_REQUIRED,
-                request
+                detailsWithReason(request, "AUTH_REQUIRED", Map.of())
         );
     }
 
@@ -279,118 +277,12 @@ public class GlobleException {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiEnvelope<Void>> genericExceptionHandler(Exception ex, WebRequest request) {
-        return buildClassifiedResponse(ex.getMessage(), request);
-    }
-
-    private ErrorClassification classifyMessage(String message) {
-        String safeMessage = message == null ? "" : message.trim();
-        String normalized = safeMessage.toLowerCase();
-
-        if (normalized.contains("no seller account found")
-                || normalized.contains("no customer account found")
-                || normalized.contains("seller not found")
-                || normalized.contains("user not found")
-                || normalized.contains("user not exist")
-                || normalized.contains("resource not found")) {
-            return new ErrorClassification(
-                    HttpStatus.NOT_FOUND,
-                    ApiErrorCode.RESOURCE_NOT_FOUND,
-                    "Resource not found"
-            );
-        }
-
-        if (normalized.contains("already registered")
-                || normalized.contains("already exist")
-                || normalized.contains("already exists")
-                || normalized.contains("request already exists")
-                || normalized.contains("duplicate")
-                || normalized.contains("email already in use")
-                || normalized.contains("unique")) {
-            return new ErrorClassification(
-                    HttpStatus.CONFLICT,
-                    ApiErrorCode.DUPLICATE_RESOURCE,
-                    "Resource already exists"
-            );
-        }
-
-        if (normalized.contains("maximum otp attempts")
-                || normalized.contains("too many otp")
-                || normalized.contains("too many requests")) {
-            return new ErrorClassification(
-                    HttpStatus.TOO_MANY_REQUESTS,
-                    ApiErrorCode.RATE_LIMIT_EXCEEDED,
-                    "Too many requests"
-            );
-        }
-
-        if (normalized.contains("invalid otp")
-                || normalized.contains("wrong otp")
-                || normalized.contains("otp expired")
-                || normalized.contains("otp already used")
-                || normalized.contains("bad credentials")
-                || normalized.contains("invalid credentials")) {
-            return new ErrorClassification(
-                    HttpStatus.UNAUTHORIZED,
-                    ApiErrorCode.INVALID_CREDENTIALS,
-                    "Invalid credentials"
-            );
-        }
-
-        if (normalized.contains("otp")
-                || normalized.contains("validation")
-                || normalized.contains("invalid")
-                || normalized.contains("insufficient warehouse stock")
-                || normalized.contains("insufficient seller stock")
-                || normalized.contains("transfer quantity")
-                || normalized.contains("must complete price difference payment")
-                || normalized.contains("must")
-                || normalized.contains("required")
-                || normalized.contains("unsupported payment method")
-                || normalized.contains("use seller email verification flow")
-                || normalized.contains("please register first")
-                || normalized.contains("please sign up first")
-                || normalized.contains("new email must be different")
-                || normalized.contains("request violates database constraints")
-                || normalized.contains("data too long")) {
-            return new ErrorClassification(
-                    HttpStatus.UNPROCESSABLE_ENTITY,
-                    ApiErrorCode.VALIDATION_ERROR,
-                    "Validation failed"
-            );
-        }
-
-        if (normalized.contains("service unavailable")
-                || normalized.contains("payment gateway")
-                || normalized.contains("phonepe is not configured")
-                || normalized.contains("phonepe_base_url")
-                || normalized.contains("phonepe_merchant_id")
-                || normalized.contains("phonepe_salt_key")
-                || normalized.contains("phonepe_salt_index")
-                || normalized.contains("stripe is not configured")
-                || normalized.contains("stripe_secret_key")
-                || normalized.contains("razorpay is not configured")
-                || normalized.contains("razorpay_api_key")
-                || normalized.contains("razorpay_api_secret")) {
-            return new ErrorClassification(
-                    HttpStatus.SERVICE_UNAVAILABLE,
-                    ApiErrorCode.SERVICE_UNAVAILABLE,
-                    "Service unavailable"
-            );
-        }
-
-        return new ErrorClassification(
+        return buildErrorResponse(
                 HttpStatus.INTERNAL_SERVER_ERROR,
+                "Internal server error",
                 ApiErrorCode.INTERNAL_ERROR,
-                "Internal server error"
+                detailsWithReason(request, "UNEXPECTED_ERROR", Map.of())
         );
     }
 
-    private record ErrorClassification(HttpStatus status, ApiErrorCode code, String fallbackMessage) {
-        private String resolveMessage(String message) {
-            if (code == ApiErrorCode.INTERNAL_ERROR) {
-                return fallbackMessage;
-            }
-            return message == null || message.isBlank() ? fallbackMessage : message;
-        }
-    }
 }

@@ -1,6 +1,7 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { api, publicApi, setAuthToken } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type SellerProfile = {
   id: number;
@@ -50,30 +51,6 @@ type SellerProfile = {
   role?: string;
 };
 
-const readErrorMessage = (error: unknown, fallback: string) => {
-  const safeError = error as {
-    response?: {
-      data?:
-        | {
-            message?: string;
-            error?: { code?: string; details?: unknown } | string;
-          }
-        | string;
-    };
-    message?: string;
-  };
-  const serverData = safeError.response?.data;
-  if (typeof serverData === 'string') {
-    return serverData || fallback;
-  }
-  return (
-    serverData?.message ||
-    (typeof serverData?.error === 'string' ? serverData.error : undefined) ||
-    safeError.message ||
-    fallback
-  );
-};
-
 export const sendLoginSignupOtp = createAsyncThunk(
   'auth/sendLoginSignupOtp',
   async ({ email }: { email: string }, { rejectWithValue }) => {
@@ -87,7 +64,7 @@ export const sendLoginSignupOtp = createAsyncThunk(
       );
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Failed to send OTP'));
+      return rejectWithValue(getErrorMessage(error, 'Failed to send OTP'));
     }
   },
 );
@@ -110,7 +87,7 @@ export const signinSeller = createAsyncThunk(
 
       return response.data;
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Login failed'));
+      return rejectWithValue(getErrorMessage(error, 'Login failed'));
     }
   },
 );
@@ -166,7 +143,7 @@ export const registerSeller = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Seller registration failed'),
+        getErrorMessage(error, 'Seller registration failed'),
       );
     }
   },
@@ -188,7 +165,7 @@ export const verifySellerEmail = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Email verification failed'),
+        getErrorMessage(error, 'Email verification failed'),
       );
     }
   },
@@ -202,7 +179,7 @@ export const fetchSellerProfile = createAsyncThunk<
     const response = await api.get(API_ROUTES.sellers.profile);
     return response.data;
   } catch (error: unknown) {
-    return rejectWithValue(readErrorMessage(error, 'Failed to load profile'));
+    return rejectWithValue(getErrorMessage(error, 'Failed to load profile'));
   }
 });
 
@@ -214,7 +191,7 @@ export const updateSellerProfile = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to update seller profile'),
+        getErrorMessage(error, 'Failed to update seller profile'),
       );
     }
   },
@@ -230,7 +207,7 @@ export const requestSellerEmailChangeOtp = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to request seller email change OTP'),
+        getErrorMessage(error, 'Failed to request seller email change OTP'),
       );
     }
   },
@@ -250,7 +227,7 @@ export const verifySellerEmailChangeOtp = createAsyncThunk(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to verify seller email change OTP'),
+        getErrorMessage(error, 'Failed to verify seller email change OTP'),
       );
     }
   },

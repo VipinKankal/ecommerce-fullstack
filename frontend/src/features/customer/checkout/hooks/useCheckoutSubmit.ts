@@ -13,6 +13,7 @@ import { toggleWishlistProduct } from 'State/features/customer/wishlist/slice';
 import { Address } from 'shared/types/user.types';
 import { PaymentOption, ShippingAddressForm } from '../types/checkoutTypes';
 import { matchesAddress } from '../utils/addressForm';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type CartItem = {
   id?: number;
@@ -26,11 +27,6 @@ type CartShape = {
   couponCode?: string | null;
   couponDiscountAmount?: number | null;
 };
-
-const readErrorMessage = (error: unknown, fallback: string) =>
-  typeof error === 'string'
-    ? error
-    : (error as { message?: string })?.message || fallback;
 
 const couponReasonMessages: Record<string, string> = {
   COUPON_NOT_FOUND: 'This coupon could not be found.',
@@ -200,7 +196,7 @@ export const useCheckoutSubmit = ({
         setUseManualAddress(false);
       }
     } catch (error: unknown) {
-      setSubmitError(readErrorMessage(error, 'Failed to save address'));
+      setSubmitError(getErrorMessage(error, 'Failed to save address'));
     } finally {
       setSavingAddress(false);
     }
@@ -301,7 +297,7 @@ export const useCheckoutSubmit = ({
           `${resolvedError.message} Go back to your bag and update the coupon before placing the order again.`,
         );
       } else {
-        setSubmitError(readErrorMessage(error, 'Failed to create payment order'));
+        setSubmitError(getErrorMessage(error, 'Failed to create payment order'));
       }
     } finally {
       setSubmitting(false);

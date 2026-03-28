@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 const label = (value?: string | null) => (value || '-').replaceAll('_', ' ');
 const date = (value?: string | null) =>
@@ -39,10 +40,6 @@ type ExchangePickupItem = {
 };
 type PickupAction = 'ARRIVED' | 'OLD_ITEM_PICKED' | 'PICKUP_COMPLETED';
 
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message || fallback;
-
 const CourierExchangePickupList = () => {
   const [pickups, setPickups] = useState<ExchangePickupItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -62,7 +59,7 @@ const CourierExchangePickupList = () => {
       setPickups(Array.isArray(response.data) ? response.data : []);
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to load exchange pickups'),
+        getErrorMessage(requestError, 'Failed to load exchange pickups'),
       );
     } finally {
       setLoading(false);
@@ -95,7 +92,7 @@ const CourierExchangePickupList = () => {
       await loadPickups();
     } catch (requestError: unknown) {
       setError(
-        readErrorMessage(requestError, 'Failed to update exchange pickup'),
+        getErrorMessage(requestError, 'Failed to update exchange pickup'),
       );
     } finally {
       setSubmitting(false);

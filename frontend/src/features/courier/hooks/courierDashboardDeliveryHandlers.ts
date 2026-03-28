@@ -15,6 +15,7 @@ import {
   CourierPetrolFormState,
   CourierToastState,
 } from './courierDashboardTypes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type CreateDeliveryHandlersParams = {
   selectedTask: CourierAssignmentItem | null;
@@ -67,9 +68,7 @@ export const createDeliveryHandlers = ({
   setPetrolForm,
   loadWorkspace,
 }: CreateDeliveryHandlersParams) => {
-  const readErrorMessage = (error: unknown, fallback: string) =>
-    (error as { response?: { data?: { message?: string } } })?.response?.data
-      ?.message || fallback;
+  
 
   const ensureCodDetails = () => {
     if (selectedTask?.paymentType !== 'COD') return true;
@@ -215,7 +214,7 @@ export const createDeliveryHandlers = ({
       setOtpSent(false);
       await loadWorkspace();
     } catch (requestError: unknown) {
-      const serverMessage = readErrorMessage(
+      const serverMessage = getErrorMessage(
         requestError,
         'Failed to update delivery status',
       );
@@ -278,7 +277,7 @@ export const createDeliveryHandlers = ({
           statusReason: current.statusReason || 'OTP sent to customer email',
         }));
       } else {
-        setError(readErrorMessage(requestError, 'Failed to send delivery OTP'));
+        setError(getErrorMessage(requestError, 'Failed to send delivery OTP'));
       }
     }
   };
@@ -329,7 +328,7 @@ export const createDeliveryHandlers = ({
       setCodForm(initialCodForm);
       await loadWorkspace();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to submit COD deposit'));
+      setError(getErrorMessage(requestError, 'Failed to submit COD deposit'));
     }
   };
 
@@ -345,7 +344,7 @@ export const createDeliveryHandlers = ({
       setPetrolForm(initialPetrolForm);
       await loadWorkspace();
     } catch (requestError: unknown) {
-      setError(readErrorMessage(requestError, 'Failed to submit petrol claim'));
+      setError(getErrorMessage(requestError, 'Failed to submit petrol claim'));
     }
   };
 

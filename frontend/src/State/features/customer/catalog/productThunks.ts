@@ -1,15 +1,12 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { publicApi } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type ProductQueryParams = {
   pageNumber?: number;
   [key: string]: unknown;
 };
-
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message || fallback;
 
 /**
  * 1. Fetch Filtered Products (Category, Color, Size, Price Range, Pagination)
@@ -30,7 +27,7 @@ export const fetchAllProduct = createAsyncThunk(
       return response.data; // Usually returns a Page object { content: [], totalPages: 0 }
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to load products'),
+        getErrorMessage(error, 'Failed to load products'),
       );
     }
   },
@@ -49,7 +46,7 @@ export const searchProducts = createAsyncThunk(
       });
       return response.data; // Returns List<Product>
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Search failed'));
+      return rejectWithValue(getErrorMessage(error, 'Search failed'));
     }
   },
 );
@@ -65,7 +62,7 @@ export const fetchProductById = createAsyncThunk(
       const response = await publicApi.get(API_ROUTES.products.byId(productId));
       return response.data; // Returns a single Product object
     } catch (error: unknown) {
-      return rejectWithValue(readErrorMessage(error, 'Product not found'));
+      return rejectWithValue(getErrorMessage(error, 'Product not found'));
     }
   },
 );

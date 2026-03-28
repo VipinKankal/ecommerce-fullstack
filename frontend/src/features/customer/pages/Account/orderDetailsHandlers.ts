@@ -15,6 +15,7 @@ import {
   submitExchangeBankDetails,
 } from 'State/features/customer/exchange/slice';
 import { OrderItemLite, ReturnRefundRequestLite } from './orderDetailsTypes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type ReturnRefundPayload = {
   returnReason: string;
@@ -65,34 +66,6 @@ type CreateOrderDetailsHandlersParams = {
   setPaymentReference: React.Dispatch<React.SetStateAction<string>>;
   setBalanceFormOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setBankFormOpen: React.Dispatch<React.SetStateAction<boolean>>;
-};
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    typeof error.response === 'object' &&
-    error.response !== null &&
-    'data' in error.response &&
-    typeof error.response.data === 'object' &&
-    error.response.data !== null &&
-    'message' in error.response.data &&
-    typeof error.response.data.message === 'string'
-  ) {
-    return error.response.data.message;
-  }
-
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'message' in error &&
-    typeof error.message === 'string'
-  ) {
-    return error.message;
-  }
-
-  return fallback;
 };
 
 export const createOrderDetailsHandlers = ({

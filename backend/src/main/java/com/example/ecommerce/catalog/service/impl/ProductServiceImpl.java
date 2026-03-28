@@ -103,7 +103,7 @@ public class ProductServiceImpl implements ProductService {
                 EnumSet.of(OrderStatus.CANCELLED, OrderStatus.DELIVERED)
         );
         if (hasActiveOrders) {
-            throw new ProductException("Product cannot be deleted while active orders exist");
+            throw ProductException.activeOrderConflict(productId);
         }
         productRepository.delete(product);
     }
@@ -206,7 +206,7 @@ public class ProductServiceImpl implements ProductService {
     @Transactional(readOnly = true)
     public Product findProductById(Long productId) throws ProductException {
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new ProductException("Product not found with id " + productId));
+                .orElseThrow(() -> ProductException.notFound(productId));
         initializeCollections(product);
         return product;
     }
@@ -216,7 +216,7 @@ public class ProductServiceImpl implements ProductService {
     public Product findActiveProductById(Long productId) throws ProductException {
         Product product = findProductById(productId);
         if (!product.isActive()) {
-            throw new ProductException("Product not found with id " + productId);
+            throw ProductException.notFound(productId);
         }
         return product;
     }
@@ -316,7 +316,7 @@ public class ProductServiceImpl implements ProductService {
         if (product.getSeller() == null
                 || product.getSeller().getId() == null
                 || !product.getSeller().getId().equals(sellerId)) {
-            throw new ProductException("Unauthorized product access");
+            throw ProductException.unauthorizedAccess(product.getId(), sellerId);
         }
     }
 

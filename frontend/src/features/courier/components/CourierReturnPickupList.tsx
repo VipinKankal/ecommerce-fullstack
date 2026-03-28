@@ -14,6 +14,7 @@ import {
 } from '@mui/material';
 import { api } from 'shared/api/Api';
 import { uploadToCloudinary } from 'shared/utils/uploadToCloudinary';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type PickupItem = {
   id: number | string;
@@ -33,25 +34,6 @@ type PickupItem = {
 
 const fmt = (value?: string) =>
   value ? new Date(value).toLocaleString() : '-';
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (
-    typeof error === 'object' &&
-    error !== null &&
-    'response' in error &&
-    typeof error.response === 'object' &&
-    error.response !== null &&
-    'data' in error.response &&
-    typeof error.response.data === 'object' &&
-    error.response.data !== null &&
-    'message' in error.response.data &&
-    typeof error.response.data.message === 'string'
-  ) {
-    return error.response.data.message;
-  }
-
-  return fallback;
-};
 
 const CourierReturnPickupList = () => {
   const [items, setItems] = useState<PickupItem[]>([]);

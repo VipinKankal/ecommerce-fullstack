@@ -3,7 +3,7 @@ import axios, {
   type AxiosInstance,
   type AxiosResponse,
 } from 'axios';
-import { env } from '../../config/env';
+import { env } from '../../appEnv';
 import {
   getApiError,
   getDisplayErrorMessage,
@@ -73,6 +73,9 @@ type ProductListRequestParams = {
 };
 
 const DEMO_PAGE_SIZE = 12;
+const enableMarketplaceDemoFallback =
+  process.env.NODE_ENV !== 'production' &&
+  process.env.REACT_APP_ENABLE_MARKETPLACE_DEMO_FALLBACK === 'true';
 
 const MARKETPLACE_DEMO_PRODUCTS: Product[] = [
   {
@@ -567,7 +570,9 @@ attachApiEnvelopeInterceptor(api);
 attachApiEnvelopeInterceptor(publicApi);
 attachXsrfInterceptor(api);
 attachXsrfInterceptor(publicApi);
-attachMarketplaceDemoInterceptor(publicApi);
+if (enableMarketplaceDemoFallback) {
+  attachMarketplaceDemoInterceptor(publicApi);
+}
 attachErrorNormalizationInterceptor(api);
 attachErrorNormalizationInterceptor(publicApi);
 attachUnauthorizedInterceptor(api);

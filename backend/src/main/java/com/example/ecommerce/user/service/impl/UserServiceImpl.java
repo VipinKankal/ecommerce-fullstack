@@ -32,7 +32,7 @@ public class UserServiceImpl implements UserService {
     public User findUserByEmail(String email) throws Exception {
         String normalizedEmail = email == null ? null : email.trim().toLowerCase();
         return userRepository.findByEmail(normalizedEmail)
-                .orElseThrow(() -> new UserNotFoundException("user not found with email - " + normalizedEmail));
+                .orElseThrow(() -> UserNotFoundException.byEmail(normalizedEmail));
     }
 
     @Override
@@ -48,7 +48,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public User updateUserAccountStatus(Long id, AccountStatus status) throws Exception {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new UserNotFoundException("user not found with id - " + id));
+                .orElseThrow(() -> UserNotFoundException.byId(id));
         user.setAccountStatus(status);
         return userRepository.save(user);
     }

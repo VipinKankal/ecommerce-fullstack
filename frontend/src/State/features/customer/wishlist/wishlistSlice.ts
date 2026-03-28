@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type WishlistItem = Record<string, unknown>;
 
@@ -17,12 +18,6 @@ const initialState: WishlistState = {
   actionLoading: false,
   error: null,
 };
-
-const readErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message ||
-  (error as { message?: string })?.message ||
-  fallback;
 
 const extractProducts = (payload: unknown): WishlistItem[] => {
   if (!payload) return [];
@@ -41,7 +36,7 @@ export const fetchWishlist = createAsyncThunk<unknown, void>(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to load wishlist'),
+        getErrorMessage(error, 'Failed to load wishlist'),
       );
     }
   },
@@ -57,7 +52,7 @@ export const toggleWishlistProduct = createAsyncThunk<unknown, number | string>(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to update wishlist'),
+        getErrorMessage(error, 'Failed to update wishlist'),
       );
     }
   },
@@ -73,7 +68,7 @@ export const removeWishlistProduct = createAsyncThunk<unknown, number | string>(
       return response.data;
     } catch (error: unknown) {
       return rejectWithValue(
-        readErrorMessage(error, 'Failed to remove product from wishlist'),
+        getErrorMessage(error, 'Failed to remove product from wishlist'),
       );
     }
   },

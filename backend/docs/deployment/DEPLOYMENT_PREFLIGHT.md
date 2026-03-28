@@ -6,7 +6,11 @@ Use this checklist before every production release.
 
 1. `./mvnw.cmd -DskipTests compile` succeeds.
 2. `./mvnw.cmd test` succeeds.
-3. No failing migrations or startup errors in logs.
+3. Clean DB Flyway migration succeeds:
+   - `./mvnw.cmd -Dflyway.url=jdbc:mysql://127.0.0.1:3306/ecommerce -Dflyway.user=<db_user> -Dflyway.password=<db_password> org.flywaydb:flyway-maven-plugin:11.14.1:migrate`
+4. No failing migrations or startup errors in logs.
+5. Migration policy respected:
+   - Never edit previously applied migration files (`V*`, `B*`); always add a new migration version.
 
 ## 2. Secrets and config
 
@@ -15,6 +19,8 @@ Use this checklist before every production release.
 3. `DB_PASSWORD`, `MAIL_PASSWORD`, payment keys are not in git.
 4. `JPA_SHOW_SQL=false` in production.
 5. `CORS_ALLOWED_ORIGINS` only contains trusted frontend domains.
+6. `APP_AUTH_COOKIE_SECURE=true` in production.
+7. Distributed rate limiting is enabled (`RATE_LIMIT_BACKEND=redis`) with valid Redis credentials.
 
 ## 3. Database safety
 
@@ -25,10 +31,12 @@ Use this checklist before every production release.
 ## 4. Security controls
 
 1. App runs behind HTTPS (TLS cert valid).
-2. Only required ports are open.
-3. Admin endpoints require admin token and are tested.
-4. Rate-limited auth endpoints return `429` under abuse.
-5. Invalid JWT requests return `401`.
+2. Auth cookie is issued with `Secure` flag (`app.auth.cookie.secure=true`).
+3. Only required ports are open.
+4. Admin endpoints require admin token and are tested.
+5. Rate-limited auth endpoints return `429` under abuse.
+6. Invalid JWT requests return `401`.
+7. Rate-limit response details show `rateLimitBackend=redis` in production.
 
 ## 5. External integrations
 

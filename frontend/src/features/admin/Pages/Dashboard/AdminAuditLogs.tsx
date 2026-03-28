@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import { getErrorMessage } from 'shared/errors/apiError';
 
 type AuditLogRow = {
   id: number;
@@ -30,9 +31,7 @@ type AuditLogRow = {
 const formatDateTime = (value?: string | null) =>
   value ? new Date(value).toLocaleString() : '-';
 
-const getErrorMessage = (error: unknown, fallback: string) =>
-  (error as { response?: { data?: { message?: string } } })?.response?.data
-    ?.message || fallback;
+
 
 const downloadCsv = (filename: string, rows: string[][]) => {
   const csv = rows
