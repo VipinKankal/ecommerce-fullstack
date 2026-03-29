@@ -9,7 +9,6 @@ on:
 jobs:
   codeql-java:
     name: CodeQL (Java)
-    if: ${{ vars.ENABLE_BACKEND_CI == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -47,7 +46,7 @@ jobs:
 
   dependency-audit-java:
     name: Dependency Audit (Java)
-    if: ${{ vars.ENABLE_BACKEND_CI == 'true' && github.event_name == 'pull_request' }}
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,7 +62,6 @@ jobs:
           fail-on-severity: high
 
   migration-smoke:
-    if: ${{ vars.ENABLE_BACKEND_CI == 'true' }}
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -143,7 +141,6 @@ jobs:
           tail -n 120 migration-smoke-app.log || true
 
   build-test:
-    if: ${{ vars.ENABLE_BACKEND_CI == 'true' }}
     runs-on: ubuntu-latest
     needs: migration-smoke
     services:
@@ -203,7 +200,6 @@ jobs:
         run: ./mvnw test -DskipITs
 
   postman-smoke:
-    if: ${{ vars.ENABLE_BACKEND_CI == 'true' }}
     runs-on: ubuntu-latest
     needs: build-test
     services:
