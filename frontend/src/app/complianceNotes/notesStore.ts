@@ -23,50 +23,110 @@ const dispatchChange = () => {
   globalThis.dispatchEvent(new CustomEvent(CHANGE_EVENT));
 };
 
-const normalizeAttachment = (raw: any): ComplianceNoteAttachment => ({
-  id: String(raw?.id || ''),
-  name: String(raw?.name || 'Attachment'),
-  uploadedAt: raw?.uploadedAt || undefined,
-  downloadUrl: raw?.downloadUrl || undefined,
-  url: raw?.url || undefined,
-});
+const allowedNoteTypes: ComplianceNote['noteType'][] = [
+  'GST',
+  'HSN',
+  'TCS',
+  'POLICY',
+  'CAMPAIGN',
+  'WARNING',
+  'GENERAL',
+];
+const allowedPriorities: ComplianceNote['priority'][] = [
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'CRITICAL',
+];
+const allowedStatuses: ComplianceNote['status'][] = [
+  'DRAFT',
+  'PUBLISHED',
+  'ARCHIVED',
+];
+const allowedSources: ComplianceNote['sourceMode'][] = [
+  'MANUAL',
+  'AUTO_DRAFT',
+];
 
-const normalizeNote = (raw: any): ComplianceNote => ({
-  id: Number(raw?.id || 0),
-  title: String(raw?.title || ''),
-  noteType: raw?.noteType || 'GENERAL',
-  priority: raw?.priority || 'MEDIUM',
-  shortSummary: String(raw?.shortSummary || ''),
-  fullNote: String(raw?.fullNote || ''),
-  effectiveDate: raw?.effectiveDate || undefined,
-  actionRequired: raw?.actionRequired || undefined,
-  affectedCategory: raw?.affectedCategory || undefined,
-  attachments: Array.isArray(raw?.attachments)
-    ? raw.attachments.map(normalizeAttachment)
-    : [],
-  businessEmail: String(raw?.businessEmail || ''),
-  status: raw?.status || 'DRAFT',
-  pinned: Boolean(raw?.pinned),
-  sourceMode: raw?.sourceMode || raw?.source || 'MANUAL',
-  read: raw?.read == null ? undefined : Boolean(raw.read),
-  acknowledged: raw?.acknowledged == null ? undefined : Boolean(raw.acknowledged),
-  acknowledgedAt: raw?.acknowledgedAt || undefined,
-  impactedProductCount:
-    raw?.impactedProductCount == null ? undefined : Number(raw.impactedProductCount),
-  impactedProducts: Array.isArray(raw?.impactedProducts) ? raw.impactedProducts : undefined,
-  acknowledgedCount:
-    raw?.acknowledgedCount == null ? undefined : Number(raw.acknowledgedCount),
-  acknowledgementRatePercentage:
-    raw?.acknowledgementRatePercentage == null
-      ? undefined
-      : Number(raw.acknowledgementRatePercentage),
-  createdBy: raw?.createdBy || undefined,
-  updatedBy: raw?.updatedBy || undefined,
-  createdAt: raw?.createdAt || undefined,
-  updatedAt: raw?.updatedAt || undefined,
-  publishedAt: raw?.publishedAt || undefined,
-  archivedAt: raw?.archivedAt || undefined,
-});
+const toRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+
+const coerceEnumValue = <T extends string>(
+  value: unknown,
+  allowedValues: readonly T[],
+  fallback: T,
+): T => {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim().toUpperCase() as T;
+  return allowedValues.includes(normalized) ? normalized : fallback;
+};
+
+const normalizeAttachment = (raw: unknown): ComplianceNoteAttachment => {
+  const source = toRecord(raw);
+  return {
+    id: String(source.id || ''),
+    name: String(source.name || 'Attachment'),
+    uploadedAt: source.uploadedAt ? String(source.uploadedAt) : undefined,
+    downloadUrl: source.downloadUrl ? String(source.downloadUrl) : undefined,
+    url: source.url ? String(source.url) : undefined,
+  };
+};
+
+const normalizeNote = (raw: unknown): ComplianceNote => {
+  const source = toRecord(raw);
+  const attachments = source.attachments;
+  const impactedProducts = source.impactedProducts;
+
+  return {
+    id: Number(source.id || 0),
+    title: String(source.title || ''),
+    noteType: coerceEnumValue(source.noteType, allowedNoteTypes, 'GENERAL'),
+    priority: coerceEnumValue(source.priority, allowedPriorities, 'MEDIUM'),
+    shortSummary: String(source.shortSummary || ''),
+    fullNote: String(source.fullNote || ''),
+    effectiveDate: source.effectiveDate ? String(source.effectiveDate) : undefined,
+    actionRequired: source.actionRequired ? String(source.actionRequired) : undefined,
+    affectedCategory: source.affectedCategory ? String(source.affectedCategory) : undefined,
+    attachments: Array.isArray(attachments)
+      ? attachments.map(normalizeAttachment)
+      : [],
+    businessEmail: String(source.businessEmail || ''),
+    status: coerceEnumValue(source.status, allowedStatuses, 'DRAFT'),
+    pinned: Boolean(source.pinned),
+    sourceMode: coerceEnumValue(
+      source.sourceMode || source.source,
+      allowedSources,
+      'MANUAL',
+    ),
+    read: source.read == null ? undefined : Boolean(source.read),
+    acknowledged:
+      source.acknowledged == null ? undefined : Boolean(source.acknowledged),
+    acknowledgedAt: source.acknowledgedAt
+      ? String(source.acknowledgedAt)
+      : undefined,
+    impactedProductCount:
+      source.impactedProductCount == null
+        ? undefined
+        : Number(source.impactedProductCount),
+    impactedProducts: Array.isArray(impactedProducts)
+      ? (impactedProducts as ComplianceNote['impactedProducts'])
+      : undefined,
+    acknowledgedCount:
+      source.acknowledgedCount == null
+        ? undefined
+        : Number(source.acknowledgedCount),
+    acknowledgementRatePercentage:
+      source.acknowledgementRatePercentage == null
+        ? undefined
+        : Number(source.acknowledgementRatePercentage),
+    createdBy: source.createdBy ? String(source.createdBy) : undefined,
+    updatedBy: source.updatedBy ? String(source.updatedBy) : undefined,
+    createdAt: source.createdAt ? String(source.createdAt) : undefined,
+    updatedAt: source.updatedAt ? String(source.updatedAt) : undefined,
+    publishedAt: source.publishedAt ? String(source.publishedAt) : undefined,
+    archivedAt: source.archivedAt ? String(source.archivedAt) : undefined,
+  };
+};
 
 const sortNotes = (notes: ComplianceNote[]) =>
   [...notes].sort((a, b) => {

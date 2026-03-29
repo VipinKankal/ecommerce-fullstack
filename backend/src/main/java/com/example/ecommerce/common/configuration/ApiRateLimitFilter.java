@@ -34,6 +34,7 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
             "/api/auth/signin",
             "/api/auth/sent/login-signup-otp",
             "/sellers/login",
+            "/api/admin/auth/signup",
             "/api/admin/auth/login"
     );
     private static final Set<String> FORWARDED_IP_HEADERS = Set.of(

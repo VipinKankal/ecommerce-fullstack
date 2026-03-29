@@ -19,7 +19,7 @@ const resolveApiBaseUrl = () => {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(rawApiBaseUrl);
-  } catch (error) {
+  } catch {
     throw new Error(
       `Invalid REACT_APP_API_BASE_URL "${rawApiBaseUrl}". Expected absolute http/https URL.`,
     );

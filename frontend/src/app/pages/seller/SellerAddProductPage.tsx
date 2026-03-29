@@ -19,10 +19,33 @@ import {
 import { addProductValidationSchema } from 'features/seller/products/pages/addProductValidation';
 import AddProductFormBody from 'app/overrides/seller/AddProductFormBody';
 
-const canResolveAdminTaxPreview = (values: AddProductFormValues) =>
+type TaxPreviewInput = Pick<
+  AddProductFormValues,
+  | 'category'
+  | 'category2'
+  | 'category3'
+  | 'constructionType'
+  | 'gender'
+  | 'fabricType'
+  | 'fiberFamily'
+  | 'pricingMode'
+  | 'taxClass'
+  | 'taxRuleVersion'
+  | 'sellingPrice'
+  | 'mrpPrice'
+  | 'costPrice'
+  | 'platformCommission'
+>;
+
+const canResolveAdminTaxPreview = (
+  values: Pick<
+    AddProductFormValues,
+    'category' | 'category2' | 'category3' | 'constructionType'
+  >,
+) =>
   Boolean(resolveUiCategoryKey(values) && values.constructionType);
 
-const buildTaxPreviewPayload = (values: AddProductFormValues) => ({
+const buildTaxPreviewPayload = (values: TaxPreviewInput) => ({
   uiCategoryKey: resolveUiCategoryKey(values),
   subcategoryKey: resolveSubcategoryKey(values),
   gender: values.gender || undefined,
@@ -216,6 +239,7 @@ const SellerAddProductPage = () => {
     taxClass,
     taxRuleVersion,
     sellingPrice,
+    mrpPrice,
     costPrice,
     platformCommission,
     taxPercentage,
@@ -223,7 +247,23 @@ const SellerAddProductPage = () => {
   const { setFieldValue } = formik;
 
   const taxPreviewPayload = useMemo(
-    () => buildTaxPreviewPayload(formik.values),
+    () =>
+      buildTaxPreviewPayload({
+        category,
+        category2,
+        category3,
+        constructionType,
+        costPrice,
+        fabricType,
+        fiberFamily,
+        gender,
+        mrpPrice,
+        platformCommission,
+        pricingMode,
+        sellingPrice,
+        taxClass,
+        taxRuleVersion,
+      }),
     [
       category,
       category2,
@@ -236,15 +276,21 @@ const SellerAddProductPage = () => {
       taxClass,
       taxRuleVersion,
       sellingPrice,
+      mrpPrice,
       costPrice,
       platformCommission,
     ],
   );
 
   useEffect(() => {
-    const currentValues = formik.values;
-
-    if (!canResolveAdminTaxPreview(currentValues)) {
+    if (
+      !canResolveAdminTaxPreview({
+        category,
+        category2,
+        category3,
+        constructionType,
+      })
+    ) {
       setTaxPreview(null);
       setTaxPreviewError(null);
       setFieldValue('hsnCode', '', false);
@@ -341,6 +387,7 @@ const SellerAddProductPage = () => {
     sellingPrice,
     costPrice,
     platformCommission,
+    taxPercentage,
     setFieldValue,
     taxPreviewPayload,
   ]);

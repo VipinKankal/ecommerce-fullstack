@@ -1,3 +1,4 @@
+/* eslint-disable react/display-name */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
@@ -113,6 +114,9 @@ describe('App refresh bootstrap', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
     dispatchMock.mockClear();
+    baseState.customerAuth.user = null;
+    baseState.sellerAuth.profile = null;
+    baseState.adminAuth.user = null;
     mockedGetAuthRole.mockReset();
     mockedGetUserProfile.mockClear();
     mockedFetchSellerProfile.mockClear();
@@ -173,4 +177,5 @@ describe('App refresh bootstrap', () => {
     expect(mockedGetUserProfile).not.toHaveBeenCalled();
     expect(mockedGetAdminProfile).not.toHaveBeenCalled();
   });
+
 });

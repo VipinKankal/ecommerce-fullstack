@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+set -eu
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+
+run_step() {
+  echo ""
+  echo "[pre-push] $1"
+  shift
+  "$@"
+}
+
+run_step "Backend compile" sh -c "cd \"$ROOT_DIR/backend\" && ./mvnw -q -DskipTests compile"
+run_step "Backend tests" sh -c "cd \"$ROOT_DIR/backend\" && ./mvnw -q test -DskipITs"
+
+run_step "Frontend typecheck" sh -c "cd \"$ROOT_DIR/frontend\" && npm run typecheck"
+run_step "Frontend tests" sh -c "cd \"$ROOT_DIR/frontend\" && npm run test:ci"
+run_step "Frontend build (production-safe env check)" sh -c "cd \"$ROOT_DIR/frontend\" && REACT_APP_API_BASE_URL=${REACT_APP_API_BASE_URL:-https://api.prepush.local} npm run build"
+
+echo ""
+echo "[pre-push] All checks passed."

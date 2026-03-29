@@ -28,11 +28,7 @@ const ComplianceNoteShortcut = () => {
   }, [location.pathname]);
 
   useEffect(() => {
-    if (mode === 'none') {
-      setSellerUnreadCount(0);
-      setDraftCount(0);
-      return;
-    }
+    if (mode === 'none') return;
 
     const refresh = async () => {
       if (mode === 'admin') {

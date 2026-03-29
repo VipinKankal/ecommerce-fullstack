@@ -56,6 +56,7 @@ public class AppConfiguration {
                                 "/api/auth/signin",
                                 "/api/auth/logout",
                                 "/api/auth/sent/login-signup-otp",
+                                "/api/admin/auth/signup",
                                 "/api/admin/auth/login",
                                 "/api/payment/phonepe/webhook"
                         ).permitAll()
@@ -94,6 +95,7 @@ public class AppConfiguration {
                                 "/api/auth/signin",
                                 "/api/auth/logout",
                                 "/api/auth/sent/login-signup-otp",
+                                "/api/admin/auth/signup",
                                 "/api/admin/auth/login",
                                 "/api/payment/phonepe/webhook",
                                 "/sellers",

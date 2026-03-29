@@ -2,7 +2,6 @@ package com.example.ecommerce.seller.service.impl;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.client.RestTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,11 +12,9 @@ class GstinVerificationServiceImplTest {
     private static final String VALID_GSTIN = "29ABCDE1234F1ZW";
 
     private GstinVerificationServiceImpl serviceWithManualList(String allowList) {
-        GstinVerificationServiceImpl service = new GstinVerificationServiceImpl(new RestTemplate());
+        GstinVerificationServiceImpl service = new GstinVerificationServiceImpl();
         ReflectionTestUtils.setField(service, "verificationMode", "MANUAL");
         ReflectionTestUtils.setField(service, "manuallyApprovedActiveGstins", allowList);
-        ReflectionTestUtils.setField(service, "gstVerificationApiUrl", "");
-        ReflectionTestUtils.setField(service, "gstVerificationApiKey", "");
         return service;
     }
 
@@ -62,6 +59,21 @@ class GstinVerificationServiceImplTest {
         );
         assertEquals(
                 "GSTIN is not ACTIVE. Seller onboarding allows only ACTIVE GST registration.",
+                ex.getMessage()
+        );
+    }
+
+    @Test
+    void assertActiveRejectsApiModeBecauseApiVerificationIsDisabled() {
+        GstinVerificationServiceImpl service = serviceWithManualList(VALID_GSTIN);
+        ReflectionTestUtils.setField(service, "verificationMode", "API");
+
+        IllegalArgumentException ex = assertThrows(
+                IllegalArgumentException.class,
+                () -> service.assertActive(VALID_GSTIN)
+        );
+        assertEquals(
+                "GST verification API mode is disabled. Use MANUAL verification and admin review.",
                 ex.getMessage()
         );
     }

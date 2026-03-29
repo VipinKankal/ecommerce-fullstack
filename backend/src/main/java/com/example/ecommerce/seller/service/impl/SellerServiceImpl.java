@@ -36,6 +36,9 @@ public class SellerServiceImpl implements SellerService {
     private static final String POLICY_ALLOW_NON_GST = "ALLOW_NON_GST_WITH_DECLARATION";
     private static final String GST_REGISTERED = "GST_REGISTERED";
     private static final String NON_GST_DECLARATION = "NON_GST_DECLARATION";
+    private static final String GST_COMPLIANCE_ACTIVE = "ACTIVE_GSTIN";
+    private static final String GST_COMPLIANCE_PENDING_ADMIN = "PENDING_ADMIN_VERIFICATION";
+    private static final String GST_COMPLIANCE_DECLARED_NON_GST = "DECLARED_NON_GST";
 
     private final SellerRepository sellerRepository;
     private final JwtProvider jwtProvider;
@@ -47,6 +50,9 @@ public class SellerServiceImpl implements SellerService {
 
     @Value("${app.gst.onboarding.policy:MANDATORY_ACTIVE_GSTIN}")
     private String gstOnboardingPolicy;
+
+    @Value("${app.gst.verification.enforce-active-on-signup:false}")
+    private boolean enforceActiveGstinOnSignup;
 
     @Override
     public Seller getSellerProfile(String jwt) throws Exception {
@@ -72,7 +78,7 @@ public class SellerServiceImpl implements SellerService {
         newSeller.setSellerName(request.getSellerName());
         newSeller.setPickupAddress(request.getPickupAddress() == null ? new Address() : request.getPickupAddress());
         newSeller.setRole(UserRole.ROLE_SELLER);
-        newSeller.setAccountStatus(AccountStatus.ACTIVE);
+        newSeller.setAccountStatus(AccountStatus.PENDING_VERIFICATION);
         newSeller.setMobileNumber(request.getMobileNumber());
         newSeller.setDateOfBirth(request.getDateOfBirth());
         newSeller.setBankDetails(request.getBankDetails() == null ? new BankDetails() : request.getBankDetails());
@@ -293,10 +299,14 @@ public class SellerServiceImpl implements SellerService {
 
         if (GST_REGISTERED.equals(normalizedRegistrationType)) {
             String normalizedGstin = gstinVerificationService.normalizeAndValidate(requestedGstin);
-            gstinVerificationService.assertActive(normalizedGstin);
             seller.setGSTIN(normalizedGstin);
             seller.setGstDeclarationAccepted(false);
-            seller.setGstComplianceStatus("ACTIVE_GSTIN");
+            if (enforceActiveGstinOnSignup) {
+                gstinVerificationService.assertActive(normalizedGstin);
+                seller.setGstComplianceStatus(GST_COMPLIANCE_ACTIVE);
+            } else {
+                seller.setGstComplianceStatus(GST_COMPLIANCE_PENDING_ADMIN);
+            }
             if (seller.getBusinessDetails() != null) {
                 seller.getBusinessDetails().setGstNumber(normalizedGstin);
             }
@@ -312,7 +322,7 @@ public class SellerServiceImpl implements SellerService {
 
         seller.setGSTIN(null);
         seller.setGstDeclarationAccepted(true);
-        seller.setGstComplianceStatus("DECLARED_NON_GST");
+        seller.setGstComplianceStatus(GST_COMPLIANCE_DECLARED_NON_GST);
         if (seller.getBusinessDetails() != null) {
             seller.getBusinessDetails().setGstNumber(null);
         }
