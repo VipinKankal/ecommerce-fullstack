@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Button } from '@mui/material';
+import { Button, IconButton, useMediaQuery, useTheme } from '@mui/material';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import AddShoppingCartIcon from '@mui/icons-material/AddShoppingCart';
 import FlashOnIcon from '@mui/icons-material/FlashOn';
+import ShoppingBagOutlinedIcon from '@mui/icons-material/ShoppingBagOutlined';
+import RateReviewOutlinedIcon from '@mui/icons-material/RateReviewOutlined';
+import SendOutlinedIcon from '@mui/icons-material/SendOutlined';
+import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import { useNavigate } from 'react-router-dom';
 import { Product } from 'shared/types/product.types';
 import { useAppDispatch, useAppSelector } from 'app/store/Store';
@@ -16,16 +20,18 @@ const ProductCard = ({ item }: { item: Product }) => {
   const [isHovered, setIsHovered] = useState(false);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const customer = useAppSelector((state) => state.customerAuth.user);
   const wishlistItems = useAppSelector((state) => state.wishlist.items);
 
   const images = item.images || [];
   const isWishlisted = Boolean(
     item.id &&
-    wishlistItems.some(
-      (wishlistItem: { id?: number } | null | undefined) =>
-        wishlistItem?.id === item.id,
-    ),
+      wishlistItems.some(
+        (wishlistItem: { id?: number } | null | undefined) =>
+          wishlistItem?.id === item.id,
+      ),
   );
 
   useEffect(() => {
@@ -136,6 +142,32 @@ const ProductCard = ({ item }: { item: Product }) => {
     }
   };
 
+  const handleReviewClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!item.id) return;
+    navigate(`/reviews/${item.id}`);
+  };
+
+  const handleShare = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const shareUrl = `${window.location.origin}/product-details/${item.category?.categoryId}/${item.title}/${item.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: item.title,
+          text: item.description,
+          url: shareUrl,
+        });
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+    } catch {
+      // Ignore share cancellation on mobile browsers.
+    }
+  };
+
   const colorValue = item.color as unknown;
   const displayColor =
     typeof colorValue === 'string'
@@ -148,6 +180,111 @@ const ProductCard = ({ item }: { item: Product }) => {
         : 'N/A';
   const fallbackImage =
     'https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=600&auto=format&fit=crop';
+  const productImages = images.length > 0 ? images : [fallbackImage];
+  const brandName = (item.brand || item.seller?.sellerName || 'BRAND NAME').toUpperCase();
+  const shortDescription =
+    item.description?.trim().length > 0
+      ? item.description.trim().slice(0, 48)
+      : displayColor;
+
+  if (isMobile) {
+    return (
+      <div className="mx-auto w-full max-w-md overflow-hidden border border-gray-300 bg-white shadow-sm">
+        <div className="flex items-center justify-between px-3 py-2 text-[11px] uppercase tracking-wide text-gray-800">
+          <span className="truncate">{brandName}</span>
+          <button
+            type="button"
+            onClick={handleToggleWishlist}
+            className="rounded-full border-none bg-transparent p-0 text-gray-500"
+          >
+            {isWishlisted ? (
+              <FavoriteIcon sx={{ fontSize: 28 }} className="text-[#ff3f6c]" />
+            ) : (
+              <AccountCircleOutlinedIcon sx={{ fontSize: 30 }} />
+            )}
+          </button>
+        </div>
+
+        <div className="border-t border-gray-300 px-3 py-2">
+          <div className="flex items-start gap-5 text-[10px] text-gray-700">
+            <button
+              type="button"
+              onClick={handleBuyNow}
+              className="flex flex-col items-center gap-1 border-none bg-transparent p-0 text-inherit"
+            >
+              <ShoppingBagOutlinedIcon sx={{ fontSize: 18 }} />
+              <span>Buy Now</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleReviewClick}
+              className="flex flex-col items-center gap-1 border-none bg-transparent p-0 text-inherit"
+            >
+              <RateReviewOutlinedIcon sx={{ fontSize: 18 }} />
+              <span>Review</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex flex-col items-center gap-1 border-none bg-transparent p-0 text-inherit"
+            >
+              <SendOutlinedIcon sx={{ fontSize: 18 }} />
+              <span>Share</span>
+            </button>
+          </div>
+
+          <div className="mt-3 space-y-1 text-[11px] leading-4 text-gray-800">
+            <p>{item.title || 'Product Name'}</p>
+            <p>{shortDescription || 'Product Description'}</p>
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span>Rs. {item.sellingPrice}</span>
+              <span className="text-gray-500 line-through">Rs. {item.mrpPrice}</span>
+              <span className="text-gray-700">({item.discountPercent}% OFF)</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          onClick={handleNavigate}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              handleNavigate();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          className="relative"
+        >
+          <img
+            src={productImages[currentImage]}
+            alt={item.title}
+            className="h-[300px] w-full object-cover"
+          />
+          <div className="absolute right-3 top-3 rounded-full bg-black/55 px-3 py-1 text-[11px] text-white">
+            {currentImage + 1} / {productImages.length}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center gap-1 py-3 text-gray-400">
+          {productImages.map((image, index) => (
+            <button
+              key={`${image}-${index}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrentImage(index);
+              }}
+              className={`h-1.5 w-1.5 rounded-full ${
+                currentImage === index ? 'bg-gray-700' : 'bg-gray-300'
+              }`}
+              aria-label={`View image ${index + 1}`}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -172,7 +309,7 @@ const ProductCard = ({ item }: { item: Product }) => {
           className="flex transition-transform duration-500 ease-in-out h-full"
           style={{ transform: `translateX(-${currentImage * 100}%)` }}
         >
-          {(images.length > 0 ? images : [fallbackImage]).map((img) => (
+          {productImages.map((img) => (
             <img
               key={`${item.id || item.title}-${img}`}
               src={img}

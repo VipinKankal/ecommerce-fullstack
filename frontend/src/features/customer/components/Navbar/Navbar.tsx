@@ -17,6 +17,9 @@ import {
   AddShoppingCart,
   FavoriteBorder,
   Search as SearchIcon,
+  HomeOutlined,
+  Inventory2Outlined,
+  ShoppingBagOutlined,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { mainCategory } from 'shared/constants/data/Category/mainCategory';
@@ -40,6 +43,8 @@ const Navbar = () => {
     (s) => s.cart.cart?.cartItems ?? EMPTY_CART_ITEMS,
   );
   const wishlistCount = useAppSelector((s) => s.wishlist.items.length);
+  const mobileNavItemClass =
+    'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-none bg-transparent px-1 py-2 text-[11px] font-medium text-gray-700';
 
   const actionButtonSx = {
     borderRadius: '20px',
@@ -59,7 +64,6 @@ const Navbar = () => {
     <nav className="relative">
       <Box className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div className="flex items-center justify-between px-3 sm:px-5 lg:px-20 h-[64px] lg:h-[75px]">
-          {/* LEFT: Logo & Nav Links */}
           <div className="flex items-center gap-3 lg:gap-10 min-w-0">
             <div className="flex items-center">
               {!isLarge && (
@@ -102,7 +106,6 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* RIGHT: Actions */}
           <div className="flex gap-1 lg:gap-3 items-center">
             <IconButton className="hover:text-teal-600">
               <SearchIcon />
@@ -228,7 +231,6 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* MEGA MENU: Desktop only */}
         {isLarge && (
           <div
             onMouseLeave={() => setShowCategorySheet(false)}
@@ -246,7 +248,16 @@ const Navbar = () => {
         )}
       </Box>
 
-      {/* MOBILE DRAWER */}
+      {!isLarge && !user && (
+        <button
+          type="button"
+          onClick={() => navigate('/login')}
+          className="fixed right-3 top-[74px] z-[60] rounded-sm border border-[#5b84ff] bg-white px-3 py-1 text-[11px] font-medium text-gray-700 shadow-sm"
+        >
+          login
+        </button>
+      )}
+
       <Drawer
         anchor="left"
         open={openMobileDrawer}
@@ -295,7 +306,6 @@ const Navbar = () => {
             ))}
           </List>
 
-          {/* Mobile Login Button */}
           <Box className="p-5 mt-auto">
             <Button
               fullWidth
@@ -309,12 +319,53 @@ const Navbar = () => {
         </Box>
       </Drawer>
 
-      {/* OVERLAY */}
       {showCategorySheet && isLarge && (
         <div
           onMouseEnter={() => setShowCategorySheet(false)}
           className="fixed inset-0 bg-black/30 z-40 backdrop-blur-[2px]"
         />
+      )}
+
+      {!isLarge && (
+        <div className="fixed inset-x-0 bottom-0 z-50 border-t border-gray-200 bg-white">
+          <div className="mx-auto flex max-w-md items-stretch justify-between">
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className={mobileNavItemClass}
+            >
+              <HomeOutlined sx={{ fontSize: 24 }} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/products/men')}
+              className={mobileNavItemClass}
+            >
+              <SearchIcon sx={{ fontSize: 24 }} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/products/men')}
+              className={mobileNavItemClass}
+            >
+              <Inventory2Outlined sx={{ fontSize: 24 }} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/checkout/cart')}
+              className={mobileNavItemClass}
+            >
+              <ShoppingBagOutlined sx={{ fontSize: 24 }} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(user ? '/wishlist' : '/login')}
+              className={mobileNavItemClass}
+            >
+              <FavoriteBorder sx={{ fontSize: 24 }} />
+            </button>
+          </div>
+        </div>
       )}
     </nav>
   );

@@ -1,24 +1,20 @@
-package com.example.ecommerce.order.controller;
+package com.example.ecommerce.order.usecase;
 
+import com.example.ecommerce.common.domain.CouponReservationState;
+import com.example.ecommerce.common.domain.OrderStatus;
 import com.example.ecommerce.common.domain.PaymentMethod;
 import com.example.ecommerce.common.domain.PaymentOrderStatus;
 import com.example.ecommerce.common.domain.PaymentProvider;
 import com.example.ecommerce.common.domain.PaymentStatus;
 import com.example.ecommerce.common.domain.PaymentType;
-import com.example.ecommerce.common.domain.CouponReservationState;
-import com.example.ecommerce.common.domain.UserRole;
-import com.example.ecommerce.common.mapper.ResponseMapper;
-import com.example.ecommerce.inventory.service.InventoryService;
-import com.example.ecommerce.modal.*;
+import com.example.ecommerce.modal.Address;
+import com.example.ecommerce.modal.Cart;
+import com.example.ecommerce.modal.Order;
+import com.example.ecommerce.modal.PaymentOrder;
+import com.example.ecommerce.modal.User;
 import com.example.ecommerce.order.request.CheckoutOrderRequest;
 import com.example.ecommerce.order.request.CheckoutOrderSummaryRequest;
-import com.example.ecommerce.order.request.CancelOrderRequest;
-import com.example.ecommerce.repository.PaymentOrderRepository;
 import com.example.ecommerce.order.response.CheckoutOrderSummaryResponse;
-import com.example.ecommerce.order.response.OrderHistoryItemResponse;
-import com.example.ecommerce.order.response.OrderHistoryProductResponse;
-import com.example.ecommerce.order.response.OrderHistoryResponse;
-import com.example.ecommerce.order.response.OrderShippingAddressResponse;
 import com.example.ecommerce.order.response.PaymentLinkResponse;
 import com.example.ecommerce.order.response.PhonePePaymentSession;
 import com.example.ecommerce.order.service.CartService;
@@ -26,80 +22,44 @@ import com.example.ecommerce.order.service.CheckoutTaxSummaryService;
 import com.example.ecommerce.order.service.CouponService;
 import com.example.ecommerce.order.service.OrderService;
 import com.example.ecommerce.order.service.PaymentService;
-import com.example.ecommerce.seller.service.SellerReportService;
-import com.example.ecommerce.seller.service.SellerService;
+import com.example.ecommerce.repository.PaymentOrderRepository;
 import com.example.ecommerce.user.service.UserService;
-import com.razorpay.PaymentLink;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.Hibernate;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
+import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 import java.util.Set;
 
-@RestController
+@Service
 @RequiredArgsConstructor
-@RequestMapping("/api/orders")
-public class OrderController {
-    private static final List<String> CANCEL_REASONS = List.of(
-            "FOUND_BETTER_PRICE",
-            "CHANGED_MY_MIND",
-            "ORDERED_BY_MISTAKE",
-            "DELIVERY_IS_TOO_LATE",
-            "NEED_TO_CHANGE_ADDRESS",
-            "PAYMENT_ISSUE",
-            "OTHER"
-    );
+public class OrderCheckoutUseCase {
 
     private final OrderService orderService;
     private final UserService userService;
     private final CartService cartService;
     private final CheckoutTaxSummaryService checkoutTaxSummaryService;
     private final CouponService couponService;
-    private final SellerService sellerService;
-    private final SellerReportService sellerReportService;
     private final PaymentService paymentService;
     private final PaymentOrderRepository paymentOrderRepository;
-    private final InventoryService inventoryService;
 
-    @PostMapping
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<PaymentLinkResponse> createPaymentLink(
-            @RequestBody Address shippingAddress,
-            @RequestParam String paymentMethod,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
+    public PaymentLinkResponse createPaymentLink(Address shippingAddress, String paymentMethod, String jwt) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
-        PaymentMethod resolvedPaymentMethod = resolveCheckoutPaymentMethod(paymentMethod == null ? "" : paymentMethod.trim().toUpperCase());
-        PaymentLinkResponse response = resolvedPaymentMethod == PaymentMethod.COD
+        PaymentMethod resolvedPaymentMethod =
+                resolveCheckoutPaymentMethod(paymentMethod == null ? "" : paymentMethod.trim().toUpperCase());
+        return resolvedPaymentMethod == PaymentMethod.COD
                 ? createCashOnDeliveryResponse(user, shippingAddress)
                 : createOnlinePaymentResponse(user, shippingAddress, resolvedPaymentMethod, null);
-        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @PostMapping("/create")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<PaymentLinkResponse> createCheckoutOrder(
-            @Valid @RequestBody CheckoutOrderRequest request,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
+    public PaymentLinkResponse createCheckoutOrder(CheckoutOrderRequest request, String jwt) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         String normalizedPaymentMethod = request.getPaymentMethod() == null
                 ? ""
                 : request.getPaymentMethod().trim().toUpperCase();
 
         if ("COD".equals(normalizedPaymentMethod)) {
-            return new ResponseEntity<>(createCashOnDeliveryResponse(user, request.getShippingAddress()), HttpStatus.OK);
+            return createCashOnDeliveryResponse(user, request.getShippingAddress());
         }
 
         String checkoutRequestId = normalizeCheckoutRequestId(request.getCheckoutRequestId());
@@ -109,198 +69,22 @@ public class OrderController {
                     checkoutRequestId
             );
             if (previousAttempt != null && previousAttempt.getStatus() != PaymentOrderStatus.SUCCESS) {
-                return new ResponseEntity<>(retryExistingPaymentOrder(user, previousAttempt), HttpStatus.OK);
+                return retryExistingPaymentOrder(user, previousAttempt);
             }
         }
 
-        return new ResponseEntity<>(
-                createOnlinePaymentResponse(
-                        user,
-                        request.getShippingAddress(),
-                        resolveCheckoutPaymentMethod(normalizedPaymentMethod),
-                        checkoutRequestId
-                ),
-                HttpStatus.OK
+        return createOnlinePaymentResponse(
+                user,
+                request.getShippingAddress(),
+                resolveCheckoutPaymentMethod(normalizedPaymentMethod),
+                checkoutRequestId
         );
     }
 
-    @PostMapping("/summary")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<CheckoutOrderSummaryResponse> getCheckoutSummary(
-            @Valid @RequestBody CheckoutOrderSummaryRequest request,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
+    public CheckoutOrderSummaryResponse getCheckoutSummary(CheckoutOrderSummaryRequest request, String jwt) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
         Cart cart = requireCart(user);
-        return ResponseEntity.ok(checkoutTaxSummaryService.buildSummary(cart, request.getShippingAddress()));
-    }
-
-    @GetMapping("/user/history")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    @Transactional(readOnly = true)
-    public ResponseEntity<List<OrderHistoryResponse>> usersOrderHistory(
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
-        User user = userService.findUserByJwtToken(jwt);
-        List<Order> orders = orderService.usersOrderHistory(user.getId());
-        List<OrderHistoryResponse> response = orders.stream().map(this::toOrderHistoryResponse).toList();
-        return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
-    }
-
-    @GetMapping("/{orderId}")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    @Transactional(readOnly = true)
-    public ResponseEntity<OrderHistoryResponse> getOrderById(
-            @PathVariable Long orderId,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
-        User user = userService.findUserByJwtToken(jwt);
-        Order order = orderService.findOrderById(orderId);
-
-        if (user.getRole() != UserRole.ROLE_ADMIN && (order.getUser() == null || !order.getUser().getId().equals(user.getId()))) {
-            throw new AccessDeniedException("Unauthorized order access");
-        }
-
-        return new ResponseEntity<>(toOrderHistoryResponse(order), HttpStatus.ACCEPTED);
-    }
-
-    @GetMapping("/item/{orderItemId}")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    @Transactional(readOnly = true)
-    public ResponseEntity<OrderHistoryItemResponse> getOrderItemById(
-            @PathVariable Long orderItemId,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
-        User user = userService.findUserByJwtToken(jwt);
-        OrderItem orderItem = orderService.getOrderItemById(orderItemId);
-
-        if (user.getRole() != UserRole.ROLE_ADMIN && (orderItem.getOrder() == null || orderItem.getOrder().getUser() == null
-                || !orderItem.getOrder().getUser().getId().equals(user.getId()))) {
-            throw new AccessDeniedException("Unauthorized order item access");
-        }
-
-        return new ResponseEntity<>(toOrderItemResponse(orderItem), HttpStatus.ACCEPTED);
-    }
-
-    @GetMapping("/cancel-reasons")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    public ResponseEntity<List<String>> getCancelReasons() {
-        return ResponseEntity.ok(CANCEL_REASONS);
-    }
-
-    @PutMapping("/{orderId}/cancel")
-    @PreAuthorize("hasAnyRole('CUSTOMER','ADMIN')")
-    @Transactional
-    public ResponseEntity<OrderHistoryResponse> cancelOrder(
-            @PathVariable Long orderId,
-            @Valid @RequestBody CancelOrderRequest request,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
-        User user = userService.findUserByJwtToken(jwt);
-        Order order = orderService.cancelOrder(
-                orderId,
-                user,
-                request.getCancelReasonCode(),
-                request.getCancelReasonText()
-        );
-        couponService.releaseCouponReservation(
-                order.getCouponCode(),
-                user.getId(),
-                "ORDER_CANCELLED",
-                "Reservation released due to customer cancellation"
-        );
-        couponService.restoreCouponUsageForCancelledOrders(
-                user,
-                List.of(order),
-                "Order cancelled by customer before shipment"
-        );
-
-        if (order.getOrderItems() != null) {
-            for (OrderItem orderItem : order.getOrderItems()) {
-                if (orderItem.getProduct() != null) {
-                    inventoryService.restoreWarehouseStockFromCancellation(
-                            orderItem.getProduct(),
-                            orderItem.getQuantity(),
-                            orderItem.getId(),
-                            "Order cancelled and stock returned to warehouse"
-                    );
-                }
-            }
-        }
-
-        Seller seller = sellerService.getSellerById(order.getSellerId());
-        SellerReport report = sellerReportService.getSellerReport(seller);
-        report.setCancelledOrders(report.getCancelledOrders() + 1);
-        report.setTotalRefunds(report.getTotalRefunds() + order.getTotalSellingPrice());
-        sellerReportService.updateSellerReport(report);
-
-        return new ResponseEntity<>(toOrderHistoryResponse(order), HttpStatus.ACCEPTED);
-    }
-
-    private OrderHistoryResponse toOrderHistoryResponse(Order order) {
-        OrderHistoryResponse response = new OrderHistoryResponse();
-        response.setId(order.getId());
-        response.setOrderStatus(order.getOrderStatus() != null ? order.getOrderStatus().name() : "PENDING");
-        response.setPaymentStatus(order.getPaymentStatus() != null ? order.getPaymentStatus().name() : "PENDING");
-        response.setPaymentMethod(order.getPaymentMethod());
-        response.setPaymentType(order.getPaymentType());
-        response.setProvider(order.getProvider());
-        response.setTotalSellingPrice(order.getTotalSellingPrice());
-        response.setTotalItems(order.getTotalItems());
-        response.setOrderDate(order.getOrderDate());
-        response.setDeliveredAt(order.getDeliveredAt());
-        response.setCancelledAt(order.getCancelledAt());
-        response.setCancelReasonCode(order.getCancelReasonCode());
-        response.setCancelReasonText(order.getCancelReasonText());
-        response.setShippingAddress(toShippingAddressResponse(order.getShippingAddress()));
-        response.setOrderTaxSnapshot(ResponseMapper.toOrderTaxSnapshotResponse(order.getOrderTaxSnapshot()));
-
-        List<OrderHistoryItemResponse> items = order.getOrderItems().stream()
-                .map(this::toOrderItemResponse)
-                .toList();
-
-        response.setOrderItems(items);
-        return response;
-    }
-
-    private OrderHistoryItemResponse toOrderItemResponse(OrderItem orderItem) {
-        OrderHistoryItemResponse itemResponse = new OrderHistoryItemResponse();
-        itemResponse.setId(orderItem.getId());
-        itemResponse.setSize(orderItem.getSize());
-        itemResponse.setQuantity(orderItem.getQuantity());
-        itemResponse.setMrpPrice(orderItem.getMrpPrice());
-        itemResponse.setSellingPrice(orderItem.getSellingPrice());
-
-        if (orderItem.getProduct() != null) {
-            OrderHistoryProductResponse product = new OrderHistoryProductResponse();
-            product.setId(orderItem.getProduct().getId());
-            product.setTitle(orderItem.getProduct().getTitle());
-            product.setDescription(orderItem.getProduct().getDescription());
-
-            if (Hibernate.isInitialized(orderItem.getProduct().getImages())) {
-                product.setImages(new ArrayList<>(orderItem.getProduct().getImages()));
-            } else {
-                product.setImages(List.of());
-            }
-
-            itemResponse.setProduct(product);
-        }
-
-        return itemResponse;
-    }
-
-    private OrderShippingAddressResponse toShippingAddressResponse(Address address) {
-        if (address == null) return null;
-        OrderShippingAddressResponse response = new OrderShippingAddressResponse();
-        response.setName(address.getName());
-        response.setStreet(address.getStreet());
-        response.setLocality(address.getLocality());
-        response.setAddress(address.getAddress());
-        response.setCity(address.getCity());
-        response.setState(address.getState());
-        response.setPinCode(address.getPinCode());
-        response.setMobileNumber(address.getMobileNumber());
-        return response;
+        return checkoutTaxSummaryService.buildSummary(cart, request.getShippingAddress());
     }
 
     private Cart requireCart(User user) throws Exception {
@@ -327,7 +111,7 @@ public class OrderController {
                         user,
                         shippingAddress,
                         cart,
-                        com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                        OrderStatus.INITIATED,
                         PaymentStatus.PENDING,
                         PaymentMethod.UPI,
                         PaymentType.UPI,
@@ -353,7 +137,7 @@ public class OrderController {
                         PaymentType.UPI,
                         PaymentProvider.PHONEPE,
                         PaymentStatus.PENDING,
-                        com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                        OrderStatus.INITIATED,
                         session.getRedirectUrl(),
                         session.getMerchantTransactionId()
                 );
@@ -363,7 +147,7 @@ public class OrderController {
                     user,
                     shippingAddress,
                     cart,
-                    com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                    OrderStatus.INITIATED,
                     PaymentStatus.PENDING,
                     PaymentMethod.CARD,
                     PaymentType.CARD,
@@ -394,7 +178,7 @@ public class OrderController {
                     PaymentType.CARD,
                     PaymentProvider.STRIPE,
                     PaymentStatus.PENDING,
-                    com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                    OrderStatus.INITIATED,
                     paymentUrl,
                     String.valueOf(paymentOrder.getId())
             );
@@ -418,7 +202,7 @@ public class OrderController {
                 user,
                 shippingAddress,
                 cart,
-                com.example.ecommerce.common.domain.OrderStatus.PLACED,
+                OrderStatus.PLACED,
                 PaymentStatus.PENDING,
                 PaymentMethod.COD,
                 PaymentType.CASH,
@@ -432,7 +216,7 @@ public class OrderController {
                 PaymentType.CASH,
                 null,
                 PaymentStatus.PENDING,
-                com.example.ecommerce.common.domain.OrderStatus.PLACED,
+                OrderStatus.PLACED,
                 null,
                 null
         );
@@ -511,7 +295,7 @@ public class OrderController {
                 paymentType,
                 provider,
                 PaymentStatus.PENDING,
-                com.example.ecommerce.common.domain.OrderStatus.INITIATED,
+                OrderStatus.INITIATED,
                 paymentUrl,
                 paymentReference
         );
@@ -537,7 +321,7 @@ public class OrderController {
             PaymentType paymentType,
             PaymentProvider provider,
             PaymentStatus paymentStatus,
-            com.example.ecommerce.common.domain.OrderStatus orderStatus,
+            OrderStatus orderStatus,
             String paymentUrl,
             String paymentReference
     ) {

@@ -1,14 +1,12 @@
 package com.example.ecommerce.order.service.impl;
 
 import com.example.ecommerce.admin.request.CreateCouponRequest;
-import com.example.ecommerce.common.domain.AccountStatus;
-import com.example.ecommerce.common.domain.CouponEventType;
 import com.example.ecommerce.common.domain.CouponDiscountType;
+import com.example.ecommerce.common.domain.CouponEventType;
 import com.example.ecommerce.common.domain.CouponScopeType;
 import com.example.ecommerce.common.domain.CouponUserEligibilityType;
 import com.example.ecommerce.common.response.ApiErrorCode;
 import com.example.ecommerce.modal.Cart;
-import com.example.ecommerce.modal.CartItem;
 import com.example.ecommerce.modal.Coupon;
 import com.example.ecommerce.modal.CouponEventLog;
 import com.example.ecommerce.modal.CouponUsage;
@@ -39,12 +37,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -56,11 +51,6 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CouponServiceImpl implements CouponService {
 
     private static final long CACHE_TTL_SECONDS = 180;
-    private static final int MAX_COUPON_ATTEMPTS_PER_2_MIN = 20;
-    private static final int MAX_COUPON_REJECTS_PER_10_MIN = 8;
-    private static final int MAX_IP_REJECTS_PER_10_MIN = 16;
-    private static final int MAX_DEVICE_REJECTS_PER_10_MIN = 12;
-    private static final int MAX_DEVICE_ATTEMPTS_PER_2_MIN = 24;
 
     private final CouponRepository couponRepository;
     private final CartRepository cartRepository;
@@ -243,7 +233,7 @@ public class CouponServiceImpl implements CouponService {
     public List<CouponResponse> findAllCoupons() {
         return couponRepository.findAll().stream()
                 .sorted(Comparator.comparing(Coupon::getId, Comparator.nullsLast(Long::compareTo)).reversed())
-                .map(this::toResponse)
+                .map(coupon -> CouponAdminSupport.toResponse(coupon, couponUserMapRepository))
                 .toList();
     }
 
@@ -478,135 +468,42 @@ public class CouponServiceImpl implements CouponService {
     @Transactional(readOnly = true)
     public Map<String, Object> recommendCoupon(User user) {
         Cart cart = requireCart(user);
-        double subtotal = calculateCartSubtotal(cart);
-        LocalDate today = LocalDate.now();
-        long orderCount = orderRepository.countByUserId(user.getId());
-        String experimentGroup = user.getId() != null && user.getId() % 2 == 0 ? "A" : "B";
-
-        Coupon winner = null;
-        double winnerDiscount = 0;
-        String winnerReason = null;
-
-        List<Coupon> candidates = couponRepository.findAll().stream()
-                .filter(Objects::nonNull)
-                .filter(Coupon::isActive)
-                .filter(coupon -> coupon.getValidityStartDate() == null || !today.isBefore(coupon.getValidityStartDate()))
-                .filter(coupon -> coupon.getValidityEndDate() == null || !today.isAfter(coupon.getValidityEndDate()))
-                .toList();
-
-        for (Coupon coupon : candidates) {
-            try {
-                validateCouponEligibility(coupon, user, cart);
-            } catch (CouponOperationException ignored) {
-                continue;
-            }
-
-            double applicableSubtotal = calculateApplicableSubtotal(coupon, cart);
-            if (applicableSubtotal <= 0) {
-                continue;
-            }
-            double discount = estimateDiscount(coupon, applicableSubtotal);
-            String reason;
-            if (Boolean.TRUE.equals(coupon.isFirstOrderOnly()) && orderCount == 0) {
-                reason = "new-user";
-            } else if (subtotal >= 2000) {
-                reason = "high-cart-value";
-            } else if (orderCount >= 5) {
-                reason = "loyal-customer";
-            } else {
-                reason = "best-discount";
-            }
-
-            boolean winsByGroupTieBreak = winner != null
-                    && Double.compare(discount, winnerDiscount) == 0
-                    && "B".equals(experimentGroup)
-                    && coupon.getCode().compareToIgnoreCase(winner.getCode()) > 0;
-
-            if (winner == null || discount > winnerDiscount || winsByGroupTieBreak) {
-                winner = coupon;
-                winnerDiscount = discount;
-                winnerReason = reason;
-            }
-        }
-
-        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
-        response.put("experimentGroup", experimentGroup);
-        response.put("cartSubtotal", roundCurrency(subtotal));
-        response.put("eligibleCouponCount", candidates.size());
-
-        if (winner == null) {
-            response.put("recommended", false);
-            response.put("message", "No eligible coupon found for current cart.");
-            return response;
-        }
-
-        response.put("recommended", true);
-        response.put("couponCode", winner.getCode());
-        response.put("estimatedDiscount", roundCurrency(winnerDiscount));
-        response.put("reason", winnerReason);
-        response.put("scopeType", winner.getScopeType() == null ? CouponScopeType.GLOBAL.name() : winner.getScopeType().name());
-        response.put("minimumOrderValue", winner.getMinimumOrderValue());
-        logEvent(winner.getId(), winner.getCode(), user.getId(), CouponEventType.RECOMMENDED, "AB_GROUP_" + experimentGroup, "Coupon recommendation served");
-        return response;
+        return CouponAnalyticsSupport.recommendCoupon(
+                user,
+                cart,
+                couponRepository,
+                orderRepository,
+                couponUsageRepository,
+                couponUserMapRepository,
+                this::couponValidation,
+                (eventType, payload) -> logEvent(
+                        (Long) payload.get("couponId"),
+                        (String) payload.get("couponCode"),
+                        (Long) payload.get("userId"),
+                        eventType,
+                        (String) payload.get("reasonCode"),
+                        (String) payload.get("note")
+                )
+        );
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> couponMetrics(int days) {
-        int effectiveDays = days <= 0 ? 30 : Math.min(days, 365);
-        LocalDateTime from = LocalDateTime.now().minusDays(effectiveDays);
-
-        long applyCount = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.APPLIED, from);
-        long rejectCount = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.APPLY_REJECTED, from);
-        long consumedCount = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.CONSUMED, from);
-        long restoredCount = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.RESTORED, from);
-        long usageCount = couponUsageRepository.countByUsedAtAfter(from);
-        Double summedDiscount = couponUsageRepository.sumDiscountAmountByUsedAtAfter(from);
-        double totalDiscountGiven = roundCurrency(summedDiscount == null ? 0 : summedDiscount);
-
-        double conversion = applyCount == 0 ? 0 : (consumedCount * 100.0) / applyCount;
-        double rejectionRate = applyCount == 0 ? 0 : (rejectCount * 100.0) / applyCount;
-
-        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
-        response.put("days", effectiveDays);
-        response.put("applied", applyCount);
-        response.put("rejected", rejectCount);
-        response.put("consumed", consumedCount);
-        response.put("restored", restoredCount);
-        response.put("usageRows", usageCount);
-        response.put("totalDiscountGiven", totalDiscountGiven);
-        response.put("conversionRatePercent", roundCurrency(conversion));
-        response.put("rejectionRatePercent", roundCurrency(rejectionRate));
-        return response;
+        return CouponAnalyticsSupport.couponMetrics(days, couponEventLogRepository, couponUsageRepository);
     }
 
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> couponMonitoringSnapshot(int windowMinutes) {
-        int effectiveWindow = windowMinutes <= 0 ? 30 : Math.min(windowMinutes, 180);
-        LocalDateTime from = LocalDateTime.now().minusMinutes(effectiveWindow);
-        long applies = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.APPLIED, from);
-        long rejects = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.APPLY_REJECTED, from);
-        long recommended = couponEventLogRepository.countByEventTypeAndCreatedAtAfter(CouponEventType.RECOMMENDED, from);
-        double rejectRate = applies == 0 ? 0 : (rejects * 100.0) / applies;
-        long cacheHits = couponCacheHits.get();
-        long cacheMisses = couponCacheMisses.get();
-        long cacheAccesses = cacheHits + cacheMisses;
-        double cacheHitRate = cacheAccesses == 0 ? 0 : (cacheHits * 100.0) / cacheAccesses;
-
-        LinkedHashMap<String, Object> response = new LinkedHashMap<>();
-        response.put("windowMinutes", effectiveWindow);
-        response.put("applies", applies);
-        response.put("rejects", rejects);
-        response.put("recommended", recommended);
-        response.put("rejectRatePercent", roundCurrency(rejectRate));
-        response.put("cacheHits", cacheHits);
-        response.put("cacheMisses", cacheMisses);
-        response.put("cacheHitRatePercent", roundCurrency(cacheHitRate));
-        response.put("cacheSize", couponCache.size());
-        response.put("cacheTtlSeconds", CACHE_TTL_SECONDS);
-        response.put("alert", applies >= 20 && rejectRate >= 40.0);
-        return response;
+        return CouponAnalyticsSupport.couponMonitoringSnapshot(
+                windowMinutes,
+                couponEventLogRepository,
+                couponCacheHits,
+                couponCacheMisses,
+                couponCache.size(),
+                CACHE_TTL_SECONDS
+        );
     }
 
     @Scheduled(cron = "${app.coupon.monitor-cron:0 */10 * * * *}")
@@ -652,178 +549,35 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private void validateCouponEligibility(Coupon coupon, User user, Cart cart) {
-        double subtotal = calculateCartSubtotal(cart);
-        if (!coupon.isActive()) {
-            throw couponValidation("COUPON_INACTIVE", "Coupon is not active");
-        }
-        if (user.getAccountStatus() != AccountStatus.ACTIVE) {
-            throw couponValidation("USER_INACTIVE", "Only active users can use coupons");
-        }
-        if (subtotal <= 0) {
-            throw couponValidation("CART_EMPTY", "Cart is empty");
-        }
-        if (subtotal < coupon.getMinimumOrderValue()) {
-            throw couponValidation(
-                    "MIN_ORDER_NOT_MET",
-                    "Valid for minimum order value " + roundCurrency(coupon.getMinimumOrderValue())
-            );
-        }
-
-        LocalDate today = LocalDate.now();
-        boolean afterStart = coupon.getValidityStartDate() == null || !today.isBefore(coupon.getValidityStartDate());
-        boolean beforeEnd = coupon.getValidityEndDate() == null || !today.isAfter(coupon.getValidityEndDate());
-        if (!afterStart || !beforeEnd) {
-            throw couponValidation("COUPON_EXPIRED", "Coupon not valid");
-        }
-
-        int usedCount = coupon.getUsedCount() == null ? 0 : coupon.getUsedCount();
-        int reservedCount = coupon.getReservedCount() == null ? 0 : coupon.getReservedCount();
-        if (coupon.getUsageLimit() != null && usedCount + reservedCount >= coupon.getUsageLimit()) {
-            throw couponValidation("USAGE_LIMIT_REACHED", "Coupon usage limit reached");
-        }
-
-        long userOrderCount = orderRepository.countByUserId(user.getId());
-        long usedByUser = couponUsageRepository.countByCouponIdAndUserId(coupon.getId(), user.getId());
-        int perUserLimit = coupon.getPerUserLimit() == null ? 1 : coupon.getPerUserLimit();
-        if (usedByUser >= perUserLimit) {
-            throw couponValidation("PER_USER_LIMIT_REACHED", "Per user coupon limit reached");
-        }
-
-        if (Boolean.TRUE.equals(coupon.isFirstOrderOnly()) && userOrderCount > 0) {
-            throw couponValidation("FIRST_ORDER_ONLY", "This coupon is valid for first order only");
-        }
-
-        validateAdvancedUserEligibility(coupon, user, userOrderCount);
-
-        if (couponUserMapRepository.countByCouponId(coupon.getId()) > 0
-                && !couponUserMapRepository.existsByCouponIdAndUserId(coupon.getId(), user.getId())) {
-            throw couponValidation("USER_NOT_ELIGIBLE", "You are not eligible for this coupon");
-        }
-
-        double applicableSubtotal = calculateApplicableSubtotal(coupon, cart);
-        if (applicableSubtotal <= 0) {
-            throw couponValidation("NOT_APPLICABLE_TO_CART", "Coupon is not applicable to current cart items");
-        }
-    }
-
-    private void validateAdvancedUserEligibility(Coupon coupon, User user, long userOrderCount) {
-        CouponUserEligibilityType eligibilityType = coupon.getUserEligibilityType() == null
-                ? CouponUserEligibilityType.ALL_USERS
-                : coupon.getUserEligibilityType();
-
-        if (eligibilityType == CouponUserEligibilityType.ALL_USERS) {
-            return;
-        }
-        if (eligibilityType == CouponUserEligibilityType.NEW_USERS_ONLY && userOrderCount > 0) {
-            throw couponValidation("NEW_USERS_ONLY", "This coupon is only valid for new users");
-        }
-        if (eligibilityType == CouponUserEligibilityType.RETURNING_USERS_ONLY && userOrderCount == 0) {
-            throw couponValidation("RETURNING_USERS_ONLY", "This coupon is only valid for returning users");
-        }
-        if (eligibilityType == CouponUserEligibilityType.INACTIVE_USERS_ONLY) {
-            if (userOrderCount == 0) {
-                throw couponValidation("INACTIVE_USERS_ONLY", "This coupon is for inactive users with prior orders");
-            }
-            int inactiveDays = coupon.getInactiveDaysThreshold() == null || coupon.getInactiveDaysThreshold() < 1
-                    ? 30
-                    : coupon.getInactiveDaysThreshold();
-            Order latestOrder = orderRepository.findTopByUserIdOrderByOrderDateDesc(user.getId()).orElse(null);
-            LocalDateTime latestOrderDate = latestOrder == null ? null : latestOrder.getOrderDate();
-            if (latestOrderDate == null || latestOrderDate.isAfter(LocalDateTime.now().minusDays(inactiveDays))) {
-                throw couponValidation(
-                        "INACTIVE_DAYS_NOT_MET",
-                        "This coupon is valid for users inactive for at least " + inactiveDays + " days"
-                );
-            }
-        }
+        CouponEligibilitySupport.validateCouponEligibility(
+                coupon,
+                user,
+                cart,
+                orderRepository,
+                couponUsageRepository,
+                couponUserMapRepository,
+                this::couponValidation
+        );
     }
 
     private double calculateCartSubtotal(Cart cart) {
-        if (cart.getCartItems() == null) {
-            return 0;
-        }
-        return cart.getCartItems().stream()
-                .map(CartItem::getSellingPrice)
-                .filter(value -> value != null)
-                .mapToDouble(Integer::doubleValue)
-                .sum();
+        return CouponEligibilitySupport.calculateCartSubtotal(cart);
     }
 
     private double calculateApplicableSubtotal(Coupon coupon, Cart cart) {
-        if (cart.getCartItems() == null) {
-            return 0;
-        }
-        return cart.getCartItems().stream()
-                .filter(item -> isItemApplicable(coupon, item))
-                .map(CartItem::getSellingPrice)
-                .filter(value -> value != null)
-                .mapToDouble(Integer::doubleValue)
-                .sum();
-    }
-
-    private boolean isItemApplicable(Coupon coupon, CartItem item) {
-        if (coupon == null || item == null || item.getProduct() == null) {
-            return false;
-        }
-        CouponScopeType scopeType = coupon.getScopeType() == null ? CouponScopeType.GLOBAL : coupon.getScopeType();
-        Long scopeId = coupon.getScopeId();
-        if (scopeType == CouponScopeType.GLOBAL || scopeId == null) {
-            return true;
-        }
-        return switch (scopeType) {
-            case SELLER -> item.getProduct().getSeller() != null && scopeId.equals(item.getProduct().getSeller().getId());
-            case CATEGORY -> item.getProduct().getCategory() != null && scopeId.equals(item.getProduct().getCategory().getId());
-            case PRODUCT -> item.getProduct().getId() != null && scopeId.equals(item.getProduct().getId());
-            case GLOBAL -> true;
-        };
+        return CouponEligibilitySupport.calculateApplicableSubtotal(coupon, cart);
     }
 
     private CouponResponse toResponse(Coupon coupon) {
-        CouponResponse response = new CouponResponse();
-        response.setId(coupon.getId());
-        response.setCode(coupon.getCode());
-        response.setDiscountType(coupon.getDiscountType());
-        response.setDiscountValue(coupon.getDiscountValue());
-        response.setDiscountPercentage(coupon.getDiscountPercentage());
-        response.setMaxDiscount(coupon.getMaxDiscount());
-        response.setMinimumOrderValue(coupon.getMinimumOrderValue());
-        response.setValidityStartDate(coupon.getValidityStartDate());
-        response.setValidityEndDate(coupon.getValidityEndDate());
-        response.setUsageLimit(coupon.getUsageLimit());
-        response.setPerUserLimit(coupon.getPerUserLimit());
-        response.setUsedCount(coupon.getUsedCount());
-        response.setReservedCount(coupon.getReservedCount());
-        response.setScopeType(coupon.getScopeType());
-        response.setScopeId(coupon.getScopeId());
-        response.setFirstOrderOnly(coupon.isFirstOrderOnly());
-        response.setUserEligibilityType(coupon.getUserEligibilityType());
-        response.setInactiveDaysThreshold(coupon.getInactiveDaysThreshold());
-        response.setMappedUserCount(resolveMappedUserCount(coupon.getId()));
-        response.setActive(coupon.isActive());
-        return response;
-    }
-
-    private long resolveMappedUserCount(Long couponId) {
-        if (couponId == null) {
-            return 0;
-        }
-        try {
-            return couponUserMapRepository.countByCouponId(couponId);
-        } catch (Exception ex) {
-            log.warn("Unable to resolve mapped user count for coupon {}", couponId, ex);
-            return 0;
-        }
+        return CouponAdminSupport.toResponse(coupon, couponUserMapRepository);
     }
 
     private String normalizeCode(String code) {
-        if (code == null || code.isBlank()) {
-            throw couponValidation("COUPON_CODE_REQUIRED", "Coupon code is required");
-        }
-        return code.trim().toUpperCase(Locale.ROOT);
+        return CouponValueSupport.normalizeCode(code, this::couponValidation);
     }
 
     private double roundCurrency(double value) {
-        return Math.round(value * 100.0) / 100.0;
+        return CouponValueSupport.roundCurrency(value);
     }
 
     private void validateCreateOrUpdateRequest(
@@ -842,68 +596,25 @@ public class CouponServiceImpl implements CouponService {
             Boolean firstOrderOnly,
             Long existingCouponId
     ) {
-        if (discountType == null) {
-            throw couponValidation("DISCOUNT_TYPE_REQUIRED", "Discount type is required");
-        }
-        if (discountValue == null || discountValue <= 0) {
-            throw couponValidation("DISCOUNT_VALUE_INVALID", "Discount value must be greater than 0");
-        }
-        if (minimumOrderValue == null || minimumOrderValue < 0) {
-            throw couponValidation("MIN_ORDER_INVALID", "Minimum order value cannot be negative");
-        }
-        if (startDate == null || endDate == null) {
-            throw couponValidation("COUPON_DATE_REQUIRED", "Start and end date are required");
-        }
-        if (endDate.isBefore(startDate)) {
-            throw couponValidation("COUPON_DATE_INVALID", "End date cannot be before start date");
-        }
-        if (discountType == CouponDiscountType.PERCENT && discountValue > 100) {
-            throw couponValidation("DISCOUNT_PERCENT_INVALID", "Percent discount cannot exceed 100");
-        }
-        if (usageLimit != null && usageLimit < 1) {
-            throw couponValidation("USAGE_LIMIT_INVALID", "Usage limit must be at least 1");
-        }
-        if (perUserLimit != null && perUserLimit < 1) {
-            throw couponValidation("PER_USER_LIMIT_INVALID", "Per user limit must be at least 1");
-        }
-        if (usageLimit != null && perUserLimit != null && perUserLimit > usageLimit) {
-            throw couponValidation("PER_USER_LIMIT_INVALID", "Per user limit cannot exceed usage limit");
-        }
-        CouponScopeType effectiveScopeType = scopeType == null ? CouponScopeType.GLOBAL : scopeType;
-        if (effectiveScopeType != CouponScopeType.GLOBAL && scopeId == null) {
-            throw couponValidation("SCOPE_ID_REQUIRED", "Scope id is required for selected scope type");
-        }
-        CouponUserEligibilityType effectiveEligibilityType = userEligibilityType == null
-                ? CouponUserEligibilityType.ALL_USERS
-                : userEligibilityType;
-        if (Boolean.TRUE.equals(firstOrderOnly)
-                && effectiveEligibilityType != CouponUserEligibilityType.ALL_USERS
-                && effectiveEligibilityType != CouponUserEligibilityType.NEW_USERS_ONLY) {
-            throw couponValidation(
-                    "ELIGIBILITY_CONFLICT",
-                    "firstOrderOnly can only be used with ALL_USERS or NEW_USERS_ONLY eligibility"
-            );
-        }
-        if (effectiveEligibilityType == CouponUserEligibilityType.INACTIVE_USERS_ONLY
-                && (inactiveDaysThreshold == null || inactiveDaysThreshold < 1)) {
-            throw couponValidation(
-                    "INACTIVE_DAYS_REQUIRED",
-                    "Inactive days threshold is required for INACTIVE_USERS_ONLY eligibility"
-            );
-        }
-        if (effectiveEligibilityType != CouponUserEligibilityType.INACTIVE_USERS_ONLY
-                && inactiveDaysThreshold != null
-                && inactiveDaysThreshold < 1) {
-            throw couponValidation("INACTIVE_DAYS_INVALID", "Inactive days threshold must be at least 1");
-        }
-        if (existingCouponId == null) {
-            return;
-        }
-        couponRepository.findByCodeIgnoreCase(normalizedCode).ifPresent(existing -> {
-            if (!existingCouponId.equals(existing.getId())) {
-                throw couponDuplicate();
-            }
-        });
+        CouponAdminSupport.validateCreateOrUpdateRequest(
+                normalizedCode,
+                discountType,
+                discountValue,
+                minimumOrderValue,
+                startDate,
+                endDate,
+                usageLimit,
+                perUserLimit,
+                scopeType,
+                scopeId,
+                userEligibilityType,
+                inactiveDaysThreshold,
+                firstOrderOnly,
+                existingCouponId,
+                couponRepository,
+                this::couponValidation,
+                this::couponDuplicate
+        );
     }
 
     private void applyRequestToCoupon(
@@ -925,145 +636,43 @@ public class CouponServiceImpl implements CouponService {
             Boolean firstOrderOnly,
             Boolean active
     ) {
-        coupon.setCode(normalizedCode);
-        coupon.setDiscountType(discountType);
-        coupon.setDiscountValue(roundCurrency(discountValue));
-        coupon.setDiscountPercentage(
-                discountType == CouponDiscountType.PERCENT
-                        ? roundCurrency(discountValue)
-                        : roundCurrency(discountPercentage == null ? 0.0 : discountPercentage)
+        CouponAdminSupport.applyRequestToCoupon(
+                coupon,
+                normalizedCode,
+                discountType,
+                discountValue,
+                discountPercentage,
+                maxDiscount,
+                minimumOrderValue,
+                startDate,
+                endDate,
+                usageLimit,
+                perUserLimit,
+                scopeType,
+                scopeId,
+                userEligibilityType,
+                inactiveDaysThreshold,
+                firstOrderOnly,
+                active
         );
-        coupon.setMaxDiscount(maxDiscount == null ? null : roundCurrency(maxDiscount));
-        coupon.setMinimumOrderValue(roundCurrency(minimumOrderValue));
-        coupon.setValidityStartDate(startDate);
-        coupon.setValidityEndDate(endDate);
-        coupon.setUsageLimit(usageLimit);
-        coupon.setPerUserLimit(perUserLimit == null ? 1 : perUserLimit);
-        coupon.setScopeType(scopeType == null ? CouponScopeType.GLOBAL : scopeType);
-        coupon.setScopeId(scopeType == null || scopeType == CouponScopeType.GLOBAL ? null : scopeId);
-        coupon.setFirstOrderOnly(firstOrderOnly != null && firstOrderOnly);
-        CouponUserEligibilityType effectiveEligibilityType = userEligibilityType == null
-                ? CouponUserEligibilityType.ALL_USERS
-                : userEligibilityType;
-        if (coupon.isFirstOrderOnly() && effectiveEligibilityType == CouponUserEligibilityType.ALL_USERS) {
-            effectiveEligibilityType = CouponUserEligibilityType.NEW_USERS_ONLY;
-        }
-        coupon.setUserEligibilityType(effectiveEligibilityType);
-        coupon.setInactiveDaysThreshold(
-                effectiveEligibilityType == CouponUserEligibilityType.INACTIVE_USERS_ONLY
-                        ? (inactiveDaysThreshold == null || inactiveDaysThreshold < 1 ? 30 : inactiveDaysThreshold)
-                        : null
-        );
-        if (active != null) {
-            coupon.setActive(active);
-        }
     }
 
     private void enforceFraudThrottle(User user, String clientIp, String deviceId) {
-        if (user == null || user.getId() == null) {
-            return;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        long recentAttempts = couponEventLogRepository.countByUserIdAndCreatedAtAfter(
-                user.getId(),
-                now.minusMinutes(2)
+        CouponFraudSupport.enforceFraudThrottle(
+                user == null ? null : user.getId(),
+                clientIp,
+                deviceId,
+                couponEventLogRepository,
+                this::couponValidation
         );
-        if (recentAttempts >= MAX_COUPON_ATTEMPTS_PER_2_MIN) {
-            throw couponValidation(
-                    "COUPON_RATE_LIMIT",
-                    "Too many coupon attempts. Please wait a moment before retrying."
-            );
-        }
-
-        long recentRejects = couponEventLogRepository.countByUserIdAndEventTypeAndCreatedAtAfter(
-                user.getId(),
-                CouponEventType.APPLY_REJECTED,
-                now.minusMinutes(10)
-        );
-        if (recentRejects >= MAX_COUPON_REJECTS_PER_10_MIN) {
-            throw couponValidation(
-                    "COUPON_SUSPICIOUS_ACTIVITY",
-                    "Coupon usage temporarily restricted due to repeated invalid attempts."
-            );
-        }
-
-        String normalizedIp = clientIp == null ? null : clientIp.trim();
-        if (normalizedIp != null && !normalizedIp.isBlank()) {
-            String ipToken = "ip=" + normalizedIp;
-            long ipRejects = couponEventLogRepository.countByEventTypeAndNoteContainingAndCreatedAtAfter(
-                    CouponEventType.APPLY_REJECTED,
-                    ipToken,
-                    now.minusMinutes(10)
-            );
-            if (ipRejects >= MAX_IP_REJECTS_PER_10_MIN) {
-                throw couponValidation(
-                        "COUPON_IP_BLOCKED",
-                        "Too many invalid coupon attempts from this network. Please retry later."
-                );
-            }
-        }
-
-        String normalizedDevice = deviceId == null ? null : deviceId.trim();
-        if (normalizedDevice != null && !normalizedDevice.isBlank()) {
-            String deviceToken = "device=" + normalizedDevice;
-            long deviceRejects = couponEventLogRepository.countByEventTypeAndNoteContainingAndCreatedAtAfter(
-                    CouponEventType.APPLY_REJECTED,
-                    deviceToken,
-                    now.minusMinutes(10)
-            );
-            if (deviceRejects >= MAX_DEVICE_REJECTS_PER_10_MIN) {
-                throw couponValidation(
-                        "COUPON_DEVICE_BLOCKED",
-                        "Coupon activity from this device is temporarily restricted."
-                );
-            }
-
-            long deviceAttempts = couponEventLogRepository.countByNoteContainingAndCreatedAtAfter(
-                    deviceToken,
-                    now.minusMinutes(2)
-            );
-            if (deviceAttempts >= MAX_DEVICE_ATTEMPTS_PER_2_MIN) {
-                throw couponValidation(
-                        "COUPON_DEVICE_RATE_LIMIT",
-                        "Too many coupon attempts from this device. Please wait and try again."
-                );
-            }
-        }
     }
 
     private double estimateDiscount(Coupon coupon, double applicableSubtotal) {
-        CouponDiscountType discountType = coupon.getDiscountType() == null
-                ? CouponDiscountType.PERCENT
-                : coupon.getDiscountType();
-        double discount;
-        if (discountType == CouponDiscountType.FLAT) {
-            discount = coupon.getDiscountValue();
-        } else {
-            double percent = coupon.getDiscountValue() > 0
-                    ? coupon.getDiscountValue()
-                    : coupon.getDiscountPercentage();
-            discount = (applicableSubtotal * percent) / 100.0;
-        }
-        if (coupon.getMaxDiscount() != null && coupon.getMaxDiscount() > 0) {
-            discount = Math.min(discount, coupon.getMaxDiscount());
-        }
-        return roundCurrency(Math.min(discount, applicableSubtotal));
+        return CouponEligibilitySupport.estimateDiscount(coupon, applicableSubtotal);
     }
 
     private String formatContext(String clientIp, String deviceId) {
-        String normalizedIp = clientIp == null ? "" : clientIp.trim();
-        String normalizedDevice = deviceId == null ? "" : deviceId.trim();
-        if (normalizedIp.isEmpty() && normalizedDevice.isEmpty()) {
-            return "";
-        }
-        LinkedHashMap<String, String> context = new LinkedHashMap<>();
-        if (!normalizedIp.isEmpty()) {
-            context.put("ip", normalizedIp);
-        }
-        if (!normalizedDevice.isEmpty()) {
-            context.put("device", normalizedDevice);
-        }
-        return " context=" + context;
+        return CouponValueSupport.formatContext(clientIp, deviceId);
     }
 
     private void putCache(Coupon coupon) {
@@ -1112,12 +721,7 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private Set<Long> sanitizeUserIds(List<Long> userIds) {
-        if (userIds == null) {
-            return Set.of();
-        }
-        return userIds.stream()
-                .filter(value -> value != null && value > 0)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        return CouponValueSupport.sanitizeUserIds(userIds);
     }
 
     private void logEvent(

@@ -2,16 +2,10 @@ package com.example.ecommerce.seller.controller;
 
 import com.example.ecommerce.common.mapper.ResponseMapper;
 import com.example.ecommerce.common.response.ApiResponse;
-import com.example.ecommerce.inventory.service.InventoryService;
-import com.example.ecommerce.inventory.service.RestockNotificationService;
-import com.example.ecommerce.inventory.service.WarehouseTransferService;
-import com.example.ecommerce.modal.Product;
-import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.catalog.request.CreateProductRequest;
 import com.example.ecommerce.catalog.request.UpdateProductRequest;
 import com.example.ecommerce.catalog.response.ProductResponse;
-import com.example.ecommerce.catalog.service.ProductService;
-import com.example.ecommerce.seller.service.SellerService;
+import com.example.ecommerce.seller.usecase.SellerProductUseCase;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,19 +21,13 @@ import java.util.Map;
 @RequestMapping("/api/sellers/products")
 @PreAuthorize("hasRole('SELLER')")
 public class SellerProductController {
-    private final ProductService productService;
-    private final SellerService sellerService;
-    private final InventoryService inventoryService;
-    private final RestockNotificationService restockNotificationService;
-    private final WarehouseTransferService warehouseTransferService;
+    private final SellerProductUseCase sellerProductUseCase;
 
     @GetMapping
     public ResponseEntity<List<ProductResponse>> getProductsBySellerId(
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        List<Product> products = productService.getProductBySellerId(seller.getId());
-        return new ResponseEntity<>(ResponseMapper.toProductResponses(products), HttpStatus.OK);
+        return ResponseEntity.ok(ResponseMapper.toProductResponses(sellerProductUseCase.getProductsForSeller(jwt)));
     }
 
     @PostMapping
@@ -47,9 +35,8 @@ public class SellerProductController {
             @Valid @RequestBody CreateProductRequest request,
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        Product product = productService.createProduct(request, seller);
-        return new ResponseEntity<>(ResponseMapper.toProductResponse(product), HttpStatus.CREATED);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ResponseMapper.toProductResponse(sellerProductUseCase.createProduct(request, jwt)));
     }
 
     @DeleteMapping("/{productId}")
@@ -57,11 +44,10 @@ public class SellerProductController {
             @PathVariable Long productId,
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        productService.deleteProduct(productId, seller.getId());
+        sellerProductUseCase.deleteProduct(productId, jwt);
         ApiResponse response = new ApiResponse();
         response.setMessage("Product deleted successfully");
-        return new ResponseEntity<>(response, HttpStatus.OK);
+        return ResponseEntity.ok(response);
     }
 
     @PutMapping("/{productId}")
@@ -70,9 +56,9 @@ public class SellerProductController {
             @Valid @RequestBody UpdateProductRequest incoming,
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        Product updatedProduct = productService.updateProduct(productId, incoming, seller.getId());
-        return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
+        return ResponseEntity.ok(
+                ResponseMapper.toProductResponse(sellerProductUseCase.updateProduct(productId, incoming, jwt))
+        );
     }
 
     @PatchMapping("/{productId}/active")
@@ -81,13 +67,9 @@ public class SellerProductController {
             @RequestBody Map<String, Object> payload,
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        Object rawActive = payload == null ? null : payload.get("active");
-        boolean active = rawActive instanceof Boolean bool
-                ? bool
-                : Boolean.parseBoolean(String.valueOf(rawActive));
-        Product updatedProduct = productService.setProductActive(productId, seller.getId(), active);
-        return new ResponseEntity<>(ResponseMapper.toProductResponse(updatedProduct), HttpStatus.OK);
+        return ResponseEntity.ok(
+                ResponseMapper.toProductResponse(sellerProductUseCase.updateProductActiveState(productId, payload, jwt))
+        );
     }
 
     @PostMapping("/{productId}/warehouse-transfer")
@@ -96,60 +78,9 @@ public class SellerProductController {
             @RequestBody(required = false) Map<String, Object> payload,
             @RequestHeader(value = "Authorization", required = false) String jwt
     ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        Product product = productService.findProductById(productId);
-        if (product.getSeller() == null || !seller.getId().equals(product.getSeller().getId())) {
-            throw new Exception("Unauthorized product access");
-        }
-
-        Object rawQuantity = payload == null ? null : payload.get("quantity");
-        if (rawQuantity == null) {
-            throw new IllegalArgumentException("Transfer quantity is required");
-        }
-        int quantity;
-        try {
-            quantity = rawQuantity instanceof Number number
-                    ? number.intValue()
-                    : Integer.parseInt(String.valueOf(rawQuantity));
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException("Invalid transfer quantity");
-        }
-        String sellerNote = payload == null || payload.get("sellerNote") == null
-                ? "Seller requested warehouse transfer"
-                : String.valueOf(payload.get("sellerNote"));
-        String pickupMode = payload == null || payload.get("pickupMode") == null
-                ? "WAREHOUSE_PICKUP"
-                : String.valueOf(payload.get("pickupMode"));
-
-        warehouseTransferService.createTransferRequest(
-                product,
-                seller,
-                quantity,
-                sellerNote,
-                pickupMode
+        return ResponseEntity.ok(
+                ResponseMapper.toProductResponse(sellerProductUseCase.transferStockToWarehouse(productId, payload, jwt))
         );
-        return new ResponseEntity<>(ResponseMapper.toProductResponse(product), HttpStatus.OK);
-    }
-
-    @GetMapping("/{productId}/movements")
-    public ResponseEntity<List<Map<String, Object>>> getProductMovements(
-            @PathVariable Long productId,
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        Product product = productService.findProductById(productId);
-        if (product.getSeller() == null || !seller.getId().equals(product.getSeller().getId())) {
-            throw new Exception("Unauthorized product access");
-        }
-        return ResponseEntity.ok(inventoryService.getMovementsForProduct(productId));
-    }
-
-    @GetMapping("/demand")
-    public ResponseEntity<Map<String, Object>> getSellerDemandInsights(
-            @RequestHeader(value = "Authorization", required = false) String jwt
-    ) throws Exception {
-        Seller seller = sellerService.getSellerProfile(jwt);
-        return ResponseEntity.ok(restockNotificationService.getSellerDemandInsights(seller.getId()));
     }
 }
 
