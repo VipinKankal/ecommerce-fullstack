@@ -103,6 +103,9 @@ function App() {
     Boolean(bootstrapKey) &&
     !hasBootstrapProfile &&
     (isAuthBootstrapLoading || lastBootstrapKey.current !== bootstrapKey);
+  const isStaticProductPreview = location.pathname.startsWith('/products/');
+  const shouldShowGlobalNavbar = !isStaticProductPreview;
+  const shouldShowShortcut = !isStaticProductPreview;
 
   useEffect(() => {
     const resetSessionState = () => {
@@ -221,8 +224,8 @@ function App() {
     <ThemeProvider theme={customTheme}>
       <div>
         <RouteApiDispatcher />
-        <Navbar />
-        <ComplianceNoteShortcut />
+        {shouldShowGlobalNavbar && <Navbar />}
+        {shouldShowShortcut && <ComplianceNoteShortcut />}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Auth />} />
