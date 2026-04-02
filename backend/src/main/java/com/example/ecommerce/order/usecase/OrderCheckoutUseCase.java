@@ -45,8 +45,7 @@ public class OrderCheckoutUseCase {
 
     public PaymentLinkResponse createPaymentLink(Address shippingAddress, String paymentMethod, String jwt) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
-        PaymentMethod resolvedPaymentMethod =
-                resolveCheckoutPaymentMethod(paymentMethod == null ? "" : paymentMethod.trim().toUpperCase());
+        PaymentMethod resolvedPaymentMethod = OrderCheckoutSupport.resolveCheckoutPaymentMethod(paymentMethod == null ? "" : paymentMethod.trim().toUpperCase());
         return resolvedPaymentMethod == PaymentMethod.COD
                 ? createCashOnDeliveryResponse(user, shippingAddress)
                 : createOnlinePaymentResponse(user, shippingAddress, resolvedPaymentMethod, null);
@@ -54,31 +53,20 @@ public class OrderCheckoutUseCase {
 
     public PaymentLinkResponse createCheckoutOrder(CheckoutOrderRequest request, String jwt) throws Exception {
         User user = userService.findUserByJwtToken(jwt);
-        String normalizedPaymentMethod = request.getPaymentMethod() == null
-                ? ""
-                : request.getPaymentMethod().trim().toUpperCase();
-
+        String normalizedPaymentMethod = request.getPaymentMethod() == null ? "" : request.getPaymentMethod().trim().toUpperCase();
         if ("COD".equals(normalizedPaymentMethod)) {
             return createCashOnDeliveryResponse(user, request.getShippingAddress());
         }
 
-        String checkoutRequestId = normalizeCheckoutRequestId(request.getCheckoutRequestId());
+        String checkoutRequestId = OrderCheckoutSupport.normalizeCheckoutRequestId(request.getCheckoutRequestId());
         if (checkoutRequestId != null) {
-            PaymentOrder previousAttempt = paymentOrderRepository.findTopByUserIdAndCheckoutRequestIdOrderByIdDesc(
-                    user.getId(),
-                    checkoutRequestId
-            );
+            PaymentOrder previousAttempt = paymentOrderRepository.findTopByUserIdAndCheckoutRequestIdOrderByIdDesc(user.getId(), checkoutRequestId);
             if (previousAttempt != null && previousAttempt.getStatus() != PaymentOrderStatus.SUCCESS) {
                 return retryExistingPaymentOrder(user, previousAttempt);
             }
         }
 
-        return createOnlinePaymentResponse(
-                user,
-                request.getShippingAddress(),
-                resolveCheckoutPaymentMethod(normalizedPaymentMethod),
-                checkoutRequestId
-        );
+        return createOnlinePaymentResponse(user, request.getShippingAddress(), OrderCheckoutSupport.resolveCheckoutPaymentMethod(normalizedPaymentMethod), checkoutRequestId);
     }
 
     public CheckoutOrderSummaryResponse getCheckoutSummary(CheckoutOrderSummaryRequest request, String jwt) throws Exception {
@@ -95,101 +83,33 @@ public class OrderCheckoutUseCase {
         return cart;
     }
 
-    private PaymentLinkResponse createOnlinePaymentResponse(
-            User user,
-            Address shippingAddress,
-            PaymentMethod paymentMethod,
-            String checkoutRequestId
-    ) throws Exception {
+    private PaymentLinkResponse createOnlinePaymentResponse(User user, Address shippingAddress, PaymentMethod paymentMethod, String checkoutRequestId) throws Exception {
         Cart cart = requireCart(user);
         couponService.validateAppliedCoupon(user, cart);
         String reservedCouponCode = couponService.reserveCouponForCheckout(user, cart, checkoutRequestId);
         try {
             if (paymentMethod == PaymentMethod.UPI) {
                 paymentService.assertPhonePeConfigured();
-                Set<Order> orders = orderService.createOrder(
-                        user,
-                        shippingAddress,
-                        cart,
-                        OrderStatus.INITIATED,
-                        PaymentStatus.PENDING,
-                        PaymentMethod.UPI,
-                        PaymentType.UPI,
-                        PaymentProvider.PHONEPE
-                );
-                PaymentOrder paymentOrder = paymentService.createOrder(
-                        user,
-                        orders,
-                        PaymentMethod.UPI,
-                        PaymentType.UPI,
-                        PaymentProvider.PHONEPE
-                );
+                Set<Order> orders = orderService.createOrder(user, shippingAddress, cart, OrderStatus.INITIATED, PaymentStatus.PENDING, PaymentMethod.UPI, PaymentType.UPI, PaymentProvider.PHONEPE);
+                PaymentOrder paymentOrder = paymentService.createOrder(user, orders, PaymentMethod.UPI, PaymentType.UPI, PaymentProvider.PHONEPE);
                 paymentOrder.setCheckoutRequestId(checkoutRequestId);
-                paymentOrder.setCouponReservationState(
-                        reservedCouponCode == null ? CouponReservationState.NONE : CouponReservationState.RESERVED
-                );
+                paymentOrder.setCouponReservationState(reservedCouponCode == null ? CouponReservationState.NONE : CouponReservationState.RESERVED);
                 paymentOrderRepository.save(paymentOrder);
                 PhonePePaymentSession session = paymentService.createPhonePePaymentSession(user, paymentOrder);
-                return buildPaymentResponse(
-                        orders,
-                        paymentOrder.getId(),
-                        PaymentMethod.UPI,
-                        PaymentType.UPI,
-                        PaymentProvider.PHONEPE,
-                        PaymentStatus.PENDING,
-                        OrderStatus.INITIATED,
-                        session.getRedirectUrl(),
-                        session.getMerchantTransactionId()
-                );
+                return OrderCheckoutSupport.buildPaymentResponse(orders, paymentOrder.getId(), PaymentMethod.UPI, PaymentType.UPI, PaymentProvider.PHONEPE, PaymentStatus.PENDING, OrderStatus.INITIATED, session.getRedirectUrl(), session.getMerchantTransactionId());
             }
 
-            Set<Order> orders = orderService.createOrder(
-                    user,
-                    shippingAddress,
-                    cart,
-                    OrderStatus.INITIATED,
-                    PaymentStatus.PENDING,
-                    PaymentMethod.CARD,
-                    PaymentType.CARD,
-                    PaymentProvider.STRIPE
-            );
-            PaymentOrder paymentOrder = paymentService.createOrder(
-                    user,
-                    orders,
-                    PaymentMethod.CARD,
-                    PaymentType.CARD,
-                    PaymentProvider.STRIPE
-            );
+            Set<Order> orders = orderService.createOrder(user, shippingAddress, cart, OrderStatus.INITIATED, PaymentStatus.PENDING, PaymentMethod.CARD, PaymentType.CARD, PaymentProvider.STRIPE);
+            PaymentOrder paymentOrder = paymentService.createOrder(user, orders, PaymentMethod.CARD, PaymentType.CARD, PaymentProvider.STRIPE);
             paymentOrder.setCheckoutRequestId(checkoutRequestId);
-            paymentOrder.setCouponReservationState(
-                    reservedCouponCode == null ? CouponReservationState.NONE : CouponReservationState.RESERVED
-            );
-            String paymentUrl = paymentService.createStripePaymentLink(
-                    user,
-                    paymentOrder.getAmount(),
-                    paymentOrder.getId()
-            );
+            paymentOrder.setCouponReservationState(reservedCouponCode == null ? CouponReservationState.NONE : CouponReservationState.RESERVED);
+            String paymentUrl = paymentService.createStripePaymentLink(user, paymentOrder.getAmount(), paymentOrder.getId());
             paymentOrder.setPaymentLinkId(String.valueOf(paymentOrder.getId()));
             paymentOrderRepository.save(paymentOrder);
-            return buildPaymentResponse(
-                    orders,
-                    paymentOrder.getId(),
-                    PaymentMethod.CARD,
-                    PaymentType.CARD,
-                    PaymentProvider.STRIPE,
-                    PaymentStatus.PENDING,
-                    OrderStatus.INITIATED,
-                    paymentUrl,
-                    String.valueOf(paymentOrder.getId())
-            );
+            return OrderCheckoutSupport.buildPaymentResponse(orders, paymentOrder.getId(), PaymentMethod.CARD, PaymentType.CARD, PaymentProvider.STRIPE, PaymentStatus.PENDING, OrderStatus.INITIATED, paymentUrl, String.valueOf(paymentOrder.getId()));
         } catch (Exception ex) {
             if (reservedCouponCode != null) {
-                couponService.releaseCouponReservation(
-                        reservedCouponCode,
-                        user.getId(),
-                        "CHECKOUT_CREATE_FAILED",
-                        "Reservation released due to checkout failure"
-                );
+                couponService.releaseCouponReservation(reservedCouponCode, user.getId(), "CHECKOUT_CREATE_FAILED", "Reservation released due to checkout failure");
             }
             throw ex;
         }
@@ -198,36 +118,9 @@ public class OrderCheckoutUseCase {
     private PaymentLinkResponse createCashOnDeliveryResponse(User user, Address shippingAddress) throws Exception {
         Cart cart = requireCart(user);
         couponService.validateAppliedCoupon(user, cart);
-        Set<Order> orders = orderService.createOrder(
-                user,
-                shippingAddress,
-                cart,
-                OrderStatus.PLACED,
-                PaymentStatus.PENDING,
-                PaymentMethod.COD,
-                PaymentType.CASH,
-                null
-        );
+        Set<Order> orders = orderService.createOrder(user, shippingAddress, cart, OrderStatus.PLACED, PaymentStatus.PENDING, PaymentMethod.COD, PaymentType.CASH, null);
         couponService.markCouponUsedIfPresent(user, orders);
-        return buildPaymentResponse(
-                orders,
-                null,
-                PaymentMethod.COD,
-                PaymentType.CASH,
-                null,
-                PaymentStatus.PENDING,
-                OrderStatus.PLACED,
-                null,
-                null
-        );
-    }
-
-    private String normalizeCheckoutRequestId(String rawCheckoutRequestId) {
-        if (rawCheckoutRequestId == null || rawCheckoutRequestId.isBlank()) {
-            return null;
-        }
-        String trimmed = rawCheckoutRequestId.trim();
-        return trimmed.length() > 120 ? trimmed.substring(0, 120) : trimmed;
+        return OrderCheckoutSupport.buildPaymentResponse(orders, null, PaymentMethod.COD, PaymentType.CASH, null, PaymentStatus.PENDING, OrderStatus.PLACED, null, null);
     }
 
     private PaymentLinkResponse retryExistingPaymentOrder(User user, PaymentOrder paymentOrder) throws Exception {
@@ -242,11 +135,7 @@ public class OrderCheckoutUseCase {
             throw new IllegalArgumentException("Cannot retry payment without order context");
         }
         if (paymentOrder.getCouponReservationState() == CouponReservationState.RELEASED) {
-            couponService.reserveCouponForOrders(
-                    user,
-                    orders,
-                    "PAYMENT_RETRY:" + paymentOrder.getId()
-            );
+            couponService.reserveCouponForOrders(user, orders, "PAYMENT_RETRY:" + paymentOrder.getId());
             paymentOrder.setCouponReservationState(CouponReservationState.RESERVED);
         }
 
@@ -268,11 +157,7 @@ public class OrderCheckoutUseCase {
             paymentMethod = PaymentMethod.CARD;
             paymentType = PaymentType.CARD;
             provider = PaymentProvider.STRIPE;
-            paymentUrl = paymentService.createStripePaymentLink(
-                    user,
-                    paymentOrder.getAmount(),
-                    paymentOrder.getId()
-            );
+            paymentUrl = paymentService.createStripePaymentLink(user, paymentOrder.getAmount(), paymentOrder.getId());
             paymentOrder.setPaymentLinkId(String.valueOf(paymentOrder.getId()));
             paymentReference = String.valueOf(paymentOrder.getId());
         }
@@ -288,54 +173,6 @@ public class OrderCheckoutUseCase {
         }
         paymentOrderRepository.save(paymentOrder);
 
-        return buildPaymentResponse(
-                orders,
-                paymentOrder.getId(),
-                paymentMethod,
-                paymentType,
-                provider,
-                PaymentStatus.PENDING,
-                OrderStatus.INITIATED,
-                paymentUrl,
-                paymentReference
-        );
-    }
-
-    private PaymentMethod resolveCheckoutPaymentMethod(String paymentMethod) {
-        if ("COD".equals(paymentMethod)) {
-            return PaymentMethod.COD;
-        }
-        if ("PHONEPE".equals(paymentMethod) || "UPI".equals(paymentMethod) || "RAZORPAY".equals(paymentMethod)) {
-            return PaymentMethod.UPI;
-        }
-        if ("STRIPE".equals(paymentMethod) || "CARD".equals(paymentMethod)) {
-            return PaymentMethod.CARD;
-        }
-        throw new IllegalArgumentException("Unsupported payment method");
-    }
-
-    private PaymentLinkResponse buildPaymentResponse(
-            Set<Order> orders,
-            Long paymentOrderId,
-            PaymentMethod paymentMethod,
-            PaymentType paymentType,
-            PaymentProvider provider,
-            PaymentStatus paymentStatus,
-            OrderStatus orderStatus,
-            String paymentUrl,
-            String paymentReference
-    ) {
-        PaymentLinkResponse response = new PaymentLinkResponse();
-        response.setOrderId(orders.size() == 1 ? orders.iterator().next().getId() : null);
-        response.setPaymentOrderId(paymentOrderId);
-        response.setPaymentMethod(paymentMethod);
-        response.setPaymentType(paymentType);
-        response.setProvider(provider);
-        response.setPaymentStatus(paymentStatus);
-        response.setOrderStatus(orderStatus);
-        response.setPayment_link_url(paymentUrl);
-        response.setPayment_link_id(paymentReference);
-        return response;
+        return OrderCheckoutSupport.buildPaymentResponse(orders, paymentOrder.getId(), paymentMethod, paymentType, provider, PaymentStatus.PENDING, OrderStatus.INITIATED, paymentUrl, paymentReference);
     }
 }
-

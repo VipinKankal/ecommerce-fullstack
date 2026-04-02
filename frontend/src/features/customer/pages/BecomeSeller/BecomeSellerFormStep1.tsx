@@ -69,11 +69,11 @@ const BecomeSellerFormStep1 = ({ formik }: { formik: SellerAccountFormik }) => (
       }
     >
       {[
-        'Electronics',
-        'Clothing',
-        'Shoes',
-        'Furniture',
-        'Beauty',
+        'Menswear',
+        'Womenswear',
+        'Ethnic Wear',
+        'Footwear',
+        'Innerwear & Sleepwear',
         'Accessories',
       ].map((option) => (
         <MenuItem key={option} value={option}>

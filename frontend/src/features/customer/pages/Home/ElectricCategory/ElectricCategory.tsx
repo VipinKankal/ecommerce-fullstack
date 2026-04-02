@@ -1,49 +1,49 @@
 import React from 'react';
 import ElectricCategoryCard from './ElectricCategoryCard';
 import {
+  BedtimeOutlined,
   CheckroomOutlined,
-  HeadphonesOutlined,
-  HomeOutlined,
-  SpaOutlined,
-  WatchOutlined,
+  DryCleaningOutlined,
+  HikingOutlined,
+  LocalMallOutlined,
 } from '@mui/icons-material';
 
 const ElectricCategory = () => {
   const categories = [
     {
-      id: 'audio',
-      title: 'Audio',
-      subtitle: 'Headphones & speakers',
+      id: 'menswear',
+      title: 'Menswear',
+      subtitle: 'Shirts, tees and tailored layers',
       accent: 'from-[#ffe0cc] to-[#fff5ef]',
-      icon: <HeadphonesOutlined sx={{ fontSize: 20 }} />,
-    },
-    {
-      id: 'wearables',
-      title: 'Wearables',
-      subtitle: 'Watches & fitness tech',
-      accent: 'from-[#dae8ff] to-[#f3f7ff]',
-      icon: <WatchOutlined sx={{ fontSize: 20 }} />,
-    },
-    {
-      id: 'fashion',
-      title: 'Fashion',
-      subtitle: 'Fresh everyday edits',
-      accent: 'from-[#ffe4ea] to-[#fff6f8]',
       icon: <CheckroomOutlined sx={{ fontSize: 20 }} />,
     },
     {
-      id: 'home',
-      title: 'Home',
-      subtitle: 'Decor & utility',
-      accent: 'from-[#e7f3df] to-[#f7fcf3]',
-      icon: <HomeOutlined sx={{ fontSize: 20 }} />,
+      id: 'womenswear',
+      title: 'Womenswear',
+      subtitle: 'Tops, kurtis and denim edits',
+      accent: 'from-[#dae8ff] to-[#f3f7ff]',
+      icon: <DryCleaningOutlined sx={{ fontSize: 20 }} />,
     },
     {
-      id: 'beauty',
-      title: 'Beauty',
-      subtitle: 'Skincare & wellness',
+      id: 'ethnic',
+      title: 'Ethnic',
+      subtitle: 'Festive and fusion-ready fits',
+      accent: 'from-[#ffe4ea] to-[#fff6f8]',
+      icon: <LocalMallOutlined sx={{ fontSize: 20 }} />,
+    },
+    {
+      id: 'footwear',
+      title: 'Footwear',
+      subtitle: 'Sneakers, sandals and staples',
+      accent: 'from-[#e7f3df] to-[#f7fcf3]',
+      icon: <HikingOutlined sx={{ fontSize: 20 }} />,
+    },
+    {
+      id: 'basics',
+      title: 'Basics',
+      subtitle: 'Sleepwear, innerwear and repeats',
       accent: 'from-[#efe0ff] to-[#faf5ff]',
-      icon: <SpaOutlined sx={{ fontSize: 20 }} />,
+      icon: <BedtimeOutlined sx={{ fontSize: 20 }} />,
     },
   ];
 

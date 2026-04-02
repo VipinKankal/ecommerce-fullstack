@@ -327,9 +327,9 @@ class SecurityIntegrationTests {
                   "quantity":6,
                   "color":"Black",
                   "images":["https://example.com/p1.jpg"],
-                  "category":"electronics",
-                  "category2":"audio",
-                  "category3":"earbuds",
+                  "category":"men",
+                  "category2":"men_topwear",
+                  "category3":"men_t_shirts",
                   "size":"M"
                 }
                 """;
@@ -539,5 +539,6 @@ class SecurityIntegrationTests {
         assertTrue(cartResponse.body().contains("\"totalItems\":0"));
     }
 }
+
 
 

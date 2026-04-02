@@ -300,8 +300,6 @@ const AddProductFormBody = ({
         >
           <MenuItem value="men">Men</MenuItem>
           <MenuItem value="women">Women</MenuItem>
-          <MenuItem value="home_furniture">Home & Furniture</MenuItem>
-          <MenuItem value="electronics">Electronics</MenuItem>
         </TextField>
       </Grid>
       <Grid size={{ xs: 12, sm: 4 }}>

@@ -47,8 +47,8 @@ const Home = () => {
                   Make the homepage feel like a live storefront, not a template.
                 </h1>
                 <p className="max-w-2xl text-sm leading-7 text-[#5b6470] sm:text-base">
-                  Fashion-led drops, sharp electronics picks, and warehouse-ready
-                  delivery promises in one cleaner customer flow.
+                  Clothing-led drops, seasonal edits, and warehouse-ready delivery
+                  promises in one cleaner customer flow.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3">
@@ -128,14 +128,14 @@ const Home = () => {
                   Fast movers
                 </div>
                 <h2 className="mt-4 text-2xl font-black text-[#1f2937]">
-                  Audio, wearables and desk tech under one clean sweep
+                  Denim, footwear and ethnic edits under one clean sweep
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-[#67707c]">
-                  Designed for scrolling shoppers who want fewer blocks, better
-                  hierarchy, and stronger calls to action.
+                  Designed for scrolling shoppers who want fewer blocks, tighter
+                  styling stories, and stronger calls to action.
                 </p>
                 <div className="mt-6 rounded-[22px] bg-[#fff1d6] px-4 py-3 text-sm font-semibold text-[#7c4a1f]">
-                  Up to 45% off on featured picks today
+                  Up to 45% off on featured apparel picks today
                 </div>
               </article>
             </div>
@@ -173,8 +173,8 @@ const Home = () => {
               </h2>
             </div>
             <p className="max-w-xl text-sm leading-7 text-[#67707c]">
-              Distinct category entry points for fashion, home, beauty, gadgets and
-              gifting.
+              Distinct category entry points for menswear, womenswear, ethnic,
+              footwear and basics.
             </p>
           </div>
           <ShopByCategory />
@@ -187,7 +187,7 @@ const Home = () => {
                 Closing banner
               </p>
               <h2 className="mt-3 text-3xl font-black lg:text-5xl">
-                Summer sale energy, but with a sharper premium finish.
+                Apparel-first energy, but with a sharper premium finish.
               </h2>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200">
                 Keep the page expressive, bold and fast to scan. Big ideas up top,

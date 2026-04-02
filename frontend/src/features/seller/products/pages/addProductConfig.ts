@@ -1,11 +1,7 @@
 import { menLevelTwo } from 'shared/constants/data/Category/Level Two/menLavelTwo';
 import { womenLevelTwo } from 'shared/constants/data/Category/Level Two/womenLavelTwo';
-import { furnitureLevelTwo } from 'shared/constants/data/Category/Level Two/furuitureLavelTwo';
-import { electronicsLevelTwo } from 'shared/constants/data/Category/Level Two/electronicsLavelTwo';
 import { menLevelThree } from 'shared/constants/data/Category/Level Three/menLavelThree';
 import { womenLevelThree } from 'shared/constants/data/Category/Level Three/womenLavelThree';
-import { furnitureLevelThree } from 'shared/constants/data/Category/Level Three/furuitureLavelThree';
-import { electronicsLevelThree } from 'shared/constants/data/Category/Level Three/electronicsLavelThree';
 
 type CategoryNode = {
   name: string;
@@ -18,15 +14,11 @@ type CategoryNode = {
 export const categoryTwo: Record<string, CategoryNode[]> = {
   men: menLevelTwo,
   women: womenLevelTwo,
-  home_furniture: furnitureLevelTwo,
-  electronics: electronicsLevelTwo,
 };
 
 export const categoryThree: Record<string, CategoryNode[]> = {
   men: menLevelThree,
   women: womenLevelThree,
-  home_furniture: furnitureLevelThree,
-  electronics: electronicsLevelThree,
 };
 
 export const PRODUCT_DESCRIPTION_MAX_LENGTH = 300;

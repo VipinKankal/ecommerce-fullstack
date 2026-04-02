@@ -30,7 +30,6 @@ export const mainCategory = [
       },
     ],
   },
-
   {
     name: 'Women',
     categoryId: 'women',
@@ -68,7 +67,4 @@ export const mainCategory = [
       },
     ],
   },
-
-  { name: 'Electronics', categoryId: 'electronics', level: 1 },
-  { name: 'Home & Furniture', categoryId: 'home_furniture', level: 1 },
 ];

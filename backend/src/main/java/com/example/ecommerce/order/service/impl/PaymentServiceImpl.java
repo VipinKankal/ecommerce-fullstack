@@ -15,15 +15,9 @@ import com.example.ecommerce.repository.OrderRepository;
 import com.example.ecommerce.repository.PaymentOrderRepository;
 import com.razorpay.Payment;
 import com.razorpay.PaymentLink;
-import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
-import com.stripe.Stripe;
-import com.stripe.exception.StripeException;
-import com.stripe.model.checkout.Session;
-import com.stripe.param.checkout.SessionCreateParams;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
-import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,51 +44,35 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Value("${payment.razorpay.api-key}")
     private String apiKey;
-
     @Value("${payment.razorpay.api-secret}")
     private String apiSecret;
-
     @Value("${payment.stripe.secret-key}")
     private String stripeSecretKey;
-
     @Value("${payment.phonepe.base-url:}")
     private String phonePeBaseUrl;
-
     @Value("${payment.phonepe.merchant-id:}")
     private String phonePeMerchantId;
-
     @Value("${payment.phonepe.salt-key:}")
     private String phonePeSaltKey;
-
     @Value("${payment.phonepe.salt-index:}")
     private String phonePeSaltIndex;
-
     @Value("${app.frontend.base-url:http://localhost:3000}")
     private String frontendBaseUrl;
-
     @Value("${app.backend.base-url:http://localhost:8080}")
     private String backendBaseUrl;
 
     @PostConstruct
     void logPaymentConfigStatus() {
-        log.info(
-                "Payment config loaded: phonePeConfigured={}, razorpayConfigured={}, razorpayKeyPrefix={}, razorpaySecretSuffix={}, stripeConfigured={}",
-                isPhonePeConfigured(),
-                isRazorpayConfigured(),
+        log.info("Payment config loaded: phonePeConfigured={}, razorpayConfigured={}, razorpayKeyPrefix={}, razorpaySecretSuffix={}, stripeConfigured={}",
+                PaymentGatewaySupport.isPhonePeConfigured(phonePeBaseUrl, phonePeMerchantId, phonePeSaltKey, phonePeSaltIndex),
+                PaymentGatewaySupport.isRazorpayConfigured(apiKey, apiSecret),
                 PaymentGatewaySupport.maskPrefix(apiKey),
                 PaymentGatewaySupport.maskSuffix(apiSecret),
-                isStripeConfigured()
-        );
+                PaymentGatewaySupport.isStripeConfigured(stripeSecretKey));
     }
 
     @Override
-    public PaymentOrder createOrder(
-            User user,
-            Set<Order> orders,
-            PaymentMethod paymentMethod,
-            PaymentType paymentType,
-            PaymentProvider provider
-    ) {
+    public PaymentOrder createOrder(User user, Set<Order> orders, PaymentMethod paymentMethod, PaymentType paymentType, PaymentProvider provider) {
         Long amount = orders.stream().mapToLong(Order::getTotalSellingPrice).sum();
         PaymentOrder paymentOrder = new PaymentOrder();
         paymentOrder.setAmount(amount);
@@ -108,101 +86,81 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     public PaymentOrder getPaymentOrderById(Long orderId) throws Exception {
-        return paymentOrderRepository.findById(orderId).orElseThrow(
-                () -> new Exception("Payment Order not found"));
+        return paymentOrderRepository.findById(orderId).orElseThrow(() -> new Exception("Payment Order not found"));
     }
 
     @Override
     public PaymentOrder getPaymentOrderByPaymentId(String orderId) throws Exception {
         PaymentOrder paymentOrder = paymentOrderRepository.findByPaymentLinkId(orderId);
-        if (paymentOrder == null) {
-            throw new Exception("Payment Order not found with provided payment link id: " + orderId);
-        }
+        if (paymentOrder == null) throw new Exception("Payment Order not found with provided payment link id: " + orderId);
         return paymentOrder;
     }
 
     @Override
     public PaymentOrder getPaymentOrderByMerchantTransactionId(String merchantTransactionId) throws Exception {
         PaymentOrder paymentOrder = paymentOrderRepository.findByMerchantTransactionId(merchantTransactionId);
-        if (paymentOrder == null) {
-            throw new Exception("Payment Order not found with provided merchant transaction id: " + merchantTransactionId);
-        }
+        if (paymentOrder == null) throw new Exception("Payment Order not found with provided merchant transaction id: " + merchantTransactionId);
         return paymentOrder;
     }
 
     @Override
     public Boolean ProceedPaymentOrder(PaymentOrder paymentOrder, String paymentId, String paymentLinkId) throws RazorpayException {
         if (paymentOrder.getStatus().equals(PaymentOrderStatus.PENDING)) {
-            RazorpayClient razorpay = new RazorpayClient(apiKey, apiSecret);
+            com.razorpay.RazorpayClient razorpay = new com.razorpay.RazorpayClient(apiKey, apiSecret);
             Payment payment = razorpay.payments.fetch(paymentId);
-            boolean success = PaymentOrderStateSupport.markRazorpayPaymentResult(
-                    paymentOrder,
-                    paymentLinkId,
-                    payment.get("status"),
-                    orderRepository,
-                    couponService
-            );
+            boolean success = PaymentOrderStateSupport.markRazorpayPaymentResult(paymentOrder, paymentLinkId, payment.get("status"), orderRepository, couponService);
             paymentOrderRepository.save(paymentOrder);
             return success;
         }
-
         return false;
     }
 
     @Override
     public void assertPhonePeConfigured() {
-        if (!isPhonePeConfigured()) {
-            throw new IllegalArgumentException(
-                    "PhonePe is not configured. Set PHONEPE_BASE_URL, PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY and PHONEPE_SALT_INDEX."
-            );
+        if (!PaymentGatewaySupport.isPhonePeConfigured(phonePeBaseUrl, phonePeMerchantId, phonePeSaltKey, phonePeSaltIndex)) {
+            throw new IllegalArgumentException("PhonePe is not configured. Set PHONEPE_BASE_URL, PHONEPE_MERCHANT_ID, PHONEPE_SALT_KEY and PHONEPE_SALT_INDEX.");
         }
     }
 
     @Override
     public PhonePePaymentSession createPhonePePaymentSession(User user, PaymentOrder paymentOrder) throws Exception {
         assertPhonePeConfigured();
-
         String merchantTransactionId = PhonePeSupport.buildMerchantTransactionId(paymentOrder.getId());
         JSONObject payload = new JSONObject();
         payload.put("merchantId", phonePeMerchantId);
         payload.put("merchantTransactionId", merchantTransactionId);
         payload.put("merchantUserId", "USER-" + user.getId());
         payload.put("amount", paymentOrder.getAmount() * 100);
-        payload.put("redirectUrl", buildFrontendUrl(
-                "/payment-success/" + paymentOrder.getId()
-                        + "?provider=PHONEPE&merchantTransactionId=" + merchantTransactionId
-        ));
+        payload.put("redirectUrl", PaymentGatewaySupport.buildUrl(frontendBaseUrl, "http://localhost:3000", "/payment-success/" + paymentOrder.getId() + "?provider=PHONEPE&merchantTransactionId=" + merchantTransactionId));
         payload.put("redirectMode", "REDIRECT");
-        payload.put("callbackUrl", buildBackendUrl(
-                "/api/payment/phonepe/webhook?merchantTransactionId=" + merchantTransactionId
-        ));
+        payload.put("callbackUrl", PaymentGatewaySupport.buildUrl(backendBaseUrl, "http://localhost:8080", "/api/payment/phonepe/webhook?merchantTransactionId=" + merchantTransactionId));
 
         JSONObject paymentInstrument = new JSONObject();
         paymentInstrument.put("type", "PAY_PAGE");
         payload.put("paymentInstrument", paymentInstrument);
-
-        if (PaymentGatewaySupport.isMeaningfulSecret(user.getMobileNumber())) {
-            payload.put("mobileNumber", user.getMobileNumber().trim());
-        }
+        if (PaymentGatewaySupport.isMeaningfulSecret(user.getMobileNumber())) payload.put("mobileNumber", user.getMobileNumber().trim());
 
         String encodedRequest = PhonePeSupport.encodePayload(payload);
-
         JSONObject requestBody = new JSONObject();
         requestBody.put("request", encodedRequest);
 
-        JSONObject response = sendPhonePePost(PHONEPE_PAY_PATH, requestBody, encodedRequest);
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(PaymentGatewaySupport.normalizeUrl(phonePeBaseUrl) + PHONEPE_PAY_PATH))
+                .header("Content-Type", "application/json")
+                .header("accept", "application/json")
+                .header("X-VERIFY", PhonePeSupport.buildPayloadSignature(encodedRequest, PHONEPE_PAY_PATH, phonePeSaltKey, phonePeSaltIndex))
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        JSONObject parsed = PhonePeSupport.parsePhonePeResponse(response.body());
         String redirectUrl = PaymentGatewaySupport.firstNonBlank(
-                extractNestedString(response, "data", "instrumentResponse", "redirectInfo", "url"),
-                extractNestedString(response, "data", "redirectInfo", "url"),
-                extractNestedString(response, "data", "instrumentResponse", "intentUrl"),
-                extractNestedString(response, "data", "intentUrl")
+                PaymentGatewaySupport.extractNestedString(parsed, "data", "instrumentResponse", "redirectInfo", "url"),
+                PaymentGatewaySupport.extractNestedString(parsed, "data", "redirectInfo", "url"),
+                PaymentGatewaySupport.extractNestedString(parsed, "data", "instrumentResponse", "intentUrl"),
+                PaymentGatewaySupport.extractNestedString(parsed, "data", "intentUrl")
         );
-
         if (!PaymentGatewaySupport.isMeaningfulSecret(redirectUrl)) {
-            throw new IllegalArgumentException(PaymentGatewaySupport.firstNonBlank(
-                    extractNestedString(response, "message"),
-                    "PhonePe did not return a redirect URL."
-            ));
+            throw new IllegalArgumentException(PaymentGatewaySupport.firstNonBlank(PaymentGatewaySupport.extractNestedString(parsed, "message"), "PhonePe did not return a redirect URL."));
         }
 
         paymentOrder.setProvider(PaymentProvider.PHONEPE);
@@ -211,232 +169,36 @@ public class PaymentServiceImpl implements PaymentService {
         paymentOrder.setMerchantTransactionId(merchantTransactionId);
         paymentOrder.setPaymentLinkId(merchantTransactionId);
         paymentOrderRepository.save(paymentOrder);
-
         return new PhonePePaymentSession(merchantTransactionId, redirectUrl);
     }
 
     @Override
     public PaymentOrder syncPhonePePaymentStatus(PaymentOrder paymentOrder) throws Exception {
-        if (paymentOrder.getProvider() != PaymentProvider.PHONEPE) {
-            return paymentOrder;
-        }
+        if (paymentOrder.getProvider() != PaymentProvider.PHONEPE) return paymentOrder;
+        if (!PaymentGatewaySupport.isMeaningfulSecret(paymentOrder.getMerchantTransactionId())) throw new IllegalArgumentException("PhonePe merchant transaction id is missing");
 
-        if (!PaymentGatewaySupport.isMeaningfulSecret(paymentOrder.getMerchantTransactionId())) {
-            throw new IllegalArgumentException("PhonePe merchant transaction id is missing");
-        }
-
-        JSONObject response = fetchPhonePeStatus(paymentOrder.getMerchantTransactionId());
-        PaymentOrderStateSupport.applyPhonePeStatus(
-                paymentOrder,
-                PhonePeSupport.resolvePhonePeStatus(response),
-                orderRepository,
-                couponService
-        );
-
+        String path = PHONEPE_STATUS_PATH_TEMPLATE.formatted(phonePeMerchantId, paymentOrder.getMerchantTransactionId());
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(PaymentGatewaySupport.normalizeUrl(phonePeBaseUrl) + path))
+                .header("accept", "application/json")
+                .header("Content-Type", "application/json")
+                .header("X-VERIFY", PhonePeSupport.buildStatusSignature(path, phonePeSaltKey, phonePeSaltIndex))
+                .header("X-MERCHANT-ID", phonePeMerchantId)
+                .GET()
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        JSONObject parsed = PhonePeSupport.parsePhonePeResponse(response.body());
+        PaymentOrderStateSupport.applyPhonePeStatus(paymentOrder, PhonePeSupport.resolvePhonePeStatus(parsed), orderRepository, couponService);
         return paymentOrderRepository.save(paymentOrder);
     }
 
     @Override
     public PaymentLink createRazorpayPaymentLink(User user, Long amount, Long orderId) throws RazorpayException {
-        if (!isRazorpayConfigured()) {
-            throw new IllegalArgumentException("Razorpay is not configured. Set RAZORPAY_API_KEY and RAZORPAY_API_SECRET.");
-        }
-        amount = amount * 100;
-        try {
-            RazorpayClient razorpay = new RazorpayClient(apiKey, apiSecret);
-
-            JSONObject paymentLinkRequest = new JSONObject();
-            paymentLinkRequest.put("amount", amount);
-            paymentLinkRequest.put("currency", "INR");
-
-            JSONObject customer = new JSONObject();
-            customer.put("name", user.getFullName());
-            customer.put("email", user.getEmail());
-            paymentLinkRequest.put("customer", customer);
-
-            JSONObject notify = new JSONObject();
-            notify.put("email", true);
-            paymentLinkRequest.put("notify", notify);
-
-            paymentLinkRequest.put("callback_url", buildFrontendUrl("/payment-success/" + orderId));
-            paymentLinkRequest.put("callback_method", "get");
-
-            return razorpay.paymentLink.create(paymentLinkRequest);
-
-        } catch (Exception e) {
-            throw new RazorpayException(e.getMessage());
-        }
+        return PaymentCheckoutSupport.createRazorpayPaymentLink(user, amount, orderId, apiKey, apiSecret, frontendBaseUrl);
     }
 
     @Override
-    public String createStripePaymentLink(User user, Long amount, Long orderId) throws StripeException {
-        if (!isStripeConfigured()) {
-            throw new IllegalArgumentException("Stripe is not configured. Set STRIPE_SECRET_KEY.");
-        }
-        Stripe.apiKey = stripeSecretKey;
-        SessionCreateParams params = SessionCreateParams.builder()
-                .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
-                .setMode(SessionCreateParams.Mode.PAYMENT)
-                .setSuccessUrl(buildFrontendUrl("/payment-success/" + orderId))
-                .setCancelUrl(buildFrontendUrl("/payment-cancel"))
-                .addLineItem(SessionCreateParams.LineItem.builder()
-                        .setQuantity(1L)
-                        .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
-                                .setCurrency("inr")
-                                .setUnitAmount(amount * 100)
-                                .setProductData(
-                                        SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                                .setName("Vipin e comm paymet" + orderId)
-                                                .build()
-                                )
-                                .build()
-                        )
-                        .build()
-                ).build();
-
-        Session session = Session.create(params);
-        return session.getUrl();
+    public String createStripePaymentLink(User user, Long amount, Long orderId) throws com.stripe.exception.StripeException {
+        return PaymentCheckoutSupport.createStripePaymentLink(user, amount, orderId, stripeSecretKey, frontendBaseUrl);
     }
-
-    private String buildFrontendUrl(String path) {
-        return PaymentGatewaySupport.buildUrl(frontendBaseUrl, "http://localhost:3000", path);
-    }
-
-    private boolean isRazorpayConfigured() {
-        return PaymentGatewaySupport.isRazorpayConfigured(apiKey, apiSecret);
-    }
-
-    private boolean isPhonePeConfigured() {
-        return PaymentGatewaySupport.isPhonePeConfigured(
-                phonePeBaseUrl,
-                phonePeMerchantId,
-                phonePeSaltKey,
-                phonePeSaltIndex
-        );
-    }
-
-    private boolean isStripeConfigured() {
-        return PaymentGatewaySupport.isStripeConfigured(stripeSecretKey);
-    }
-
-    private boolean isMeaningfulSecret(String value) {
-        return PaymentGatewaySupport.isMeaningfulSecret(value);
-    }
-
-    private String maskPrefix(String value) {
-        return PaymentGatewaySupport.maskPrefix(value);
-    }
-
-    private String maskSuffix(String value) {
-        return PaymentGatewaySupport.maskSuffix(value);
-    }
-
-    private JSONObject sendPhonePePost(String path, JSONObject requestBody, String encodedRequest) throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(normalizeUrl(phonePeBaseUrl) + path))
-                .header("Content-Type", "application/json")
-                .header("accept", "application/json")
-                .header("X-VERIFY", buildPhonePePayloadSignature(encodedRequest, path))
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody.toString()))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        return parsePhonePeResponse(response.body());
-    }
-
-    private JSONObject fetchPhonePeStatus(String merchantTransactionId) throws Exception {
-        String path = PHONEPE_STATUS_PATH_TEMPLATE.formatted(phonePeMerchantId, merchantTransactionId);
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(normalizeUrl(phonePeBaseUrl) + path))
-                .header("accept", "application/json")
-                .header("Content-Type", "application/json")
-                .header("X-VERIFY", buildPhonePeStatusSignature(path))
-                .header("X-MERCHANT-ID", phonePeMerchantId)
-                .GET()
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        return parsePhonePeResponse(response.body());
-    }
-
-    private JSONObject parsePhonePeResponse(String body) {
-        return PhonePeSupport.parsePhonePeResponse(body);
-    }
-
-    private String resolvePhonePeStatus(JSONObject response) {
-        return PhonePeSupport.resolvePhonePeStatus(response);
-    }
-
-    private String buildMerchantTransactionId(Long paymentOrderId) {
-        return PhonePeSupport.buildMerchantTransactionId(paymentOrderId);
-    }
-
-    private String buildPhonePePayloadSignature(String encodedRequest, String path) throws Exception {
-        return PhonePeSupport.buildPayloadSignature(encodedRequest, path, phonePeSaltKey, phonePeSaltIndex);
-    }
-
-    private String buildPhonePeStatusSignature(String path) throws Exception {
-        return PhonePeSupport.buildStatusSignature(path, phonePeSaltKey, phonePeSaltIndex);
-    }
-
-    private String buildBackendUrl(String path) {
-        return PaymentGatewaySupport.buildUrl(backendBaseUrl, "http://localhost:8080", path);
-    }
-
-    private String normalizeUrl(String url) {
-        return PaymentGatewaySupport.normalizeUrl(url);
-    }
-
-    private String firstNonBlank(String... values) {
-        return PaymentGatewaySupport.firstNonBlank(values);
-    }
-
-    private String extractNestedString(JSONObject root, String... path) {
-        Object current = root;
-        for (String key : path) {
-            if (!(current instanceof JSONObject currentObject) || !currentObject.has(key)) {
-                return null;
-            }
-            current = currentObject.opt(key);
-        }
-        return extractStringValue(current);
-    }
-
-    private String extractStringValue(Object value) {
-        if (value == null || value == JSONObject.NULL) {
-            return null;
-        }
-        if (value instanceof String str) {
-            return str;
-        }
-        if (value instanceof Number || value instanceof Boolean) {
-            return String.valueOf(value);
-        }
-        if (value instanceof JSONObject object) {
-            return firstNonBlank(
-                    extractNestedString(object, "url"),
-                    extractNestedString(object, "redirectUrl"),
-                    extractNestedString(object, "merchantTransactionId"),
-                    extractNestedString(object, "transactionId"),
-                    extractNestedString(object, "status"),
-                    extractNestedString(object, "state")
-            );
-        }
-        if (value instanceof JSONArray array) {
-            for (int index = 0; index < array.length(); index++) {
-                String nested = extractStringValue(array.opt(index));
-                if (nested != null) {
-                    return nested;
-                }
-            }
-        }
-        return null;
-    }
-
 }
-
-
-
-
-
-

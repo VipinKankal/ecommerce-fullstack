@@ -45,11 +45,10 @@ export const emptyForm: SellerProfileForm = {
 
 export const BUSINESS_TYPES = ['Individual', 'Company', 'Partnership', 'LLP'];
 export const PRIMARY_CATEGORIES = [
-  'Electronics',
-  'Clothing',
-  'Shoes',
-  'Furniture',
-  'Beauty',
-  'Grocery',
+  'Menswear',
+  'Womenswear',
+  'Ethnic Wear',
+  'Footwear',
+  'Innerwear & Sleepwear',
   'Accessories',
 ];

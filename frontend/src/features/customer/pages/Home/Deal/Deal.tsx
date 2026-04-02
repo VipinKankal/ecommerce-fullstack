@@ -4,13 +4,13 @@ import DealCard from './DealCard';
 const Deal = () => {
   const deals = [
     {
-      id: 'watch',
-      title: 'Smart Watch',
-      subtitle: 'Clean AMOLED styles',
+      id: 'footwear',
+      title: 'Sneaker Drop',
+      subtitle: 'Clean everyday pairs',
       price: 'Up to 40% off',
       accent: 'bg-[#171717]',
       image:
-        'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=800&q=80',
     },
     {
       id: 'shirt',
@@ -22,22 +22,22 @@ const Deal = () => {
         'https://images.unsplash.com/photo-1603252109303-2751441dd157?auto=format&fit=crop&w=800&q=80',
     },
     {
-      id: 'speaker',
-      title: 'Desk Speakers',
-      subtitle: 'Compact but punchy',
+      id: 'denim',
+      title: 'Denim Rotation',
+      subtitle: 'Straight fits and washed blues',
       price: 'Save Rs 1800',
       accent: 'bg-[#0f172a]',
       image:
-        'https://images.unsplash.com/photo-1519677100203-a0e668c92439?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=800&q=80',
     },
     {
-      id: 'skincare',
-      title: 'Glow Set',
-      subtitle: 'Fresh beauty bundle',
+      id: 'ethnic',
+      title: 'Festive Edit',
+      subtitle: 'Fresh ethnic bundle',
       price: 'Flat 30% off',
       accent: 'bg-[#9d174d]',
       image:
-        'https://images.unsplash.com/photo-1556228578-8c89e6adf883?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80',
     },
   ];
 

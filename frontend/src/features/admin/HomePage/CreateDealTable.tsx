@@ -9,10 +9,11 @@ import {
 } from '@mui/material';
 
 const categories = [
-  { value: 'electronics', label: 'Electronics' },
-  { value: 'fashion', label: 'Fashion' },
-  { value: 'home_appliances', label: 'Home Appliances' },
-  { value: 'beauty', label: 'Beauty' },
+  { value: 'menswear', label: 'Menswear' },
+  { value: 'womenswear', label: 'Womenswear' },
+  { value: 'ethnic', label: 'Ethnic Wear' },
+  { value: 'footwear', label: 'Footwear' },
+  { value: 'basics', label: 'Basics' },
 ];
 
 const DealCategoryTable = () => {

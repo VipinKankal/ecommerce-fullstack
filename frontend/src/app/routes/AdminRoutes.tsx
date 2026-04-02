@@ -2,9 +2,6 @@ import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 import SellersTable from '../../features/admin/Pages/Sellers/SellersTable';
 import Coupon from '../../features/admin/Coupon/Coupon';
-import GridTable from '../../features/admin/HomePage/GridTable';
-import ElectronicTable from '../../features/admin/HomePage/ElectronicTable';
-import ShopByCategoryTable from '../../features/admin/HomePage/ShopByCategoryTable';
 import Deal from '../../features/admin/HomePage/Deal';
 import AdminTransactions from '../../features/admin/Pages/Dashboard/AdminTransactions';
 import AdminAccount from '../../features/admin/Pages/Dashboard/AdminAccount';
@@ -42,9 +39,6 @@ const AdminRoutes = () => {
         <Route path="/account" element={<AdminAccount />} />
         <Route path="/coupon" element={<Coupon />} />
         <Route path="/add-new-coupon-from" element={<Coupon />} />
-        <Route path="/home-grid" element={<GridTable />} />
-        <Route path="/electronic-category" element={<ElectronicTable />} />
-        <Route path="/shop-by-category" element={<ShopByCategoryTable />} />
         <Route path="/deals" element={<Deal />} />
       </Routes>
     </div>

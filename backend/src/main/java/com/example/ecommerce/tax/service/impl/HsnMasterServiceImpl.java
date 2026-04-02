@@ -1,7 +1,7 @@
 package com.example.ecommerce.tax.service.impl;
 
-import com.example.ecommerce.modal.HsnMasterRule;
 import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
+import com.example.ecommerce.modal.HsnMasterRule;
 import com.example.ecommerce.repository.HsnMasterRuleRepository;
 import com.example.ecommerce.tax.request.CreateHsnMasterRuleRequest;
 import com.example.ecommerce.tax.request.UpdateHsnMasterRuleRequest;
@@ -12,17 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class HsnMasterServiceImpl implements HsnMasterService {
-
-    private static final List<String> SUPPORTED_MAPPING_MODES = List.of(
-            "DIRECT",
-            "FIBER_REQUIRED",
-            "RULE_BASED"
-    );
 
     private final HsnMasterRuleRepository hsnMasterRuleRepository;
     private final ComplianceSellerNoteService complianceSellerNoteService;
@@ -30,14 +25,14 @@ public class HsnMasterServiceImpl implements HsnMasterService {
     @Override
     @Transactional
     public HsnMasterRule createRule(CreateHsnMasterRuleRequest request) {
-        String normalizedRuleCode = normalizeUpper(request.getRuleCode(), "Rule code is required");
+        String normalizedRuleCode = HsnMasterRuleSupport.normalizeUpper(request.getRuleCode(), "Rule code is required");
         if (hsnMasterRuleRepository.findByRuleCodeIgnoreCase(normalizedRuleCode).isPresent()) {
             throw new IllegalArgumentException("HSN master rule code already exists");
         }
 
         HsnMasterRule rule = new HsnMasterRule();
         rule.setRuleCode(normalizedRuleCode);
-        applyCreateOrUpdate(rule, request);
+        HsnMasterRuleSupport.applyCreateOrUpdate(rule, request);
         rule.setPublished(false);
         HsnMasterRule savedRule = hsnMasterRuleRepository.save(rule);
         triggerAutoDraft("HSN_RULE_CREATED", savedRule);
@@ -51,28 +46,28 @@ public class HsnMasterServiceImpl implements HsnMasterService {
                 .orElseThrow(() -> new IllegalArgumentException("HSN master rule not found"));
 
         if (request.getDisplayLabel() != null) {
-            rule.setDisplayLabel(normalizeDisplayLabel(request.getDisplayLabel()));
+            rule.setDisplayLabel(HsnMasterRuleSupport.normalizeDisplayLabel(request.getDisplayLabel()));
         }
         if (request.getConstructionType() != null) {
-            rule.setConstructionType(normalizeUpper(request.getConstructionType(), null));
+            rule.setConstructionType(HsnMasterRuleSupport.normalizeUpper(request.getConstructionType(), null));
         }
         if (request.getGender() != null) {
-            rule.setGender(normalizeUpper(request.getGender(), null));
+            rule.setGender(HsnMasterRuleSupport.normalizeUpper(request.getGender(), null));
         }
         if (request.getFiberFamily() != null) {
-            rule.setFiberFamily(normalizeUpper(request.getFiberFamily(), null));
+            rule.setFiberFamily(HsnMasterRuleSupport.normalizeUpper(request.getFiberFamily(), null));
         }
         if (request.getHsnChapter() != null) {
-            rule.setHsnChapter(normalizeUpper(request.getHsnChapter(), null));
+            rule.setHsnChapter(HsnMasterRuleSupport.normalizeUpper(request.getHsnChapter(), null));
         }
         if (request.getHsnCode() != null) {
-            rule.setHsnCode(normalizeUpper(request.getHsnCode(), null));
+            rule.setHsnCode(HsnMasterRuleSupport.normalizeUpper(request.getHsnCode(), null));
         }
         if (request.getTaxClass() != null) {
-            rule.setTaxClass(normalizeUpper(request.getTaxClass(), null));
+            rule.setTaxClass(HsnMasterRuleSupport.normalizeUpper(request.getTaxClass(), null));
         }
         if (request.getMappingMode() != null) {
-            rule.setMappingMode(normalizeMappingMode(request.getMappingMode()));
+            rule.setMappingMode(HsnMasterRuleSupport.normalizeMappingMode(request.getMappingMode()));
         }
         if (request.getEffectiveFrom() != null) {
             rule.setEffectiveFrom(request.getEffectiveFrom());
@@ -81,16 +76,16 @@ public class HsnMasterServiceImpl implements HsnMasterService {
             rule.setEffectiveTo(request.getEffectiveTo());
         }
         if (request.getApprovalStatus() != null) {
-            rule.setApprovalStatus(normalizeApprovalStatus(request.getApprovalStatus()));
+            rule.setApprovalStatus(HsnMasterRuleSupport.normalizeApprovalStatus(request.getApprovalStatus()));
         }
         if (request.getSourceReference() != null) {
-            rule.setSourceReference(trimToNull(request.getSourceReference()));
+            rule.setSourceReference(HsnMasterRuleSupport.trimToNull(request.getSourceReference()));
         }
         if (request.getNotes() != null) {
-            rule.setNotes(trimToNull(request.getNotes()));
+            rule.setNotes(HsnMasterRuleSupport.trimToNull(request.getNotes()));
         }
 
-        validateDateRange(rule.getEffectiveFrom(), rule.getEffectiveTo());
+        HsnMasterRuleSupport.validateDateRange(rule.getEffectiveFrom(), rule.getEffectiveTo());
         HsnMasterRule savedRule = hsnMasterRuleRepository.save(rule);
         triggerAutoDraft("HSN_RULE_UPDATED", savedRule);
         return savedRule;
@@ -113,53 +108,37 @@ public class HsnMasterServiceImpl implements HsnMasterService {
     @Override
     @Transactional(readOnly = true)
     public List<HsnMasterRule> getRules(String uiCategoryKey, Boolean published) {
-        String normalizedCategory = normalizeUiCategoryKey(uiCategoryKey);
+        String normalizedCategory = HsnMasterRuleSupport.normalizeUiCategoryKey(uiCategoryKey);
         return hsnMasterRuleRepository.findAll().stream()
                 .filter(rule -> normalizedCategory == null || normalizedCategory.equalsIgnoreCase(rule.getUiCategoryKey()))
                 .filter(rule -> published == null || published.equals(rule.isPublished()))
-                .sorted(Comparator
-                        .comparing(HsnMasterRule::getEffectiveFrom, Comparator.nullsLast(Comparator.reverseOrder()))
+                .sorted(Comparator.comparing(HsnMasterRule::getEffectiveFrom, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(HsnMasterRule::getId, Comparator.nullsLast(Comparator.reverseOrder())))
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public HsnMasterRule resolveSuggestion(
-            String uiCategoryKey,
-            String constructionType,
-            String gender,
-            String fiberFamily,
-            LocalDate effectiveDate
-    ) {
-        String normalizedCategory = normalizeUiCategoryKey(uiCategoryKey);
+    public HsnMasterRule resolveSuggestion(String uiCategoryKey, String constructionType, String gender, String fiberFamily, LocalDate effectiveDate) {
+        String normalizedCategory = HsnMasterRuleSupport.normalizeUiCategoryKey(uiCategoryKey);
         if (normalizedCategory == null) {
             return null;
         }
 
-        String normalizedConstructionType = normalizeUpper(constructionType, null);
-        String normalizedGender = normalizeUpper(gender, null);
-        String normalizedFiberFamily = normalizeUpper(fiberFamily, null);
+        String normalizedConstructionType = HsnMasterRuleSupport.normalizeUpper(constructionType, null);
+        String normalizedGender = HsnMasterRuleSupport.normalizeUpper(gender, null);
+        String normalizedFiberFamily = HsnMasterRuleSupport.normalizeUpper(fiberFamily, null);
         LocalDate resolvedEffectiveDate = effectiveDate == null ? LocalDate.now() : effectiveDate;
 
         return hsnMasterRuleRepository
-                .findByUiCategoryKeyIgnoreCaseAndPublishedTrueAndEffectiveFromLessThanEqual(
-                        normalizedCategory,
-                        resolvedEffectiveDate
-                )
+                .findByUiCategoryKeyIgnoreCaseAndPublishedTrueAndEffectiveFromLessThanEqual(normalizedCategory, resolvedEffectiveDate)
                 .stream()
                 .filter(rule -> "CA_APPROVED".equalsIgnoreCase(rule.getApprovalStatus()))
                 .filter(rule -> rule.getEffectiveTo() == null || !rule.getEffectiveTo().isBefore(resolvedEffectiveDate))
-                .filter(rule -> matchesDimension(rule.getConstructionType(), normalizedConstructionType))
-                .filter(rule -> matchesDimension(rule.getGender(), normalizedGender))
-                .filter(rule -> matchesDimension(rule.getFiberFamily(), normalizedFiberFamily))
-                .sorted(Comparator
-                        .comparingInt((HsnMasterRule rule) -> scoreRule(
-                                rule,
-                                normalizedConstructionType,
-                                normalizedGender,
-                                normalizedFiberFamily
-                        ))
+                .filter(rule -> HsnMasterRuleSupport.matchesDimension(rule.getConstructionType(), normalizedConstructionType))
+                .filter(rule -> HsnMasterRuleSupport.matchesDimension(rule.getGender(), normalizedGender))
+                .filter(rule -> HsnMasterRuleSupport.matchesDimension(rule.getFiberFamily(), normalizedFiberFamily))
+                .sorted(Comparator.comparingInt((HsnMasterRule rule) -> HsnMasterRuleSupport.scoreRule(rule, normalizedConstructionType, normalizedGender, normalizedFiberFamily))
                         .reversed()
                         .thenComparing(HsnMasterRule::getEffectiveFrom, Comparator.nullsLast(Comparator.reverseOrder()))
                         .thenComparing(HsnMasterRule::getId, Comparator.nullsLast(Comparator.reverseOrder())))
@@ -167,136 +146,9 @@ public class HsnMasterServiceImpl implements HsnMasterService {
                 .orElse(null);
     }
 
-    private void applyCreateOrUpdate(HsnMasterRule rule, CreateHsnMasterRuleRequest request) {
-        rule.setUiCategoryKey(normalizeUiCategoryKey(request.getUiCategoryKey()));
-        rule.setDisplayLabel(normalizeDisplayLabel(request.getDisplayLabel()));
-        rule.setConstructionType(normalizeUpper(request.getConstructionType(), null));
-        rule.setGender(normalizeUpper(request.getGender(), null));
-        rule.setFiberFamily(normalizeUpper(request.getFiberFamily(), null));
-        rule.setHsnChapter(normalizeUpper(request.getHsnChapter(), null));
-        rule.setHsnCode(normalizeUpper(request.getHsnCode(), null));
-        rule.setTaxClass(normalizeUpper(request.getTaxClass(), null));
-        rule.setMappingMode(normalizeMappingMode(request.getMappingMode()));
-        rule.setEffectiveFrom(request.getEffectiveFrom());
-        rule.setEffectiveTo(request.getEffectiveTo());
-        rule.setApprovalStatus(normalizeApprovalStatus(request.getApprovalStatus()));
-        rule.setSourceReference(trimToNull(request.getSourceReference()));
-        rule.setNotes(trimToNull(request.getNotes()));
-        validateDateRange(rule.getEffectiveFrom(), rule.getEffectiveTo());
-    }
-
-    private int scoreRule(
-            HsnMasterRule rule,
-            String constructionType,
-            String gender,
-            String fiberFamily
-    ) {
-        int score = 0;
-        if (isExactMatch(rule.getConstructionType(), constructionType)) {
-            score += 30;
-        }
-        if (isExactMatch(rule.getGender(), gender)) {
-            score += 20;
-        }
-        if (isExactMatch(rule.getFiberFamily(), fiberFamily)) {
-            score += 40;
-        }
-        if (!isWildcard(rule.getConstructionType())) {
-            score += 5;
-        }
-        if (!isWildcard(rule.getGender())) {
-            score += 5;
-        }
-        if (!isWildcard(rule.getFiberFamily())) {
-            score += 5;
-        }
-        return score;
-    }
-
-    private boolean matchesDimension(String ruleValue, String requestedValue) {
-        if (isWildcard(ruleValue)) {
-            return true;
-        }
-        if (requestedValue == null) {
-            return false;
-        }
-        return requestedValue.equalsIgnoreCase(ruleValue);
-    }
-
-    private boolean isExactMatch(String ruleValue, String requestedValue) {
-        return requestedValue != null && ruleValue != null && requestedValue.equalsIgnoreCase(ruleValue);
-    }
-
-    private boolean isWildcard(String value) {
-        if (value == null || value.isBlank()) {
-            return true;
-        }
-        String normalized = value.trim();
-        return "ANY".equalsIgnoreCase(normalized) || "*".equals(normalized);
-    }
-
-    private void validateDateRange(LocalDate effectiveFrom, LocalDate effectiveTo) {
-        if (effectiveFrom == null) {
-            throw new IllegalArgumentException("Effective from date is required");
-        }
-        if (effectiveTo != null && effectiveTo.isBefore(effectiveFrom)) {
-            throw new IllegalArgumentException("Effective to date cannot be before effective from date");
-        }
-    }
-
-    private String normalizeDisplayLabel(String displayLabel) {
-        String normalized = trimToNull(displayLabel);
-        if (normalized == null) {
-            throw new IllegalArgumentException("Display label is required");
-        }
-        return normalized;
-    }
-
-    private String normalizeMappingMode(String mappingMode) {
-        String normalized = normalizeUpper(mappingMode, "Mapping mode is required");
-        if (SUPPORTED_MAPPING_MODES.stream().noneMatch(value -> value.equalsIgnoreCase(normalized))) {
-            throw new IllegalArgumentException(
-                    "Unsupported mapping mode. Allowed values: DIRECT, FIBER_REQUIRED, RULE_BASED"
-            );
-        }
-        return normalized;
-    }
-
-    private String normalizeApprovalStatus(String approvalStatus) {
-        String normalized = normalizeUpper(approvalStatus, null);
-        return normalized == null ? "DRAFT" : normalized;
-    }
-
-    private String normalizeUiCategoryKey(String uiCategoryKey) {
-        if (uiCategoryKey == null) {
-            return null;
-        }
-        String trimmed = uiCategoryKey.trim().toLowerCase();
-        return trimmed.isBlank() ? null : trimmed;
-    }
-
-    private String normalizeUpper(String value, String message) {
-        String normalized = trimToNull(value);
-        if (normalized == null) {
-            if (message != null) {
-                throw new IllegalArgumentException(message);
-            }
-            return null;
-        }
-        return normalized.toUpperCase();
-    }
-
-    private String trimToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String trimmed = value.trim();
-        return trimmed.isBlank() ? null : trimmed;
-    }
-
     private void triggerAutoDraft(String eventType, HsnMasterRule rule) {
         try {
-            java.util.LinkedHashMap<String, Object> payload = new java.util.LinkedHashMap<>();
+            LinkedHashMap<String, Object> payload = new LinkedHashMap<>();
             payload.put("noteType", "HSN");
             payload.put("priority", "HIGH");
             payload.put("title", "%s: %s".formatted(eventType.replace('_', ' '), rule.getRuleCode()));
@@ -314,13 +166,8 @@ public class HsnMasterServiceImpl implements HsnMasterService {
             if (rule.getEffectiveFrom() != null) {
                 payload.put("effectiveDate", rule.getEffectiveFrom().toString());
             }
-            complianceSellerNoteService.createAutoDraftFromEvent(
-                    eventType,
-                    payload,
-                    "system_hsn_event"
-            );
+            complianceSellerNoteService.createAutoDraftFromEvent(eventType, payload, "system_hsn_event");
         } catch (Exception ignored) {
-            // Auto-draft must not block HSN rule workflows.
         }
     }
 }

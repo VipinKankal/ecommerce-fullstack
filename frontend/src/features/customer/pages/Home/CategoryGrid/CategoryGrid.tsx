@@ -11,35 +11,35 @@ const CategoryGrid = () => {
       className: 'col-span-12 md:col-span-6 xl:col-span-4 xl:row-span-2 min-h-[260px] xl:min-h-[560px]',
     },
     {
-      id: 'audio',
-      title: 'Desk Audio',
-      subtitle: 'Portable sound for work and play',
+      id: 'denim',
+      title: 'Denim Rotation',
+      subtitle: 'Straight fits, wide legs and washed blues',
       image:
-        'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?auto=format&fit=crop&w=900&q=80',
       className: 'col-span-12 sm:col-span-6 xl:col-span-3 min-h-[220px]',
     },
     {
-      id: 'beauty',
-      title: 'Self-care Shelf',
-      subtitle: 'Skincare and glow essentials',
+      id: 'ethnic',
+      title: 'Ethnic Staples',
+      subtitle: 'Kurtas, co-ords and festive texture',
       image:
-        'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1610030469668-6c0c2c7ea74b?auto=format&fit=crop&w=900&q=80',
       className: 'col-span-12 sm:col-span-6 xl:col-span-5 min-h-[220px]',
     },
     {
-      id: 'living',
-      title: 'Warm Living',
-      subtitle: 'Home pieces with tactile calm',
+      id: 'footwear',
+      title: 'Everyday Footwear',
+      subtitle: 'Easy pairs built for repeat wear',
       image:
-        'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=900&q=80',
       className: 'col-span-12 sm:col-span-7 xl:col-span-5 min-h-[220px]',
     },
     {
-      id: 'wearables',
-      title: 'Smart Everyday',
-      subtitle: 'Wearables that stay useful',
+      id: 'basics',
+      title: 'Core Basics',
+      subtitle: 'Tees, innerwear and soft lounge pieces',
       image:
-        'https://images.unsplash.com/photo-1546868871-7041f2a55e12?auto=format&fit=crop&w=900&q=80',
+        'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=80',
       className: 'col-span-12 sm:col-span-5 xl:col-span-3 min-h-[220px]',
     },
   ];
@@ -52,12 +52,12 @@ const CategoryGrid = () => {
             Editorial grid
           </p>
           <h2 className="mt-2 text-3xl font-black text-[#18212f] lg:text-5xl">
-            Hero stories that feel merchandised
+            Hero stories built only for apparel
           </h2>
         </div>
         <p className="max-w-xl text-sm leading-7 text-[#67707c]">
-          A better first-scroll mix of fashion, home and tech, with clear copy and
-          stronger visual rhythm.
+          A cleaner first-scroll mix of menswear, womenswear, ethnic and footwear
+          with stronger fashion rhythm.
         </p>
       </div>
       <div className="grid grid-cols-12 gap-4 lg:auto-rows-[170px]">

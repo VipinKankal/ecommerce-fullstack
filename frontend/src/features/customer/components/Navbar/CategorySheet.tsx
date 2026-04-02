@@ -3,14 +3,10 @@ import { Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { menLevelTwo } from 'shared/constants/data/Category/Level Two/menLavelTwo';
 import { womenLevelTwo } from 'shared/constants/data/Category/Level Two/womenLavelTwo';
-import { electronicsLevelTwo } from 'shared/constants/data/Category/Level Two/electronicsLavelTwo';
-import { furnitureLevelTwo } from 'shared/constants/data/Category/Level Two/furuitureLavelTwo';
 import { menLevelThree } from 'shared/constants/data/Category/Level Three/menLavelThree';
 import { womenLevelThree } from 'shared/constants/data/Category/Level Three/womenLavelThree';
-import { electronicsLevelThree } from 'shared/constants/data/Category/Level Three/electronicsLavelThree';
-import { furnitureLevelThree } from 'shared/constants/data/Category/Level Three/furuitureLavelThree';
 
-export type CategoryKey = 'men' | 'women' | 'electronics' | 'home_furniture';
+export type CategoryKey = 'men' | 'women';
 
 type CategoryNode = {
   name: string;
@@ -23,15 +19,11 @@ type CategoryNode = {
 const categoryTwoMap: Record<CategoryKey, CategoryNode[]> = {
   men: menLevelTwo,
   women: womenLevelTwo,
-  electronics: electronicsLevelTwo,
-  home_furniture: furnitureLevelTwo,
 };
 
 const categoryThreeMap: Record<CategoryKey, CategoryNode[]> = {
   men: menLevelThree,
   women: womenLevelThree,
-  electronics: electronicsLevelThree,
-  home_furniture: furnitureLevelThree,
 };
 
 type CategorySheetProps = {

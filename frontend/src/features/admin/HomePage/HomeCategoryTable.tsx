@@ -45,7 +45,7 @@ const HomeCategoryTable = () => {
     dispatch(getHomeCategories());
   }, [dispatch]);
 
-  const electronics = useMemo<HomeCategoryRow[]>(() => {
+  const homeCategories = useMemo<HomeCategoryRow[]>(() => {
     if (!Array.isArray(rawCategories)) return [];
     return (rawCategories as HomeCategoryApiRecord[]).map(
       (item, index: number) => ({
@@ -68,7 +68,7 @@ const HomeCategoryTable = () => {
         }}
       >
         <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-          Electronic Categories
+          Homepage Apparel Categories
         </Typography>
         <Button
           variant="contained"
@@ -89,7 +89,7 @@ const HomeCategoryTable = () => {
             <TableRow>
               <TableCell sx={{ fontWeight: 'bold' }}>ID</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Image</TableCell>
-              <TableCell sx={{ fontWeight: 'bold' }}>Electronic Name</TableCell>
+              <TableCell sx={{ fontWeight: 'bold' }}>Category Name</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }}>Category</TableCell>
               <TableCell sx={{ fontWeight: 'bold' }} align="right">
                 Update
@@ -97,7 +97,7 @@ const HomeCategoryTable = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {electronics.map((item) => (
+            {homeCategories.map((item) => (
               <TableRow key={item.id} hover>
                 <TableCell>#{item.id}</TableCell>
                 <TableCell>
@@ -137,7 +137,7 @@ const HomeCategoryTable = () => {
                 </TableCell>
               </TableRow>
             ))}
-            {!electronics.length && (
+            {!homeCategories.length && (
               <TableRow>
                 <TableCell colSpan={5} align="center">
                   {loading

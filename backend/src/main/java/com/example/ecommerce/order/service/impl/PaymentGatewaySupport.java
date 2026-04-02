@@ -1,5 +1,7 @@
 package com.example.ecommerce.order.service.impl;
 
+import org.json.JSONObject;
+
 final class PaymentGatewaySupport {
 
     private PaymentGatewaySupport() {
@@ -73,5 +75,25 @@ final class PaymentGatewaySupport {
             }
         }
         return null;
+    }
+
+    static String extractNestedString(JSONObject source, String... path) {
+        if (source == null || path == null || path.length == 0) {
+            return null;
+        }
+
+        Object current = source;
+        for (String segment : path) {
+            if (!(current instanceof JSONObject jsonObject) || !jsonObject.has(segment) || jsonObject.isNull(segment)) {
+                return null;
+            }
+            current = jsonObject.get(segment);
+        }
+
+        if (current == null) {
+            return null;
+        }
+        String resolved = String.valueOf(current).trim();
+        return resolved.isEmpty() ? null : resolved;
     }
 }
