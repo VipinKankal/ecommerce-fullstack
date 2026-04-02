@@ -5,7 +5,6 @@ import com.example.ecommerce.admin.request.UpdateComplianceSellerNoteRequest;
 import com.example.ecommerce.compliance.service.ComplianceSellerNoteService;
 import com.example.ecommerce.modal.ComplianceSellerNote;
 import com.example.ecommerce.modal.ComplianceSellerNoteRead;
-import com.example.ecommerce.modal.Seller;
 import com.example.ecommerce.repository.ComplianceSellerNoteReadRepository;
 import com.example.ecommerce.repository.ComplianceSellerNoteRepository;
 import com.example.ecommerce.repository.ProductRepository;
@@ -17,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -94,10 +92,21 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Transactional
     public ComplianceSellerNote create(CreateComplianceSellerNoteRequest request, String actorEmail) {
         ComplianceSellerNote note = new ComplianceSellerNote();
-        applyCreatePayload(note, request);
+        ComplianceSellerNoteRequestSupport.applyCreatePayload(
+                note,
+                request,
+                objectMapper,
+                ALLOWED_TYPES,
+                ALLOWED_PRIORITIES,
+                ALLOWED_STATUSES,
+                ALLOWED_SOURCE_MODES,
+                allowedAttachmentHosts,
+                maxAttachmentCount,
+                maxAttachmentUrlLength
+        );
         note.setCreatedBy(trimToNull(actorEmail));
         note.setUpdatedBy(trimToNull(actorEmail));
-        applyStatusTransition(note, note.getStatus(), false);
+        ComplianceSellerNoteRequestSupport.applyStatusTransition(note, note.getStatus(), false, ALLOWED_STATUSES);
         return complianceSellerNoteRepository.save(note);
     }
 
@@ -105,9 +114,21 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Transactional
     public ComplianceSellerNote update(Long noteId, UpdateComplianceSellerNoteRequest request, String actorEmail) {
         ComplianceSellerNote note = getForAdmin(noteId);
-        applyUpdatePayload(note, request);
+        ComplianceSellerNoteRequestSupport.applyUpdatePayload(
+                note,
+                request,
+                objectMapper,
+                ALLOWED_TYPES,
+                ALLOWED_PRIORITIES,
+                ALLOWED_STATUSES,
+                ALLOWED_SOURCE_MODES,
+                allowedAttachmentHosts,
+                maxAttachmentCount,
+                maxAttachmentUrlLength,
+                readAttachments(note)
+        );
         note.setUpdatedBy(trimToNull(actorEmail));
-        applyStatusTransition(note, note.getStatus(), false);
+        ComplianceSellerNoteRequestSupport.applyStatusTransition(note, note.getStatus(), false, ALLOWED_STATUSES);
         return complianceSellerNoteRepository.save(note);
     }
 
@@ -123,7 +144,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
         ComplianceSellerNote note = getForAdmin(noteId);
         note.setStatus("PUBLISHED");
         note.setUpdatedBy(trimToNull(actorEmail));
-        applyStatusTransition(note, "PUBLISHED", true);
+        ComplianceSellerNoteRequestSupport.applyStatusTransition(note, "PUBLISHED", true, ALLOWED_STATUSES);
         return complianceSellerNoteRepository.save(note);
     }
 
@@ -133,7 +154,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
         ComplianceSellerNote note = getForAdmin(noteId);
         note.setStatus("ARCHIVED");
         note.setUpdatedBy(trimToNull(actorEmail));
-        applyStatusTransition(note, "ARCHIVED", true);
+        ComplianceSellerNoteRequestSupport.applyStatusTransition(note, "ARCHIVED", true, ALLOWED_STATUSES);
         return complianceSellerNoteRepository.save(note);
     }
 
@@ -195,9 +216,15 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Override
     @Transactional
     public void markRead(Long sellerId, Long noteId) {
-        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
+        ComplianceSellerNoteRead readEntry = ComplianceSellerNoteRequestSupport.getOrCreateReadEntry(
+                sellerId,
+                noteId,
+                complianceSellerNoteRepository,
+                complianceSellerNoteReadRepository,
+                sellerRepository
+        );
         readEntry.setRead(true);
-        readEntry.setReadAt(LocalDateTime.now());
+        readEntry.setReadAt(java.time.LocalDateTime.now());
         readEntry.setUnreadAt(null);
         complianceSellerNoteReadRepository.save(readEntry);
     }
@@ -205,23 +232,35 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Override
     @Transactional
     public void markUnread(Long sellerId, Long noteId) {
-        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
+        ComplianceSellerNoteRead readEntry = ComplianceSellerNoteRequestSupport.getOrCreateReadEntry(
+                sellerId,
+                noteId,
+                complianceSellerNoteRepository,
+                complianceSellerNoteReadRepository,
+                sellerRepository
+        );
         readEntry.setRead(false);
-        readEntry.setUnreadAt(LocalDateTime.now());
+        readEntry.setUnreadAt(java.time.LocalDateTime.now());
         complianceSellerNoteReadRepository.save(readEntry);
     }
 
     @Override
     @Transactional
     public void markAcknowledged(Long sellerId, Long noteId) {
-        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
+        ComplianceSellerNoteRead readEntry = ComplianceSellerNoteRequestSupport.getOrCreateReadEntry(
+                sellerId,
+                noteId,
+                complianceSellerNoteRepository,
+                complianceSellerNoteReadRepository,
+                sellerRepository
+        );
         if (!readEntry.isRead()) {
             readEntry.setRead(true);
-            readEntry.setReadAt(LocalDateTime.now());
+            readEntry.setReadAt(java.time.LocalDateTime.now());
             readEntry.setUnreadAt(null);
         }
         readEntry.setAcknowledged(true);
-        readEntry.setAcknowledgedAt(LocalDateTime.now());
+        readEntry.setAcknowledgedAt(java.time.LocalDateTime.now());
         readEntry.setUnacknowledgedAt(null);
         complianceSellerNoteReadRepository.save(readEntry);
     }
@@ -229,9 +268,15 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Override
     @Transactional
     public void markUnacknowledged(Long sellerId, Long noteId) {
-        ComplianceSellerNoteRead readEntry = getOrCreateReadEntry(sellerId, noteId);
+        ComplianceSellerNoteRead readEntry = ComplianceSellerNoteRequestSupport.getOrCreateReadEntry(
+                sellerId,
+                noteId,
+                complianceSellerNoteRepository,
+                complianceSellerNoteReadRepository,
+                sellerRepository
+        );
         readEntry.setAcknowledged(false);
-        readEntry.setUnacknowledgedAt(LocalDateTime.now());
+        readEntry.setUnacknowledgedAt(java.time.LocalDateTime.now());
         complianceSellerNoteReadRepository.save(readEntry);
     }
 
@@ -321,45 +366,18 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
             Map<String, Object> eventPayload,
             String actorEmail
     ) {
-        String normalizedEventType = trimToNull(eventType);
-        if (normalizedEventType == null) {
-            throw new IllegalArgumentException("Event type is required");
-        }
-
-        Map<String, Object> payload = eventPayload == null ? Map.of() : eventPayload;
-        String noteType = normalizeWithFallback(valueAsString(payload, "noteType"), "POLICY", ALLOWED_TYPES, "Unsupported note type");
-        String priority = normalizeWithFallback(valueAsString(payload, "priority"), "HIGH", ALLOWED_PRIORITIES, "Unsupported note priority");
-        String title = firstNonBlank(
-                valueAsString(payload, "title"),
-                "Auto Draft: " + normalizedEventType.replace('_', ' ')
+        ComplianceSellerNote note = ComplianceSellerNoteRequestSupport.createAutoDraftNote(
+                eventType,
+                eventPayload,
+                actorEmail,
+                ALLOWED_TYPES,
+                ALLOWED_PRIORITIES,
+                ALLOWED_STATUSES,
+                objectMapper,
+                allowedAttachmentHosts,
+                maxAttachmentCount,
+                maxAttachmentUrlLength
         );
-        String summary = firstNonBlank(
-                valueAsString(payload, "summary"),
-                "Compliance update captured from backend event: " + normalizedEventType
-        );
-        String fullNote = firstNonBlank(
-                valueAsString(payload, "fullNote"),
-                summary + "\n\nReview this draft before publish."
-        );
-        String businessEmail = firstNonBlank(valueAsString(payload, "businessEmail"), "compliance@yourbusiness.com");
-
-        ComplianceSellerNote note = new ComplianceSellerNote();
-        note.setTitle(trimRequired(title, "Title is required"));
-        note.setNoteType(noteType);
-        note.setPriority(priority);
-        note.setShortSummary(trimRequired(summary, "Short summary is required"));
-        note.setFullNote(trimRequired(fullNote, "Full note is required"));
-        note.setEffectiveDate(valueAsLocalDate(payload.get("effectiveDate")));
-        note.setActionRequired(trimToNull(valueAsString(payload, "actionRequired")));
-        note.setAffectedCategory(trimToNull(valueAsString(payload, "affectedCategory")));
-        note.setBusinessEmail(trimRequired(businessEmail, "Business email is required"));
-        note.setStatus("DRAFT");
-        note.setPinned(false);
-        note.setSourceMode("AUTO_DRAFT");
-        note.setAttachmentsJson(writeAttachments(List.of()));
-        note.setCreatedBy(trimToNull(actorEmail) == null ? "system_auto_draft" : trimToNull(actorEmail));
-        note.setUpdatedBy(note.getCreatedBy());
-        applyStatusTransition(note, "DRAFT", false);
         return complianceSellerNoteRepository.save(note);
     }
 
@@ -385,7 +403,7 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
     @Override
     @Transactional(readOnly = true)
     public Map<String, Object> getAttachmentForSeller(Long sellerId, Long noteId, String attachmentId) {
-        getSeller(sellerId);
+        ComplianceSellerNoteRequestSupport.getSeller(sellerId, sellerRepository);
         ComplianceSellerNote note = getForSeller(noteId);
         return findAttachment(note, attachmentId);
     }
@@ -409,101 +427,6 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
                 .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
     }
 
-    private ComplianceSellerNoteRead getOrCreateReadEntry(Long sellerId, Long noteId) {
-        ComplianceSellerNote note = getForSeller(noteId);
-        Seller seller = getSeller(sellerId);
-        ComplianceSellerNoteRead readEntry = complianceSellerNoteReadRepository
-                .findBySeller_IdAndNote_Id(seller.getId(), note.getId())
-                .orElseGet(ComplianceSellerNoteRead::new);
-        readEntry.setNote(note);
-        readEntry.setSeller(seller);
-        return readEntry;
-    }
-
-    private Seller getSeller(Long sellerId) {
-        return sellerRepository.findById(sellerId)
-                .orElseThrow(() -> new IllegalArgumentException("Seller not found"));
-    }
-
-    private void applyCreatePayload(ComplianceSellerNote note, CreateComplianceSellerNoteRequest request) {
-        validateRequest(request);
-        note.setTitle(trimRequired(request.getTitle(), "Title is required"));
-        note.setNoteType(normalizeRequired(request.getNoteType(), ALLOWED_TYPES, "Unsupported note type"));
-        note.setPriority(normalizeRequired(request.getPriority(), ALLOWED_PRIORITIES, "Unsupported note priority"));
-        note.setShortSummary(trimRequired(request.getShortSummary(), "Short summary is required"));
-        note.setFullNote(trimRequired(request.getFullNote(), "Full note is required"));
-        note.setEffectiveDate(request.getEffectiveDate());
-        note.setActionRequired(trimToNull(request.getActionRequired()));
-        note.setAffectedCategory(trimToNull(request.getAffectedCategory()));
-        note.setBusinessEmail(trimRequired(request.getBusinessEmail(), "Business email is required"));
-        note.setPinned(Boolean.TRUE.equals(request.getPinned()));
-        note.setSourceMode(normalizeWithFallback(request.getSourceMode(), "MANUAL", ALLOWED_SOURCE_MODES, "Unsupported source mode"));
-        note.setStatus(normalizeWithFallback(request.getStatus(), "DRAFT", ALLOWED_STATUSES, "Unsupported note status"));
-        note.setAttachmentsJson(writeAttachments(request.getAttachments()));
-    }
-
-    private void applyUpdatePayload(ComplianceSellerNote note, UpdateComplianceSellerNoteRequest request) {
-        validateRequest(request);
-        note.setTitle(trimRequired(request.getTitle(), "Title is required"));
-        note.setNoteType(normalizeRequired(request.getNoteType(), ALLOWED_TYPES, "Unsupported note type"));
-        note.setPriority(normalizeRequired(request.getPriority(), ALLOWED_PRIORITIES, "Unsupported note priority"));
-        note.setShortSummary(trimRequired(request.getShortSummary(), "Short summary is required"));
-        note.setFullNote(trimRequired(request.getFullNote(), "Full note is required"));
-        note.setEffectiveDate(request.getEffectiveDate());
-        note.setActionRequired(trimToNull(request.getActionRequired()));
-        note.setAffectedCategory(trimToNull(request.getAffectedCategory()));
-        note.setBusinessEmail(trimRequired(request.getBusinessEmail(), "Business email is required"));
-        note.setPinned(Boolean.TRUE.equals(request.getPinned()));
-        note.setSourceMode(normalizeWithFallback(
-                request.getSourceMode(),
-                note.getSourceMode() == null ? "MANUAL" : note.getSourceMode(),
-                ALLOWED_SOURCE_MODES,
-                "Unsupported source mode"
-        ));
-        note.setStatus(normalizeWithFallback(
-                request.getStatus(),
-                note.getStatus() == null ? "DRAFT" : note.getStatus(),
-                ALLOWED_STATUSES,
-                "Unsupported note status"
-        ));
-        note.setAttachmentsJson(writeAttachments(resolveUpdatedAttachments(note, request.getAttachments())));
-    }
-
-    private void validateRequest(CreateComplianceSellerNoteRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("Compliance note payload is required");
-        }
-    }
-
-    private void validateRequest(UpdateComplianceSellerNoteRequest request) {
-        if (request == null) {
-            throw new IllegalArgumentException("Compliance note payload is required");
-        }
-    }
-
-    private void applyStatusTransition(ComplianceSellerNote note, String status, boolean forceTimestamp) {
-        String normalizedStatus = normalizeWithFallback(status, "DRAFT", ALLOWED_STATUSES, "Unsupported note status");
-        LocalDateTime now = LocalDateTime.now();
-        note.setStatus(normalizedStatus);
-
-        if ("PUBLISHED".equals(normalizedStatus)) {
-            if (forceTimestamp || note.getPublishedAt() == null) {
-                note.setPublishedAt(now);
-            }
-            note.setArchivedAt(null);
-            return;
-        }
-
-        if ("ARCHIVED".equals(normalizedStatus)) {
-            if (forceTimestamp || note.getArchivedAt() == null) {
-                note.setArchivedAt(now);
-            }
-            return;
-        }
-
-        note.setArchivedAt(null);
-    }
-
     private boolean containsQuery(ComplianceSellerNote note, String normalizedQuery) {
         return ComplianceSellerNoteValueSupport.containsQuery(note, normalizedQuery);
     }
@@ -520,16 +443,6 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
         return ComplianceSellerNoteValueSupport.noteComparator();
     }
 
-    private String writeAttachments(List<Map<String, Object>> attachments) {
-        return ComplianceSellerNoteAttachmentSupport.writeAttachments(
-                attachments,
-                objectMapper,
-                allowedAttachmentHosts,
-                maxAttachmentCount,
-                maxAttachmentUrlLength
-        );
-    }
-
     private String normalizeTab(String tab) {
         return ComplianceSellerNoteValueSupport.normalizeTab(tab);
     }
@@ -538,20 +451,8 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
         return ComplianceSellerNoteValueSupport.normalizeQuery(query);
     }
 
-    private String normalizeRequired(String value, Set<String> allowed, String errorMessage) {
-        return ComplianceSellerNoteValueSupport.normalizeRequired(value, allowed, errorMessage);
-    }
-
-    private String normalizeWithFallback(String value, String fallback, Set<String> allowed, String errorMessage) {
-        return ComplianceSellerNoteValueSupport.normalizeWithFallback(value, fallback, allowed, errorMessage);
-    }
-
     private void assertAllowed(String value, Set<String> allowed, String errorMessage) {
         ComplianceSellerNoteValueSupport.assertAllowed(value, allowed, errorMessage);
-    }
-
-    private String trimRequired(String value, String errorMessage) {
-        return ComplianceSellerNoteValueSupport.trimRequired(value, errorMessage);
     }
 
     private String trimToNull(String value) {
@@ -560,36 +461,6 @@ public class ComplianceSellerNoteServiceImpl implements ComplianceSellerNoteServ
 
     private String normalizeNullable(String value) {
         return ComplianceSellerNoteValueSupport.normalizeNullable(value);
-    }
-
-    private String lower(String value) {
-        return ComplianceSellerNoteValueSupport.lower(value);
-    }
-
-    private String normalizeCategoryKey(String value) {
-        return ComplianceSellerNoteValueSupport.normalizeCategoryKey(value);
-    }
-
-    private String firstNonBlank(String first, String second) {
-        return ComplianceSellerNoteValueSupport.firstNonBlank(first, second);
-    }
-
-    private String valueAsString(Map<String, Object> payload, String key) {
-        return ComplianceSellerNoteValueSupport.valueAsString(payload, key);
-    }
-
-    private LocalDate valueAsLocalDate(Object value) {
-        return ComplianceSellerNoteValueSupport.valueAsLocalDate(value);
-    }
-
-    private List<Map<String, Object>> resolveUpdatedAttachments(
-            ComplianceSellerNote existingNote,
-            List<Map<String, Object>> incomingAttachments
-    ) {
-        return ComplianceSellerNoteAttachmentSupport.resolveUpdatedAttachments(
-                readAttachments(existingNote),
-                incomingAttachments
-        );
     }
 
     private String sanitizeAttachmentId(String value) {

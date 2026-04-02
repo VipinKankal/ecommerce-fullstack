@@ -7,7 +7,13 @@ import com.example.ecommerce.common.domain.PaymentStatus;
 import com.example.ecommerce.common.domain.PaymentType;
 import com.example.ecommerce.inventory.service.InventoryService;
 import com.example.ecommerce.inventory.service.RestockNotificationService;
-import com.example.ecommerce.modal.*;
+import com.example.ecommerce.modal.Address;
+import com.example.ecommerce.modal.Cart;
+import com.example.ecommerce.modal.CartItem;
+import com.example.ecommerce.modal.Order;
+import com.example.ecommerce.modal.OrderItem;
+import com.example.ecommerce.modal.User;
+import com.example.ecommerce.order.service.OrderService;
 import com.example.ecommerce.order.service.OrderTaxSnapshotService;
 import com.example.ecommerce.repository.AddressRepository;
 import com.example.ecommerce.repository.CartRepository;
@@ -15,14 +21,16 @@ import com.example.ecommerce.repository.OrderItemRepository;
 import com.example.ecommerce.repository.OrderRepository;
 import com.example.ecommerce.repository.ProductRepository;
 import com.example.ecommerce.repository.ProductVariantRepository;
-import com.example.ecommerce.order.service.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -51,107 +59,35 @@ public class OrderServiceImpl implements OrderService {
             PaymentProvider provider
     ) {
         Address address = addressRepository.save(shippingAddress);
-        Map<Long, List<CartItem>> itemsByBrand = cart.getCartItems().stream()
-                .collect(Collectors.groupingBy(item -> item.getProduct().getSeller().getId()));
+        Map<Long, List<CartItem>> itemsByBrand = OrderServiceSupport.groupItemsBySeller(cart);
         Set<Order> orders = new HashSet<>();
         List<Map.Entry<Long, List<CartItem>>> sellerEntries = new ArrayList<>(itemsByBrand.entrySet());
-        int subtotalBeforeCoupon = cart.getCartItems().stream()
-                .map(CartItem::getSellingPrice)
-                .filter(Objects::nonNull)
-                .mapToInt(Integer::intValue)
-                .sum();
-        int remainingCouponDiscount = (int) Math.round(
-                cart.getCouponDiscountAmount() == null ? 0.0 : cart.getCouponDiscountAmount()
-        );
+        int subtotalBeforeCoupon = OrderServiceSupport.calculateCartSubtotal(cart);
+        double totalCouponDiscount = cart.getCouponDiscountAmount() == null ? 0.0 : cart.getCouponDiscountAmount();
+        int remainingCouponDiscount = (int) Math.round(totalCouponDiscount);
 
         for (int index = 0; index < sellerEntries.size(); index++) {
             Map.Entry<Long, List<CartItem>> entry = sellerEntries.get(index);
-            Long sellerId = entry.getKey();
             List<CartItem> items = entry.getValue();
-            int sellerSubtotal = items.stream()
-                    .map(CartItem::getSellingPrice)
-                    .filter(Objects::nonNull)
-                    .mapToInt(Integer::intValue)
-                    .sum();
-            int totalOrderMrp = items.stream()
-                    .map(CartItem::getMrpPrice)
-                    .filter(Objects::nonNull)
-                    .mapToInt(Integer::intValue)
-                    .sum();
-            int totalItem = items.stream().mapToInt(CartItem::getQuantity).sum();
-            int sellerCouponDiscount;
-            if (index == sellerEntries.size() - 1) {
-                sellerCouponDiscount = remainingCouponDiscount;
-            } else if (subtotalBeforeCoupon <= 0 || remainingCouponDiscount <= 0) {
-                sellerCouponDiscount = 0;
-            } else {
-                sellerCouponDiscount = (int) Math.round(
-                        (double) sellerSubtotal * (cart.getCouponDiscountAmount() == null ? 0.0 : cart.getCouponDiscountAmount())
-                                / subtotalBeforeCoupon
-                );
-                sellerCouponDiscount = Math.min(sellerCouponDiscount, remainingCouponDiscount);
-            }
+            int sellerSubtotal = OrderServiceSupport.calculateSellerSubtotal(items);
+            int sellerCouponDiscount = OrderServiceSupport.calculateCouponDiscountShare(index, sellerEntries.size(), sellerSubtotal, totalCouponDiscount, subtotalBeforeCoupon, remainingCouponDiscount);
             remainingCouponDiscount -= sellerCouponDiscount;
 
-            Order createOrder = new Order();
-            createOrder.setUser(user);
-            createOrder.setSellerId(sellerId);
-            createOrder.setTotalMrpPrice(totalOrderMrp);
-            createOrder.setTotalSellingPrice(Math.max(0, sellerSubtotal - sellerCouponDiscount));
-            createOrder.setDiscount(sellerCouponDiscount);
-            createOrder.setCouponCode(cart.getCouponCode());
-            createOrder.setTotalItems(totalItem);
-            createOrder.setShippingAddress(address);
-            createOrder.setOrderStatus(orderStatus);
-            createOrder.setPaymentStatus(paymentStatus);
-            createOrder.setPaymentMethod(paymentMethod);
-            createOrder.setPaymentType(paymentType);
-            createOrder.setProvider(provider);
-
-            Order savedOrder = orderRepository.save(createOrder);
+            Order savedOrder = saveSellerOrder(user, address, entry.getKey(), items, orderStatus, paymentStatus, paymentMethod, paymentType, provider, sellerSubtotal, sellerCouponDiscount, cart.getCouponCode());
             orders.add(savedOrder);
 
-            List<OrderItem> orderItems = new ArrayList<>();
-            for (CartItem item : items) {
-                OrderItem orderItem = new OrderItem();
-                orderItem.setOrder(savedOrder);
-                orderItem.setMrpPrice(item.getMrpPrice());
-                orderItem.setProduct(item.getProduct());
-                orderItem.setQuantity(item.getQuantity());
-                orderItem.setSize(item.getSize());
-                orderItem.setUserId(item.getUserId());
-                orderItem.setSellingPrice(item.getSellingPrice());
-                savedOrder.getOrderItems().add(orderItem);
-                OrderItem savedOrderItem = orderItemRepository.save(orderItem);
-                deductVariantWarehouseStock(item.getProduct(), item.getSize(), item.getQuantity());
-                inventoryService.deductWarehouseStockForOrder(
-                        item.getProduct(),
-                        item.getQuantity(),
-                        savedOrderItem.getId()
-                );
-                restockNotificationService.markSubscriptionConverted(user, item.getProduct());
-                orderItems.add(savedOrderItem);
-            }
-
+            List<OrderItem> orderItems = createAndPersistOrderItems(savedOrder, items);
             orderTaxSnapshotService.freezeSnapshot(savedOrder, orderItems, sellerCouponDiscount);
         }
 
-        // Once order is created, clear purchased items from cart.
-        cart.getCartItems().clear();
-        cart.setTotalItems(0);
-        cart.setTotalMrpPrice(0);
-        cart.setTotalSellingPrice(0);
-        cart.setDiscount(0);
-        cart.setCouponCode(null);
+        OrderServiceSupport.clearPurchasedCart(cart);
         cartRepository.save(cart);
-
         return orders;
     }
 
     @Override
     public Order findOrderById(long id) throws Exception {
-        return orderRepository.findDetailedById(id).orElseThrow(
-                () -> new Exception("Order not found"));
+        return orderRepository.findDetailedById(id).orElseThrow(() -> new Exception("Order not found"));
     }
 
     @Override
@@ -167,24 +103,18 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public Order updateOrderStatus(Long orderId, OrderStatus status) throws Exception {
         Order order = findOrderById(orderId);
-        order.setOrderStatus(status);
         if (status == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
             order.setDeliveredAt(LocalDateTime.now());
         }
+        order.setOrderStatus(status);
         return orderRepository.save(order);
     }
 
     @Override
     public Order updateOrderStatusByAdmin(Long orderId, OrderStatus status) throws Exception {
         Order order = findOrderById(orderId);
-        validateAdminStatusTransition(order.getOrderStatus(), status);
-        order.setOrderStatus(status);
-        if (status == OrderStatus.SHIPPED && order.getShippedAt() == null) {
-            order.setShippedAt(LocalDateTime.now());
-        }
-        if (status == OrderStatus.DELIVERED && order.getDeliveredAt() == null) {
-            order.setDeliveredAt(LocalDateTime.now());
-        }
+        OrderServiceSupport.validateAdminStatusTransition(order.getOrderStatus(), status);
+        OrderServiceSupport.stampStatusTransition(order, status);
         return orderRepository.save(order);
     }
 
@@ -202,7 +132,7 @@ public class OrderServiceImpl implements OrderService {
         order.setOrderStatus(OrderStatus.CANCELLED);
         order.setCancelReasonCode(cancelReasonCode);
         order.setCancelReasonText(cancelReasonText);
-        order.setCancelledAt(java.time.LocalDateTime.now());
+        order.setCancelledAt(LocalDateTime.now());
         return orderRepository.save(order);
     }
 
@@ -224,19 +154,7 @@ public class OrderServiceImpl implements OrderService {
 
         if (order.getOrderItems() != null) {
             for (OrderItem orderItem : order.getOrderItems()) {
-                if (orderItem.getProduct() != null) {
-                    restoreVariantWarehouseStock(
-                            orderItem.getProduct(),
-                            orderItem.getSize(),
-                            orderItem.getQuantity()
-                    );
-                    inventoryService.restoreWarehouseStockFromCancellation(
-                            orderItem.getProduct(),
-                            orderItem.getQuantity(),
-                            orderItem.getId(),
-                            "Admin cancelled order and stock returned to warehouse"
-                    );
-                }
+                OrderServiceSupport.restoreOrderItemStock(orderItem, productVariantRepository, productRepository, inventoryService);
             }
         }
 
@@ -245,69 +163,47 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     public OrderItem getOrderItemById(Long id) throws Exception {
-        return orderItemRepository.findDetailedById(id).orElseThrow(
-                () -> new Exception("Order Item not found"));
+        return orderItemRepository.findDetailedById(id).orElseThrow(() -> new Exception("Order Item not found"));
     }
 
-    private void deductVariantWarehouseStock(Product product, String size, int quantity) {
-        if (product == null || product.getId() == null || size == null || size.isBlank()) {
-            return;
-        }
-        productVariantRepository.findByProductIdAndSizeIgnoreCase(product.getId(), size.trim())
-                .ifPresent(variant -> {
-                    int available = Math.max(variant.getWarehouseStock() == null ? 0 : variant.getWarehouseStock(), 0);
-                    if (available < quantity) {
-                        throw new IllegalArgumentException("Selected size is not available in requested quantity");
-                    }
-                    variant.setWarehouseStock(available - quantity);
-                    productVariantRepository.save(variant);
-                    productRepository.save(product);
-                });
+    private Order saveSellerOrder(
+            User user,
+            Address address,
+            Long sellerId,
+            List<CartItem> items,
+            OrderStatus orderStatus,
+            PaymentStatus paymentStatus,
+            PaymentMethod paymentMethod,
+            PaymentType paymentType,
+            PaymentProvider provider,
+            int sellerSubtotal,
+            int sellerCouponDiscount,
+            String couponCode
+    ) {
+        Order order = new Order();
+        order.setUser(user);
+        order.setSellerId(sellerId);
+        order.setTotalMrpPrice(OrderServiceSupport.calculateSellerMrpTotal(items));
+        order.setTotalSellingPrice(Math.max(0, sellerSubtotal - sellerCouponDiscount));
+        order.setDiscount(sellerCouponDiscount);
+        order.setCouponCode(couponCode);
+        order.setTotalItems(OrderServiceSupport.calculateTotalItemCount(items));
+        order.setShippingAddress(address);
+        order.setOrderStatus(orderStatus);
+        order.setPaymentStatus(paymentStatus);
+        order.setPaymentMethod(paymentMethod);
+        order.setPaymentType(paymentType);
+        order.setProvider(provider);
+        return orderRepository.save(order);
     }
 
-    private void restoreVariantWarehouseStock(Product product, String size, int quantity) {
-        if (product == null || product.getId() == null || size == null || size.isBlank()) {
-            return;
+    private List<OrderItem> createAndPersistOrderItems(Order savedOrder, List<CartItem> items) {
+        List<OrderItem> orderItems = new ArrayList<>();
+        for (CartItem item : items) {
+            OrderItem orderItem = OrderServiceSupport.createOrderItem(savedOrder, item);
+            OrderItem savedOrderItem = OrderServiceSupport.persistAndAllocateOrderItem(orderItem, orderItemRepository, productVariantRepository, productRepository, inventoryService, restockNotificationService);
+            orderItems.add(savedOrderItem);
         }
-        productVariantRepository.findByProductIdAndSizeIgnoreCase(product.getId(), size.trim())
-                .ifPresent(variant -> {
-                    int available = Math.max(variant.getWarehouseStock() == null ? 0 : variant.getWarehouseStock(), 0);
-                    variant.setWarehouseStock(available + quantity);
-                    productVariantRepository.save(variant);
-                    productRepository.save(product);
-                });
-    }
-
-    private void validateAdminStatusTransition(OrderStatus currentStatus, OrderStatus nextStatus) {
-        if (currentStatus == OrderStatus.CANCELLED
-                || currentStatus == OrderStatus.DELIVERED
-                || currentStatus == OrderStatus.SHIPPED
-                || currentStatus == OrderStatus.OUT_FOR_DELIVERY) {
-            throw new IllegalArgumentException("Order status can no longer be changed from " + currentStatus);
-        }
-
-        if (nextStatus == OrderStatus.CONFIRMED
-                && currentStatus != OrderStatus.INITIATED
-                && currentStatus != OrderStatus.PENDING
-                && currentStatus != OrderStatus.PLACED) {
-            throw new IllegalArgumentException("Only placed orders can be confirmed");
-        }
-
-        if (nextStatus == OrderStatus.PACKED && currentStatus != OrderStatus.CONFIRMED) {
-            throw new IllegalArgumentException("Only confirmed orders can be packed");
-        }
-
-        if (nextStatus == OrderStatus.SHIPPED
-                && currentStatus != OrderStatus.PACKED
-                && currentStatus != OrderStatus.CONFIRMED) {
-            throw new IllegalArgumentException("Only packed orders can be shipped");
-        }
+        return orderItems;
     }
 }
-
-
-
-
-
-
-

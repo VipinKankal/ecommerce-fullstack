@@ -60,7 +60,7 @@ public class CouponServiceImpl implements CouponService {
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
     private final CartService cartService;
-    private final Map<String, CouponCacheEntry> couponCache = new ConcurrentHashMap<>();
+    private final Map<String, CouponRuntimeSupport.CouponCacheEntry> couponCache = new ConcurrentHashMap<>();
     private final AtomicLong couponCacheHits = new AtomicLong();
     private final AtomicLong couponCacheMisses = new AtomicLong();
 
@@ -518,9 +518,7 @@ public class CouponServiceImpl implements CouponService {
 
     @Scheduled(cron = "${app.coupon.cache-evict-cron:0 */2 * * * *}")
     public void evictExpiredCouponCacheEntries() {
-        couponCache.entrySet().removeIf(entry ->
-                entry.getValue() == null || entry.getValue().isExpired()
-        );
+        CouponRuntimeSupport.evictExpiredEntries(couponCache);
     }
 
     private Cart requireCart(User user) {
@@ -532,20 +530,14 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private Coupon requireCoupon(String code) {
-        String normalizedCode = normalizeCode(code);
-        CouponCacheEntry cached = couponCache.get(normalizedCode);
-        if (cached != null && !cached.isExpired()) {
-            couponCacheHits.incrementAndGet();
-            return cached.coupon();
-        }
-        if (cached != null && cached.isExpired()) {
-            couponCache.remove(normalizedCode);
-        }
-        couponCacheMisses.incrementAndGet();
-        Coupon coupon = couponRepository.findByCodeIgnoreCase(normalizedCode)
-                .orElseThrow(() -> couponNotFound(normalizedCode));
-        putCache(coupon);
-        return coupon;
+        return CouponRuntimeSupport.requireCoupon(
+                code,
+                couponRepository,
+                couponCache,
+                couponCacheHits,
+                couponCacheMisses,
+                this::couponNotFound
+        );
     }
 
     private void validateCouponEligibility(Coupon coupon, User user, Cart cart) {
@@ -676,20 +668,11 @@ public class CouponServiceImpl implements CouponService {
     }
 
     private void putCache(Coupon coupon) {
-        if (coupon == null || coupon.getCode() == null || coupon.getCode().isBlank()) {
-            return;
-        }
-        couponCache.put(
-                coupon.getCode().trim().toUpperCase(Locale.ROOT),
-                new CouponCacheEntry(coupon, LocalDateTime.now().plusSeconds(CACHE_TTL_SECONDS))
-        );
+        CouponRuntimeSupport.putCache(coupon, couponCache, CACHE_TTL_SECONDS);
     }
 
     private void evictCache(String code) {
-        if (code == null || code.isBlank()) {
-            return;
-        }
-        couponCache.remove(code.trim().toUpperCase(Locale.ROOT));
+        CouponRuntimeSupport.evictCache(code, couponCache);
     }
 
     private CouponOperationException couponValidation(String reasonCode, String message) {
@@ -732,24 +715,15 @@ public class CouponServiceImpl implements CouponService {
             String reasonCode,
             String note
     ) {
-        try {
-            CouponEventLog eventLog = new CouponEventLog();
-            eventLog.setCouponId(couponId);
-            eventLog.setCouponCode(couponCode);
-            eventLog.setUserId(userId);
-            eventLog.setEventType(eventType);
-            eventLog.setReasonCode(reasonCode);
-            eventLog.setNote(note);
-            couponEventLogRepository.save(eventLog);
-        } catch (Exception ignored) {
-            // Coupon actions should not fail if analytics logging fails.
-        }
-    }
-
-    private record CouponCacheEntry(Coupon coupon, LocalDateTime expiresAt) {
-        private boolean isExpired() {
-            return expiresAt == null || LocalDateTime.now().isAfter(expiresAt);
-        }
+        CouponRuntimeSupport.logEvent(
+                couponId,
+                couponCode,
+                userId,
+                eventType,
+                reasonCode,
+                note,
+                couponEventLogRepository
+        );
     }
 }
 
