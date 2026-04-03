@@ -84,20 +84,7 @@ cmd /c mvnw.cmd test
 cmd /c mvnw.cmd -DskipTests compile
 ```
 
-## Windows Notes
 
-- In PowerShell, use `npm.cmd` instead of `npm` if script execution policy blocks `npm.ps1`.
-- If Maven wrapper complains about `JAVA_HOME`, set it once in the session:
 
-```powershell
-$env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.10.7-hotspot"
-$env:Path = "$env:JAVA_HOME\bin;$env:Path"
-```
-
-## Notes
-
-- Use the repository root as the main working directory for Git operations.
-- Frontend and backend each keep their own local config files inside their respective folders.
-- API and flow documentation already exists under `frontend/docs/` and `backend/docs/`.
 
 
