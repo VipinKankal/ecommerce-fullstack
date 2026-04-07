@@ -2,22 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Button,
-  Chip,
-  CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   InputAdornment,
   MenuItem,
   Paper,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from '@mui/material';
@@ -36,58 +23,27 @@ import {
 import { Product } from 'shared/types/product.types';
 import { api } from 'shared/api/Api';
 import { API_ROUTES } from 'shared/api/ApiRoutes';
+import MovementHistoryDialog from './productsTable/MovementHistoryDialog';
 import ProductEditDialog from './productsTable/ProductEditDialog';
+import {
+  buildEditForm,
+  buildTransferState,
+  getCategoryLabel,
+  getColorLabel,
+  getRecommendationMeta,
+  getSafeImage,
+  LOW_STOCK_THRESHOLD,
+} from './productsTable/ProductsTable.helpers';
 import ProductsInventoryTable from './productsTable/ProductsInventoryTable';
-import { ProductEditFormState } from './productsTable/ProductsTable.types';
-
-type StockFilter = 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
-type ProductWithOptionalSize = Product & { size?: string };
-type ProductUpdatePayload = Partial<Product> & {
-  size?: string;
-  sizes?: string;
-};
-type PickupMode = 'SELLER_DROP' | 'WAREHOUSE_PICKUP';
-type SellerDemandProductRow = {
-  productId?: number;
-  subscribedCount?: number;
-  notifiedCount?: number;
-  convertedCount?: number;
-};
-type SellerDemandInsights = {
-  pendingSubscribers?: number;
-  notifiedSubscribers?: number;
-  convertedSubscribers?: number;
-  demandProducts?: SellerDemandProductRow[];
-};
-type SellerMovementRow = {
-  id: number;
-  action?: string;
-  from?: string;
-  to?: string;
-  quantity?: number;
-  movementType?: string;
-  requestType?: string;
-  addedBy?: string;
-  updatedBy?: string;
-  note?: string;
-  createdAt?: string;
-};
-type SellerRecommendationMeta = {
-  recommendedQty: number;
-  headline: string;
-  detail: string;
-  tone: 'success' | 'warning' | 'error' | 'info';
-  variantHighlights: string[];
-};
-
-const LOW_STOCK_THRESHOLD = 5;
-const formatDateTime = (value?: string | null) => {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
-};
-const prettify = (value?: string | null) => (value || '-').replaceAll('_', ' ');
+import TransferRequestDialog from './productsTable/TransferRequestDialog';
+import {
+  PickupMode,
+  ProductEditFormState,
+  ProductUpdatePayload,
+  SellerDemandInsights,
+  SellerMovementRow,
+  StockFilter,
+} from './productsTable/ProductsTable.types';
 
 const ProductsTable = () => {
   const dispatch = useAppDispatch();
@@ -221,109 +177,9 @@ const ProductsTable = () => {
     });
   }, [products, searchQuery, stockFilter]);
 
-  const getSafeImage = (image?: string) => {
-    if (!image || image.startsWith('blob:')) return '/no-image.png';
-    return image;
-  };
-
-  const getColorLabel = (color: unknown) =>
-    typeof color === 'string'
-      ? color
-      : color && typeof color === 'object' && 'name' in color
-        ? String((color as { name?: unknown }).name || 'N/A')
-        : 'N/A';
-
-  const getCategoryLabel = (product: Product) =>
-    product.category?.name ||
-    product.category?.categoryId?.replace(/_/g, ' ') ||
-    'N/A';
-
-  const getRecommendationMeta = (product: Product): SellerRecommendationMeta => {
-    const sellerStock = Number(product.sellerStock ?? 0);
-    const warehouseStock = Number(product.warehouseStock ?? product.quantity ?? 0);
-    const demand = demandByProductId.get(Number(product.id)) || {
-      waiting: 0,
-      notified: 0,
-      converted: 0,
-    };
-    const targetWarehouseStock = Math.max(LOW_STOCK_THRESHOLD, demand.waiting);
-    const recommendedQty = Math.max(
-      0,
-      Math.min(sellerStock, targetWarehouseStock - warehouseStock),
-    );
-    const variantHighlights = (product.variants || [])
-      .map((variant) => {
-        const label =
-          variant.size || variant.variantValue || variant.sku || `Variant ${variant.id}`;
-        const variantSellerStock = Number(variant.sellerStock ?? 0);
-        const variantWarehouseStock = Number(variant.warehouseStock ?? 0);
-
-        if (variantWarehouseStock <= 0 && variantSellerStock > 0) {
-          return `${label}: send soon`;
-        }
-        if (variantWarehouseStock <= 0) {
-          return `${label}: empty`;
-        }
-        if (variantWarehouseStock <= LOW_STOCK_THRESHOLD) {
-          return `${label}: ${variantWarehouseStock} left`;
-        }
-        return '';
-      })
-      .filter(Boolean)
-      .slice(0, 2);
-
-    if (sellerStock <= 0) {
-      return {
-        recommendedQty: 0,
-        headline: 'Seller stock unavailable',
-        detail: demand.waiting > 0
-          ? `${demand.waiting} users are waiting but seller stock is empty.`
-          : 'No units available to send right now.',
-        tone: 'error',
-        variantHighlights,
-      };
-    }
-
-    if (recommendedQty > 0) {
-      return {
-        recommendedQty,
-        headline:
-          warehouseStock <= 0 ? 'Send to warehouse now' : 'Top up warehouse stock',
-        detail:
-          demand.waiting > 0
-            ? `${demand.waiting} users are waiting. Recommended transfer ${recommendedQty} units.`
-            : `Threshold top-up recommended: ${recommendedQty} units.`,
-        tone: warehouseStock <= 0 ? 'warning' : 'info',
-        variantHighlights,
-      };
-    }
-
-    return {
-      recommendedQty: 0,
-      headline: 'Warehouse stock healthy',
-      detail:
-        demand.waiting > 0
-          ? `${demand.waiting} users waiting, but warehouse can still cover demand.`
-          : 'No transfer recommendation right now.',
-      tone: 'success',
-      variantHighlights,
-    };
-  };
-
   const openEdit = (row: Product) => {
     setEditProduct(row);
-    setEditForm({
-      title: row.title || '',
-      brand: row.brand || '',
-      description: row.description || '',
-      sellingPrice: String(row.sellingPrice ?? ''),
-      mrpPrice: String(row.mrpPrice ?? ''),
-      quantity: String(row.sellerStock ?? 0),
-      color: getColorLabel(row.color),
-      sizes: (row as ProductWithOptionalSize).size || row.sizes || '',
-      warrantyType: row.warrantyType || 'NONE',
-      warrantyDays: String(row.warrantyDays ?? 0),
-    });
+    setEditForm(buildEditForm(row));
   };
 
   const closeEdit = () => {
@@ -332,17 +188,19 @@ const ProductsTable = () => {
 
   const openTransfer = (product: Product) => {
     setTransferProduct(product);
-    setTransferQuantity('1');
-    setTransferPickupMode('WAREHOUSE_PICKUP');
-    setTransferSellerNote('');
+    const nextTransfer = buildTransferState();
+    setTransferQuantity(nextTransfer.quantity);
+    setTransferPickupMode(nextTransfer.pickupMode);
+    setTransferSellerNote(nextTransfer.sellerNote);
     setTransferFeedback(null);
   };
 
   const closeTransfer = () => {
     setTransferProduct(null);
-    setTransferQuantity('1');
-    setTransferPickupMode('WAREHOUSE_PICKUP');
-    setTransferSellerNote('');
+    const nextTransfer = buildTransferState();
+    setTransferQuantity(nextTransfer.quantity);
+    setTransferPickupMode(nextTransfer.pickupMode);
+    setTransferSellerNote(nextTransfer.sellerNote);
   };
 
   const handleToggleActive = async (product: Product) => {
@@ -382,11 +240,7 @@ const ProductsTable = () => {
       color: editForm.color.trim() || getColorLabel(editProduct.color),
       description: editForm.description.trim() || editProduct.description,
       images: editProduct.images ?? [],
-      sizes:
-        editForm.sizes.trim() ||
-        (editProduct as ProductWithOptionalSize).size ||
-        editProduct.sizes ||
-        '',
+      sizes: editForm.sizes.trim() || editProduct.sizes || '',
       sellingPrice: Number.isFinite(parsedSellingPrice)
         ? parsedSellingPrice
         : editProduct.sellingPrice,
@@ -400,11 +254,7 @@ const ProductsTable = () => {
       quantity: Number.isFinite(parsedQuantity)
         ? parsedQuantity
         : editProduct.sellerStock ?? 0,
-      size:
-        editForm.sizes.trim() ||
-        (editProduct as ProductWithOptionalSize).size ||
-        editProduct.sizes ||
-        '',
+      size: editForm.sizes.trim() || editProduct.sizes || '',
     };
 
     try {
@@ -636,7 +486,9 @@ const ProductsTable = () => {
           transferringId={transferringId}
           togglingId={togglingId}
           lowStockThreshold={LOW_STOCK_THRESHOLD}
-          getRecommendationMeta={getRecommendationMeta}
+          getRecommendationMeta={(product) =>
+            getRecommendationMeta(product, demandByProductId)
+          }
           getDemandMeta={(productId) =>
             demandByProductId.get(Number(productId)) || {
               waiting: 0,
@@ -662,168 +514,31 @@ const ProductsTable = () => {
         onSave={saveEdit}
       />
 
-      <Dialog open={Boolean(transferProduct)} onClose={closeTransfer} fullWidth maxWidth="sm">
-        <DialogTitle>Create Warehouse Transfer Request</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-            Seller transfer request banayega. Stock deduction tabhi hoga jab
-            warehouse receive mark karega.
-          </Typography>
-          <Stack spacing={2}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <TextField
-                fullWidth
-                label="Transfer Quantity"
-                type="number"
-                value={transferQuantity}
-                onChange={(event) => setTransferQuantity(event.target.value)}
-                inputProps={{
-                  min: 1,
-                  max: Number(transferProduct?.sellerStock ?? 0),
-                }}
-              />
-              <TextField
-                select
-                fullWidth
-                label="Pickup Mode"
-                value={transferPickupMode}
-                onChange={(event) =>
-                  setTransferPickupMode(event.target.value as PickupMode)
-                }
-              >
-                <MenuItem value="WAREHOUSE_PICKUP">Warehouse Pickup</MenuItem>
-                <MenuItem value="SELLER_DROP">Seller Drop</MenuItem>
-              </TextField>
-            </div>
+      <TransferRequestDialog
+        transferProduct={transferProduct}
+        transferQuantity={transferQuantity}
+        setTransferQuantity={setTransferQuantity}
+        transferPickupMode={transferPickupMode}
+        setTransferPickupMode={setTransferPickupMode}
+        transferSellerNote={transferSellerNote}
+        setTransferSellerNote={setTransferSellerNote}
+        transferringId={transferringId}
+        onClose={closeTransfer}
+        onSubmit={handleTransferSubmit}
+      />
 
-            <TextField
-              fullWidth
-              multiline
-              minRows={2}
-              label="Transfer Note (optional)"
-              value={transferSellerNote}
-              onChange={(event) => setTransferSellerNote(event.target.value)}
-              placeholder="Example: pickup address landmark, ready timing, contact person"
-            />
-
-            <Alert severity="info">
-              {transferProduct
-                ? `Available seller stock: ${transferProduct.sellerStock ?? 0}`
-                : 'Choose quantity'}
-            </Alert>
-            {transferPickupMode === 'SELLER_DROP' ? (
-              <Alert severity="success">
-                Seller drop mode: courier assign nahi hoga. Admin approval ke baad
-                seller stock warehouse par drop karega.
-              </Alert>
-            ) : (
-              <Alert severity="warning">
-                Warehouse pickup mode: admin approve ke baad manager logistics plan
-                karega, courier/transport assign karega, phir pickup hoga.
-              </Alert>
-            )}
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeTransfer}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleTransferSubmit}
-            disabled={
-              !transferProduct ||
-              transferringId === transferProduct.id ||
-              Number(transferQuantity) <= 0
-            }
-          >
-            Create Request
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(movementProduct)}
+      <MovementHistoryDialog
+        movementProduct={movementProduct}
+        movementRows={movementRows}
+        movementLoading={movementLoading}
+        movementError={movementError}
+        recommendation={
+          movementProduct
+            ? getRecommendationMeta(movementProduct, demandByProductId)
+            : null
+        }
         onClose={() => setMovementProduct(null)}
-        fullWidth
-        maxWidth="lg"
-      >
-        <DialogTitle>Stock Movement History</DialogTitle>
-        <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1 }}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <Typography variant="body2" color="text.secondary">
-                  {movementProduct?.title} | Product #{movementProduct?.id}
-                </Typography>
-                {movementProduct && (
-                  <Typography variant="caption" color="text.secondary">
-                    {getRecommendationMeta(movementProduct).detail}
-                  </Typography>
-                )}
-              </div>
-              {movementProduct && (
-                <Chip
-                  size="small"
-                  color={getRecommendationMeta(movementProduct).tone}
-                  label={getRecommendationMeta(movementProduct).headline}
-                />
-              )}
-            </div>
-            {movementError && <Alert severity="error">{movementError}</Alert>}
-            <TableContainer
-              component={Paper}
-              sx={{ borderRadius: '20px', boxShadow: 'none', border: '1px solid #eef2f7' }}
-            >
-              <Table size="small">
-                <TableHead sx={{ bgcolor: '#f8fafc' }}>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>When</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Action</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Movement</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Flow</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Qty</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Actors</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Note</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {movementLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                        <CircularProgress size={28} />
-                      </TableCell>
-                    </TableRow>
-                  ) : movementRows.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
-                        No stock history found yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    movementRows.map((movement) => (
-                      <TableRow key={movement.id} hover>
-                        <TableCell>{formatDateTime(movement.createdAt)}</TableCell>
-                        <TableCell>{prettify(movement.action)}</TableCell>
-                        <TableCell>{prettify(movement.movementType)}</TableCell>
-                        <TableCell>
-                          {movement.from || '-'} to {movement.to || '-'}
-                        </TableCell>
-                        <TableCell>{movement.quantity ?? 0}</TableCell>
-                        <TableCell>
-                          {movement.addedBy || '-'} / {movement.updatedBy || '-'}
-                        </TableCell>
-                        <TableCell>{movement.note || '-'}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setMovementProduct(null)}>Close</Button>
-        </DialogActions>
-      </Dialog>
+      />
     </div>
   );
 };
