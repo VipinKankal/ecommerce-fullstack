@@ -1,4 +1,4 @@
-hihihihihihihihihihohihihihihihihihihihi
+hihihihihihihihihihihohihihihihihihihihihi
 Ecommerce Fullstack
 
 Full-stack ecommerce application with the frontend and backend managed in a single monorepo.
